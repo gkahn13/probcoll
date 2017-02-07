@@ -1,0 +1,214 @@
+# contains all needed parameters for all files
+
+dt: 0.5
+random_seed: 0
+
+exp_dir: bebop2d
+run: prediction # gps, dagger, replay, prediction
+exp_folder: exp101
+
+#######################################################
+################ objective + optimizer ################
+#######################################################
+
+trajopt:
+  cost_velocity:
+    velocity: [0.8, 0.]
+    weights: [1., 0.2]
+
+mpc:
+  H: 4
+
+  ilqr:
+    warm_start: True
+    use_threading: False
+    max_iter: 2
+
+  cem:
+    init:
+      init_var: 5.0
+      init_M: 200
+      K: 20
+      M: 50
+      iters: 10
+    warm_start:
+      init_var: 0.1
+      init_M: 200
+      K: 20
+      M: 50
+      iters: 3
+
+##########################################
+########## Training environment ##########
+##########################################
+
+world:
+  randomize: True
+
+##################################
+########### Prediction ###########
+##################################
+
+prediction:
+  model:
+    T: 4 # how many timesteps to predict
+
+    graph_type: 'fc' # fc / cnn / rnn
+    num_bootstrap: 5 # 5
+    dropout: 0.95 # pct keep (None if no dropout)
+    reg: 0.
+
+    # what to use as input to prediction model
+    X_order: []
+    U_order: ['linearvel']
+    O_order: ['camera']
+    output_order: ['collision'] # taken from observations O
+    use_O_orth: False
+
+    # NN training parameters
+    device: 1
+    gpu_fraction: 0.4
+    reset_every_train: True # every time train is called, reinitialize weights?
+    early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
+    learning_rate: 0.001
+    batch_size: 16
+    display_batch: 5
+    epochs: 100
+    steps: 800
+    val_pct: 0.2
+
+    # how to resample data
+    aggregate_save_data: True # put all data into one file?
+    save_type: 'fixedlen' # varlen / fixedlen
+    balance:
+      type: collision # none, collision, uncertainty
+
+      collision:
+        pct_coll: 0.5
+
+  dagger:
+    T: 10 # timesteps per trajectory
+    max_iter: 10
+    planner_type: 'primitives' # primitives / teleop
+
+    control_noise:
+      type: 'zero' # zero / gaussian / OU / smoothedgaussian
+
+      zero: {}
+      gaussian:
+        std: [0.1, 0.1]
+
+    label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+
+#    init_data: '/home/gkahn/code/gps_quadrotor/experiments/bebop2d/lfd_cmd_vel_init'
+    init_epochs: 100
+
+    use_init_cost: True # TODO
+    epsilon_greedy: 0
+
+    cost_prediction:
+      weight: 1e1 # TODO
+#      eval_cost: 'speed * speed * probs_mean + speed * speed * probs_std'
+#      pre_activation: False
+
+      eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
+      pre_activation: True
+
+    conditions:
+      repeats: 20 # TODO
+      num_test: 1
+      randomize_conds: False
+      randomize_reps: True
+
+      default:
+        linearvel: [0., 0]
+
+      range:
+        linearvel:
+          min: [0, 0]
+          max: [0, 0]
+          num: [1, 1]
+
+      perturb: # repetition perturbations
+        linearvel: [0.0, 0.0]
+
+bebop:
+  topics:
+    image: '/bebop/image_raw' # sensor_msgs/Image
+    cmd_vel: '/vservo/cmd_vel' # geometry_msgs/Twist
+    measured_vel: '/bebop/states/ardrone3/PilotingState/SpeedChanged' # bebop_msgs/Ardrone3PilotingStateSpeedChanged
+    cmd_acc: '/bebop/cmd_vel' # geometry_msgs/Twist
+
+    collision: '/bebop/collision' # std_msgs/Empty
+    start_rollout: '/bebop/start_rollout' # std_msgs/Empty
+    bad_rollout: '/bebop/bad_rollout' # std_msgs/Empty
+
+    debug_image: '/bebop/debug/image' # sensor_msgs/Image
+    debug_cmd_vel: '/bebop/debug/cmd_vel' # visualization_msgs/Marker
+
+
+######################################################
+########### States, controls, observations ###########
+######################################################
+
+X:
+  dim: 2
+  order: ['linearvel']
+
+  linearvel: {idx: 0, dim: 2}
+
+U:
+  dim: 2
+  order: ['linearvel']
+
+  linearvel: {idx: 0, dim: 2}
+
+O:
+  dim: 257
+  order: ['camera', 'collision']
+
+  camera: # TODO
+    idx: 0
+    dim: 256
+    height: 16
+    width: 16
+    noise: 0.01
+  collision: {idx: 256, dim: 1, buffer: 0.0}
+
+###################
+####### LQR #######
+###################
+
+ilqr:
+  # regularization for positive definite Quu
+  mu_start: 1.0 # 1.0
+  mu_mult: 1.6
+  mu_min: 0.1
+  mu_max: 10 # 10 # Fu is very small, requires large mu to make Quu PD
+  dmu_start: 1.0
+  reg_state: True # True # new regularization scheme
+  reg_control: False # False # old one, Quu + mu * I
+
+  # line search for policy
+  alpha_start: 1.0
+  alpha_mult: 0.1
+  alpha_min: 0.00000001
+
+  # misc
+  max_exit_mu: .3
+  min_cost_delta: 0.005 # 0.05
+  max_iter: 20
+  z_min: 0.
+
+  plot: False
+
+###################
+####### CEM #######
+###################
+
+cem:
+  init_var: 0.05
+  init_M: 40 # 40
+  K: 10 # 5
+  M: 50 # 20
+  iters: 10 # 5

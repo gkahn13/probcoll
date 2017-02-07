@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="joy_dev" default="/dev/input/js0" />
+  <arg name="joy_config" default="log710" />
+  <arg name="teleop_config" default="config/$(arg joy_config).yaml" />
+  <arg name="namespace" default="bair_car" />
+
+  <group ns="$(arg namespace)">
+    <rosparam file="$(arg teleop_config)" command="load" />
+
+    <node pkg="joy" type="joy_node" name="joy_node">
+      <param name="dev" value="$(arg joy_dev)" />
+      <param name="deadzone" value="0.25" />
+      <param name="autorepeat_rate" value="60" />
+      <param name="coalesce_interval" value="0.015" />
+    </node>
+
+    <node pkg="joy_teleop" type="joy_teleop.py" name="joy_teleop">
+    </node>
+  </group>
+
+</launch>

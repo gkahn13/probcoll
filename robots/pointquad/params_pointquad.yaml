@@ -1,0 +1,296 @@
+# contains all needed parameters for all files
+
+T: 80
+dt: 0.2
+random_seed: 0
+
+exp_dir: pointquad
+run: prediction # gps, dagger, replay, prediction
+exp_folder: test
+
+#######################################################
+################ objective + optimizer ################
+#######################################################
+
+trajopt:
+  cost_velocity:
+    velocity: [0.5, 0., 0.]
+    weights: [1., 0.0, 0.]
+
+mpc:
+  H: 6
+
+  ilqr:
+    warm_start: True
+    use_threading: False
+    max_iter: 2
+
+  cem:
+    init:
+      init_var: 5.0
+      init_M: 200
+      K: 20
+      M: 50
+      iters: 10
+    warm_start:
+      init_var: 0.1
+      init_M: 200
+      K: 20
+      M: 50
+      iters: 3
+
+##########################################
+########## Training environment ##########
+##########################################
+
+world:
+  view_rave: False
+  plot: False
+  randomize: False
+
+  obstacles:
+    - type: cylinder
+      center: [1., 0., 0.5]
+      radius: 0.2
+      height: 0.4
+      texture: # '/home/gkahn/code/rll_quadrotor/models/textures/bark2.png'
+      color: [1, 0, 0]
+
+##################################
+########### Prediction ###########
+##################################
+
+prediction:
+  model:
+    T: 6 # how many timesteps to predict
+
+    graph_type: 'fc' # fc / cnn / rnn
+    num_bootstrap: 2 # TODO
+    dropout: 0.8 # pct keep (None if no dropout)
+    reg: 0.
+
+    # what to use as input to prediction model
+    X_order: []
+    U_order: ['linearvel']
+    O_order: ['camera']
+    output_order: ['collision'] # taken from observations O
+
+    # NN training parameters
+    device: 0
+    gpu_fraction: 0.3
+    reset_every_train: True # every time train is called, reinitialize weights?
+    early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
+    learning_rate: 0.001
+    batch_size: 16
+    display_batch: 20
+    epochs: 20
+    steps: 2000 # TODO
+    val_pct: 0.2
+
+    # how to resample data
+    aggregate_save_data: True # put all data into one file?
+    save_type: 'fixedlen' # varlen / fixedlen
+    balance:
+      type: collision # none, collision, uncertainty
+
+      collision:
+        pct_coll: 0.5
+
+  dagger:
+    T: 30 # timesteps per trajectory
+    max_iter: 20
+    planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
+
+    dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
+    control_noise:
+      type: 'gaussian' # zero / gaussian / OU / smoothedgaussian
+
+      zero: {}
+      gaussian:
+        std: [0.1, 0.1, 0]
+      smoothedgaussian:
+        std: [0.1, 0.1, 0]
+        T: 30
+      ou:
+        std: [0.1, 0.1, 0]
+        mean: [0.25, 0.0, 0.0]
+        theta: 0.15
+
+
+    label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
+    obs_noise: True # boolean use noise or not
+
+    init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
+    init_epochs: 20
+
+    use_ground_truth: False
+    use_init_cost: True # TODO
+    epsilon_greedy: 0
+
+    cost_prediction:
+      weight: 1e2
+#      eval_cost: 'speed * speed * probs_mean + speed * speed * probs_std'
+#      pre_activation: False
+
+      eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
+      pre_activation: True
+
+    conditions:
+      repeats: 1
+      num_test: 1
+      randomize_conds: False
+      randomize_reps: True
+
+      default:
+        position: [0, 0, 0.5]
+        orientation: [1, 0, 0, 0]
+        linearvel: [0., 0, 0]
+        angularvel: [0, 0, 0]
+
+      range:
+        position:
+          min: [0, -0.8, 0.5] # TODO -0.8
+          max: [0, 0.8, 0.5] # TODO 0.8
+          num: [1, 20, 1] # TODO
+
+      perturb: # repetition perturbations
+        position: [0.1, 0.1, 0.0] # TODO
+        orientation: [0., 0., 0.] # rpy
+        linearvel: [0.0, 0.0, 0.]
+        angularvel: [0.0, 0.0, 0.0]
+
+
+######################################################
+########### States, controls, observations ###########
+######################################################
+
+X:
+  dim: 13
+  order: ['position', 'orientation', 'linearvel', 'angularvel']
+
+  position:    {idx: 0,  dim: 3}
+  orientation: {idx: 3,  dim: 4} # wxyz
+  linearvel:   {idx: 7,  dim: 3}
+  angularvel:  {idx: 10, dim: 3}
+
+U:
+  dim: 3
+  order: ['linearvel']
+
+  linearvel: {idx: 0, dim: 3}
+
+O:
+  dim: 297
+  order: ['camera', 'cage', 'collision'] # 'camera', 'cage', 'laserscan', 'signed_distance'
+
+#  orientation: {idx: 0, dim: 4}
+#  linearvel:   {idx: 4, dim: 3}
+#  angularvel:  {idx: 7, dim: 3}
+  camera:
+    idx: 0
+    dim: 256
+    height: 16
+    width: 16
+    noise: 0.01
+  cage:
+    idx: 256
+    dim: 40
+    range: 1.5
+  collision: {idx: 296, dim: 1, buffer: 0.0}
+
+#  signed_distance: {idx: 10, dim: 400,
+#                    extents: [10., 10., 0.],
+#                    sizes: [20, 20, 1],
+#                    max_dist: 5.0}
+#  laserscan:
+#    idx: 10
+#    dim: 30
+#    fov: 3.141592653589793 # pi
+#    range: 5.0
+#  cage:
+#    idx: 40
+#    dim: 40
+#    range: 1.5
+#  camera:
+#    idx: 0
+#    dim: 256
+#    height: 16
+#    width: 16
+#    noise: 0.01
+
+############################
+######## Neural net ########
+############################
+
+# common parameters for neural network modules
+nn:
+  module: CAFFE
+
+  todo: what is common?
+  iterations: 20000 # Number of iterations of training per inner iteration
+  init_var: 0.1  # Initial policy variance
+  save_interval: 1000
+  batch_size: 50
+  ent_reg: 0.0  # Entropy regularizer
+
+caffe:
+  ### network
+#  network_model: construct_fc_network  # Either a filename string or a function to call to create NetParameter
+  weights_file_prefix: ''
+  network_arch_params:
+    n_layers: 3
+    dim_hidden: [40, 40]
+
+  ### solver
+  # Initialization
+#  init_var: 0.1  # Initial policy variance
+#  ent_reg: 0.0  # Entropy regularizer
+  # Solver hyperparameters
+#  iterations: 20000 # Number of iterations of training per inner iteration
+#  save_interval: 1000
+#  batch_size: 25
+  lr: 0.001  # Base learning rate (by default it's fixed)
+  lr_policy: 'fixed'  # Learning rate policy
+  momentum: 0.9  # momentum
+  weight_decay: 0.005  # weight decay
+  use_gpu: 0  # Whether or not to use the gpu for caffe training
+  gpu_id: 0
+  solver_type: 'ADAM'  # Solver type to use (e.g. 'SGD', 'Adam', etc.)
+
+###################
+####### LQR #######
+###################
+
+ilqr:
+  # regularization for positive definite Quu
+  mu_start: 1.0 # 1.0
+  mu_mult: 1.6
+  mu_min: 0.1
+  mu_max: 10 # 10 # Fu is very small, requires large mu to make Quu PD
+  dmu_start: 1.0
+  reg_state: True # True # new regularization scheme
+  reg_control: False # False # old one, Quu + mu * I
+
+  # line search for policy
+  alpha_start: 1.0
+  alpha_mult: 0.1
+  alpha_min: 0.00000001
+
+  # misc
+  max_exit_mu: .3
+  min_cost_delta: 0.005 # 0.05
+  max_iter: 20
+  z_min: 0.
+
+  plot: False
+
+###################
+####### CEM #######
+###################
+
+cem:
+  init_var: 0.05
+  init_M: 40 # 40
+  K: 10 # 5
+  M: 50 # 20
+  iters: 10 # 5

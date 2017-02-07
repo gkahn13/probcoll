@@ -1,0 +1,204 @@
+# contains all needed parameters for all files
+
+dt: 0.5
+random_seed: 0
+
+exp_dir: rccar
+run: prediction # gps, dagger, replay, prediction
+exp_folder: exp20
+
+#######################################################
+################ objective + optimizer ################
+#######################################################
+
+trajopt:
+  cost_velocity:
+    u_des: [50., 14] # TODO: hard-coded order: steering then speed
+    u_weights: [0.0001, 0.2] # [0.0001, 0.2]
+    # 0, 0.2
+mpc:
+  H: 3
+
+#  cem:
+#    init:
+#      init_u: [50., 1.5]
+#      init_var: 200.0
+#      init_M: 200
+#      K: 20
+#      M: 50
+#      iters: 20
+#      fixed:
+#        cmd_vel: [1.5]
+#      bounds:
+#        min: [10, -999999]
+#        max: [90, 999999]
+#    warm_start: False
+#    warm_start_config:
+#      init_var: 0.1
+#      init_M: 200
+#      K: 20
+#      M: 50
+#      iters: 3
+#      fixed:
+#        cmd_vel: [1.5]
+#
+#  lattice:
+#    min: [10, 1.5]
+#    max: [90, 1.5]
+#    branching: [7, 0]
+
+
+##########################################
+########## Training environment ##########
+##########################################
+
+world:
+  randomize: True
+
+  back_up:
+    cmd_steer: [40, 60]
+    cmd_vel: -12
+    duration: 4.
+
+##################################
+########### Prediction ###########
+##################################
+
+prediction:
+  model:
+    T: 3 # how many timesteps to predict
+
+    graph_type: 'fc' # fc / cnn / rnn
+    num_bootstrap: 5 # 5
+    dropout: 0.95 # pct keep (None if no dropout)
+    reg: 0.
+
+    # what to use as input to prediction model
+    X_order: []
+    U_order: ['cmd_steer', 'cmd_vel']
+    O_order: ['camera']
+    output_order: ['collision'] # taken from observations O
+
+    # NN training parameters
+    device: 0
+    gpu_fraction: 0.8
+    reset_every_train: True # every time train is called, reinitialize weights?
+    early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
+    learning_rate: 0.001
+    batch_size: 16
+    display_batch: 5
+    epochs: 100
+    steps: 1500
+    val_pct: 0.2
+
+    # preprocessing
+    use_O_orth: False
+
+    # how to resample data
+    aggregate_save_data: True # put all data into one file?
+    save_type: 'fixedlen' # varlen / fixedlen
+    balance:
+      type: collision # none, collision, uncertainty
+
+      collision:
+        pct_coll: 0.5
+
+  dagger:
+    T: 20 # timesteps per trajectory
+    max_iter: 20
+    planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
+
+    control_noise:
+      type: 'uniform' # zero / gaussian / uniform
+
+      zero: {}
+      gaussian:
+        std: [3.0, 0.3]
+      uniform:
+        lower: [-5., 0.]
+        upper: [5., 2.]
+
+    label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+
+#    init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
+    init_epochs: 100
+
+    use_init_cost: True # TODO
+    epsilon_greedy: 0
+
+    cost_prediction:
+      weight: 1e3 # TODO
+      eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
+      pre_activation: True
+
+    conditions:
+      repeats: 10 # TODO
+      num_test: 1
+      randomize_conds: False
+      randomize_reps: True
+
+      default:
+        cmd_steer: [50.]
+        cmd_vel: [0.]
+
+      range:
+        cmd_vel:
+          min: [0]
+          max: [0]
+          num: [1]
+
+      perturb: # repetition perturbations
+        cmd_vel: [0.]
+
+rccar:
+  topics:
+    camera: '/bair_car/down/right' # sensor_msgs/Image
+    cmd_steer: '/bair_car/cmd/steer' # std_msgs/Float32
+    cmd_vel: '/bair_car/cmd/vel' # std_msgs/Float32
+    collision: '/bair_car/crash' # std_msgs/Empty
+    good_rollout: '/bair_car/good_rollout' # std_msgs/Empty
+    bad_rollout: '/bair_car/bad_rollout' # std_msgs/Empty
+    teleop_cmd_steer: '/bair_car/teleop_cmd/steer' # std_msgs/Float32
+    teleop_cmd_vel: '/bair_car/teleop_cmd/vel' # std_msgs/Float32
+
+    # below topics that are just recorded
+    cmd_motor: '/bair_car/cmd/motor'
+    encoder: '/bair_car/encoder'
+    motor: '/bair_car/motor'
+    state: '/bair_car/state'
+    steer: '/bair_car/steer'
+    vel: '/bair_car/vel'
+    camera_info: '/bair_car/down/camera_info'
+    # and for debugging
+    debug_cost: '/bair_car/debug_cost' # visualization_msgs/MarkerArray
+    debug_cost_prediction: '/bair_car/debug_cost_prediction' # visualization_msgs/MarkerArray
+
+######################################################
+########### States, controls, observations ###########
+######################################################
+
+X:
+  dim: 2
+  order: ['cmd_steer', 'cmd_vel']
+
+  cmd_steer: {idx: 0, dim: 1, min: 0, max: 100}
+  cmd_vel: {idx: 1, dim: 1, min: 6}
+
+U:
+  dim: 2
+  order: ['cmd_steer', 'cmd_vel']
+
+  cmd_steer: {idx: 0, dim: 1, min: 0, max: 100}
+  cmd_vel: {idx: 1, dim: 1, min: 6}
+
+O:
+  dim: 577
+  order: ['camera', 'collision']
+
+  camera:
+    idx: 0
+    dim: 576
+    height: 32
+    width: 18
+    noise: 0.01
+  collision: {idx: 576, dim: 1, buffer: 0.0}

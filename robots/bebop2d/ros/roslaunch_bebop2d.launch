@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">
+    <arg name="output_topic" value="bebop/cmd_vel"/>
+  </include>
+
+  <!-- teleop node -->
+  <remap from="/bebop/cmd_vel" to="/vservo/cmd_vel"/>
+  <include file="$(find bebop_tools)/launch/joy_teleop.launch">
+    <arg name="teleop_config" value="log710.yaml"/>
+  </include>
+</launch>

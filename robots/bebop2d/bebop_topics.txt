@@ -1,0 +1,653 @@
+/bebop/autoflight/navigate_home
+Type: std_msgs/Bool
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/autoflight/pause
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/autoflight/start
+Type: std_msgs/String
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/autoflight/stop
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/bebop_driver/parameter_descriptions
+Type: dynamic_reconfigure/ConfigDescription
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/bebop_driver/parameter_updates
+Type: dynamic_reconfigure/Config
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/camera_control
+Type: geometry_msgs/Twist
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/camera_info
+Type: sensor_msgs/CameraInfo
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/cmd_vel
+Type: geometry_msgs/Twist
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/fix
+Type: sensor_msgs/NavSatFix
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/flattrim
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/flip
+Type: std_msgs/UInt8
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/image_raw
+Type: sensor_msgs/Image
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/compressed
+Type: sensor_msgs/CompressedImage
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/compressed/parameter_descriptions
+Type: dynamic_reconfigure/ConfigDescription
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/compressed/parameter_updates
+Type: dynamic_reconfigure/Config
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/compressedDepth
+Type: sensor_msgs/CompressedImage
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/compressedDepth/parameter_descriptions
+Type: dynamic_reconfigure/ConfigDescription
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/compressedDepth/parameter_updates
+Type: dynamic_reconfigure/Config
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/theora
+Type: theora_image_transport/Packet
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/theora/parameter_descriptions
+Type: dynamic_reconfigure/ConfigDescription
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/image_raw/theora/parameter_updates
+Type: dynamic_reconfigure/Config
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/joint_states
+Type: sensor_msgs/JointState
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers:
+ * /bebop/robot_state_publisher (http://ahsoka:38980/)
+
+
+
+
+
+
+/bebop/land
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/odom
+Type: nav_msgs/Odometry
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/record
+Type: std_msgs/Bool
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/reset
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/snapshot
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/bebop/states/ardrone3/CameraState/Orientation
+Type: bebop_msgs/Ardrone3CameraStateOrientation
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/GPSState/NumberOfSatelliteChanged
+Type: bebop_msgs/Ardrone3GPSStateNumberOfSatelliteChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/MediaStreamingState/VideoEnableChanged
+Type: bebop_msgs/Ardrone3MediaStreamingStateVideoEnableChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/AltitudeChanged
+Type: bebop_msgs/Ardrone3PilotingStateAltitudeChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/AttitudeChanged
+Type: bebop_msgs/Ardrone3PilotingStateAttitudeChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/FlatTrimChanged
+Type: bebop_msgs/Ardrone3PilotingStateFlatTrimChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/FlyingStateChanged
+Type: bebop_msgs/Ardrone3PilotingStateFlyingStateChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/NavigateHomeStateChanged
+Type: bebop_msgs/Ardrone3PilotingStateNavigateHomeStateChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/PositionChanged
+Type: bebop_msgs/Ardrone3PilotingStatePositionChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/ardrone3/PilotingState/SpeedChanged
+Type: bebop_msgs/Ardrone3PilotingStateSpeedChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/CommonState/BatteryStateChanged
+Type: bebop_msgs/CommonCommonStateBatteryStateChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/CommonState/WifiSignalChanged
+Type: bebop_msgs/CommonCommonStateWifiSignalChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/FlightPlanState/AvailabilityStateChanged
+Type: bebop_msgs/CommonFlightPlanStateAvailabilityStateChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/FlightPlanState/ComponentStateListChanged
+Type: bebop_msgs/CommonFlightPlanStateComponentStateListChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/MavlinkState/MavlinkFilePlayingStateChanged
+Type: bebop_msgs/CommonMavlinkStateMavlinkFilePlayingStateChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/MavlinkState/MavlinkPlayErrorStateChanged
+Type: bebop_msgs/CommonMavlinkStateMavlinkPlayErrorStateChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/states/common/OverHeatState/OverHeatChanged
+Type: bebop_msgs/CommonOverHeatStateOverHeatChanged
+
+Publishers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/bebop/takeoff
+Type: std_msgs/Empty
+
+Publishers: None
+
+Subscribers:
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+
+
+
+
+
+/rosout
+Type: rosgraph_msgs/Log
+
+Publishers:
+ * /bebop/robot_state_publisher (http://ahsoka:38980/)
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers:
+ * /rosout (http://ahsoka:38673/)
+
+
+
+
+
+
+/rosout_agg
+Type: rosgraph_msgs/Log
+
+Publishers:
+ * /rosout (http://ahsoka:38673/)
+
+Subscribers: None
+
+
+
+
+
+
+/tf
+Type: tf2_msgs/TFMessage
+
+Publishers:
+ * /bebop/robot_state_publisher (http://ahsoka:38980/)
+ * /bebop/bebop_driver (http://ahsoka:45714/)
+
+Subscribers: None
+
+
+
+
+
+
+/tf_static
+Type: tf2_msgs/TFMessage
+
+Publishers:
+ * /bebop/robot_state_publisher (http://ahsoka:38980/)
+
+Subscribers: None
+
+
+
+
+

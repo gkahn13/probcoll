@@ -1,0 +1,71 @@
+# Logitech F710 wireless controller
+
+teleop:
+    teleop_cmd_vel:
+        type: topic
+        message_type: "std_msgs/Float32"
+        topic_name: teleop_cmd/vel
+        deadman_buttons: [6] # LT
+        axis_mappings:
+            -
+                axis: 1
+                target: data
+                scale: 12.0
+                offset: 0.0
+    teleop_cmd_steer:
+        type: topic
+        message_type: "std_msgs/Float32"
+        topic_name: teleop_cmd/steer
+        deadman_buttons: [6] # LT
+        axis_mappings:
+            -
+                axis: 2
+                target: data
+                scale: 40.0
+                offset: 50.0
+    cmd_vel:
+        type: topic
+        message_type: "std_msgs/Float32"
+        topic_name: cmd/vel
+        deadman_buttons: [7] # RT
+        axis_mappings: 
+            -
+                axis: 1
+                target: data
+                scale: 12.0
+                offset: 0.0
+    cmd_steer:
+        type: topic
+        message_type: "std_msgs/Float32"
+        topic_name: cmd/steer
+        deadman_buttons: [7] # RT
+        axis_mappings:
+            -
+                axis: 2
+                target: data
+                scale: 40.0
+                offset: 50.0
+    good_rollout_LT:
+        type: topic
+        message_type: "std_msgs/Empty"
+        topic_name: good_rollout
+        deadman_buttons: [1, 6]
+        axis_mappings: []
+    bad_rollout_LT:
+        type: topic
+        message_type: "std_msgs/Empty"
+        topic_name: bad_rollout
+        deadman_buttons: [2, 6]
+        axis_mappings: []
+    good_rollout_RT:
+        type: topic
+        message_type: "std_msgs/Empty"
+        topic_name: good_rollout
+        deadman_buttons: [1, 7]
+        axis_mappings: []
+    bad_rollout_RT:
+        type: topic
+        message_type: "std_msgs/Empty"
+        topic_name: bad_rollout
+        deadman_buttons: [2, 7]
+        axis_mappings: []
