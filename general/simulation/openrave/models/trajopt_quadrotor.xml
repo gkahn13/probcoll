@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Robot name="Quadrotor">
+ <KinBody>
+   <Body name="base_link" type="dynamic">
+     <Translation>0.0  0.0  0.0</Translation>
+     <!--<Geom type="box">-->
+       <!--<Render>iris.dae</Render>-->
+       <!--<Translation>0.0 0 0</Translation>-->
+       <!--<Quat>0.0 0.0 0.70710678 0.70710678</Quat>-->
+       <!--<Extents>0.23 0.125 0.23</Extents>-->
+       <!--<diffuseColor>0.05 0.05 0.05</diffuseColor>-->
+       <!--<transparency>0.5</transparency>-->
+     <!--</Geom>-->
+     <Geom type="sphere">
+       <Render>iris.dae</Render>
+       <Translation>0.0 0 0</Translation>
+       <Quat>0.0 0.0 0.70710678 0.70710678</Quat>
+       <Radius>0.23</Radius> <!-- 0.23 -->
+       <diffuseColor>0.05 0.05 0.05</diffuseColor>
+       <transparency>0.5</transparency>
+     </Geom>
+   </Body>
+ </KinBody>
+</Robot>
