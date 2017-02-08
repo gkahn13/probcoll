@@ -1,6 +1,6 @@
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.policy.policy import Policy
-from rll_quadrotor.utility.logger import get_logger
+from general.state_info.sample import Sample
+from general.policy.policy import Policy
+from general.utility.logger import get_logger
 
 class StraightPolicyRCcar(Policy):
 

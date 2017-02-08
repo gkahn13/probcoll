@@ -1,10 +1,10 @@
 import numpy as np
 
-from rll_quadrotor.planning.ilqr.cost.cost_utils import RAMP_CONSTANT, RAMP_LINEAR, RAMP_QUADRATIC
-from rll_quadrotor.planning.ilqr.cost.cost_state import CostState
-from rll_quadrotor.planning.ilqr.cost.cost_torque import CostTorque
-from rll_quadrotor.planning.ilqr.cost.cost_sum import CostSum
-from rll_quadrotor.utility.utils import init_component
+from general.planning.cost.cost_utils import RAMP_CONSTANT, RAMP_LINEAR, RAMP_QUADRATIC
+from general.planning.cost.cost_state import CostState
+from general.planning.cost.cost_torque import CostTorque
+from general.planning.cost.cost_sum import CostSum
+from general.utility.utils import init_component
 
 def cost_velocity_bebop2d(T, velocity, velocity_weights, weight_scale=1e5):
     costs = []

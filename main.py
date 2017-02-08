@@ -9,21 +9,21 @@ import numpy as np, random
 from config import load_params, set_params, params
 
 try:
-    from robots.pointquad.algorithms.prediction.dagger_prediction_pointquad import DaggerPredictionPointquad
-    from robots.pointquad.algorithms.prediction.analyze_prediction_pointquad import AnalyzePredictionPointquad
-    from robots.pointquad.algorithms.prediction.replay_prediction_pointquad import ReplayPredictionPointquad
+    from robots.pointquad.algorithm.prediction.probcoll_pointquad import ProbcollPointquad
+    from robots.pointquad.algorithm.prediction.analyze_pointquad import AnalyzePointquad
+    from robots.pointquad.algorithm.prediction.replay_prediction_pointquad import ReplayPredictionPointquad
 except:
     print('main.py: not importing pointquad')
 
 try:
-    from robots.bebop2d.algorithms.prediction.dagger_prediction_bebop2d import DaggerPredictionBebop2d
-    from robots.bebop2d.algorithms.prediction.replay_prediction_bebop2d import ReplayPredictionBebop2d
-    from robots.bebop2d.algorithms.prediction.analyze_prediction_bebop2d import AnalyzePredictionBebop2d
+    from robots.bebop2d.algorithm.prediction.probcoll_bebop2d import ProbcollBebop2d
+    from robots.bebop2d.algorithm.prediction.replay_prediction_bebop2d import ReplayPredictionBebop2d
+    from robots.bebop2d.algorithm.prediction.analyze_bebop2d import AnalyzeBebop2d
 except:
     print('main.py: not importing Bebop2d')
 
-from robots.rccar.algorithms.prediction.dagger_prediction_rccar import DaggerPredictionRCcar
-from robots.rccar.algorithms.prediction.analyze_prediction_rccar import AnalyzePredictionRCcar
+from robots.rccar.algorithm.prediction.probcoll_rccar import ProbcollRCcar
+from robots.rccar.algorithm.prediction.analyze_rccar import AnalyzeRCcar
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -37,14 +37,14 @@ if __name__ == '__main__':
     parser_replay.set_defaults(run='replay')
     parser_prediction = subparsers.add_parser('prediction')
     parser_prediction.set_defaults(run='prediction')
-    parser_analyze_prediction = subparsers.add_parser('analyze_prediction')
-    parser_analyze_prediction.set_defaults(run='analyze_prediction')
+    parser_analyze = subparsers.add_parser('analyze')
+    parser_analyze.set_defaults(run='analyze')
     parser_replay_prediction = subparsers.add_parser('replay_prediction')
     parser_replay_prediction.set_defaults(run='replay_prediction')
 
     ### arguments common to all
     for subparser in (parser_gps, parser_dagger, parser_replay, parser_prediction,
-                      parser_analyze_prediction, parser_replay_prediction):
+                      parser_analyze, parser_replay_prediction):
         subparser.add_argument('robot', type=str, choices=('quadrotor', 'pointquad', 'bebop2d', 'rccar', 'point2d', 'point1d'),
                                help='robot type')
         subparser.add_argument('-exp_folder', type=str, default=None,
@@ -60,12 +60,12 @@ if __name__ == '__main__':
 
     ### prediction specific arguments
 
-    ### analyze_prediction specific arguments
-    parser_analyze_prediction.add_argument('--on_replay', action='store_true', help='run analyze on replay')
-    parser_analyze_prediction.add_argument('--plot_single', action='store_true')
-    parser_analyze_prediction.add_argument('--plot_traj', action='store_true')
-    parser_analyze_prediction.add_argument('--plot_samples', action='store_true')
-    parser_analyze_prediction.add_argument('--plot_groundtruth', action='store_true')
+    ### analyze specific arguments
+    parser_analyze.add_argument('--on_replay', action='store_true', help='run analyze on replay')
+    parser_analyze.add_argument('--plot_single', action='store_true')
+    parser_analyze.add_argument('--plot_traj', action='store_true')
+    parser_analyze.add_argument('--plot_samples', action='store_true')
+    parser_analyze.add_argument('--plot_groundtruth', action='store_true')
 
     args = parser.parse_args()
     run = args.run
@@ -128,37 +128,37 @@ if __name__ == '__main__':
 
     elif run == 'prediction':
         if robot == 'quadrotor':
-            prediction = DaggerPredictionQuadrotor()
+            prediction = ProbcollQuadrotor()
         elif robot == 'pointquad':
-            prediction = DaggerPredictionPointquad()
+            prediction = ProbcollPointquad()
         elif robot == 'bebop2d':
-            prediction = DaggerPredictionBebop2d()
+            prediction = ProbcollBebop2d()
         elif robot == 'rccar':
-            prediction = DaggerPredictionRCcar()
+            prediction = ProbcollRCcar()
         elif robot == 'point2d':
-            prediction = DaggerPredictionPoint2d()
+            prediction = ProbcollPoint2d()
         elif robot == 'point1d':
-            prediction = DaggerPredictionPoint1d()
+            prediction = ProbcollPoint1d()
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 
         prediction.run()
 
-    elif run == 'analyze_prediction':
+    elif run == 'analyze':
         if robot == 'pointquad':
-            analyze_prediction = AnalyzePredictionPointquad(on_replay=args.on_replay)
+            analyze = AnalyzePointquad(on_replay=args.on_replay)
         elif robot == 'bebop2d':
-            analyze_prediction = AnalyzePredictionBebop2d(on_replay=args.on_replay)
+            analyze = AnalyzeBebop2d(on_replay=args.on_replay)
         elif robot == 'rccar':
-            analyze_prediction = AnalyzePredictionRCcar(on_replay=args.on_replay)
+            analyze = AnalyzeRCcar(on_replay=args.on_replay)
         elif robot == 'point2d':
-            analyze_prediction = AnalyzePredictionPoint2d()
+            analyze = AnalyzePoint2d()
         elif robot == 'point1d':
-            analyze_prediction = AnalyzePredictionPoint1d()
+            analyze = AnalyzePoint1d()
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 
-        analyze_prediction.run(args.plot_single, args.plot_traj, args.plot_samples, args.plot_groundtruth)
+        analyze.run(args.plot_single, args.plot_traj, args.plot_samples, args.plot_groundtruth)
 
     elif run == 'replay_prediction':
         if robot == 'pointquad':

@@ -3,12 +3,12 @@ import os
 import rospy
 import std_msgs.msg as std_msgs
 
-from general.algorithms.prediction.dagger_prediction import DaggerPrediction
+from general.algorithm.prediction.probcoll import Probcoll
 from general.traj_opt.conditions import Conditions
 import general.ros.ros_utils as ros_utils
 
-from robots.bebop2d.algorithms.prediction.prediction_model_bebop2d import PredictionModelBebop2d
-from robots.bebop2d.algorithms.prediction.cost_prediction_bebop2d import CostPredictionBebop2d
+from robots.bebop2d.algorithm.prediction.probcoll_model_bebop2d import ProbcollModelBebop2d
+from robots.bebop2d.algorithm.prediction.cost_probcoll_bebop2d import CostProbcollBebop2d
 
 from robots.bebop2d.dynamics.dynamics_bebop2d import DynamicsBebop2d
 from robots.bebop2d.world.world_bebop2d import WorldBebop2d
@@ -17,24 +17,24 @@ from robots.bebop2d.traj_opt.traj_opt_bebop2d import TrajoptBebop2d
 from robots.bebop2d.policy.primitives_mpc_policy_bebop2d import PrimitivesMPCPolicyBebop2d
 from robots.bebop2d.policy.teleop_mpc_policy_bebop2d import TeleopMPCPolicyBebop2d
 
-from rll_quadrotor.state_info.sample import Sample
+from general.state_info.sample import Sample
 
 from config import params
 
-class DaggerPredictionBebop2d(DaggerPrediction):
+class ProbcollBebop2d(Probcoll):
 
     def __init__(self, read_only=False):
-        DaggerPrediction.__init__(self, read_only=read_only)
+        Probcoll.__init__(self, read_only=read_only)
 
     def _setup(self):
-        rospy.init_node('DaggerPredictionBebop2d', anonymous=True)
+        rospy.init_node('ProbcollBebop2d', anonymous=True)
 
         self.bad_rollout_callback = ros_utils.RosCallbackEmpty(params['bebop']['topics']['bad_rollout'], std_msgs.Empty)
 
         pred_dagger_params = params['prediction']['dagger']
         world_params = params['world']
         cond_params = pred_dagger_params['conditions']
-        cp_params = pred_dagger_params['cost_prediction']
+        cp_params = pred_dagger_params['cost_probcoll']
 
         self.max_iter = pred_dagger_params['max_iter']
         self.world = WorldBebop2d(self._bag_file, wp=world_params)
@@ -46,9 +46,9 @@ class DaggerPredictionBebop2d(DaggerPrediction):
         assert(self.world.randomize)
 
         ### load prediction neural net (must go after self.world creation, why??)
-        self.bootstrap = PredictionModelBebop2d(read_only=self.read_only)
+        self.bootstrap = ProbcollModelBebop2d(read_only=self.read_only)
 
-        self.cost_cp = CostPredictionBebop2d(self.bootstrap,
+        self.cost_cp = CostProbcollBebop2d(self.bootstrap,
                                              weight=float(cp_params['weight']),
                                              eval_cost=cp_params['eval_cost'],
                                              pre_activation=cp_params['pre_activation'])

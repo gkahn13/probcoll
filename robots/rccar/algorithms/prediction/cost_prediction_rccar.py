@@ -6,23 +6,23 @@ import geometry_msgs.msg as gm
 
 import matplotlib.cm as cm
 
-from general.algorithms.prediction.cost_prediction import CostPrediction
+from general.algorithm.prediction.cost_probcoll import CostProbcoll
 
 from config import params
 
-class CostPredictionRCcar(CostPrediction):
+class CostProbcollRCcar(CostProbcoll):
 
     def __init__(self, bootstrap, **kwargs):
-        CostPrediction.__init__(self, bootstrap, **kwargs)
+        CostProbcoll.__init__(self, bootstrap, **kwargs)
 
         rccar_topics = params['rccar']['topics']
-        self.debug_cost_prediction_pub = rospy.Publisher(rccar_topics['debug_cost_prediction'],
+        self.debug_cost_probcoll_pub = rospy.Publisher(rccar_topics['debug_cost_probcoll'],
                                                          vm.MarkerArray,
                                                          queue_size=10)
 
     def eval_batch(self, samples):
         min_vel = params['U']['cmd_vel']['min']
-        cst_approxes = CostPrediction.eval_batch(self, samples,
+        cst_approxes = CostProbcoll.eval_batch(self, samples,
                 speed_func=lambda s: np.linalg.norm(s.get_U(sub_control='cmd_vel') - min_vel, axis=1).mean())
         # costs = [cst_approx.J for cst_approx in cst_approxes]
         costs = [1. / (1. + np.exp(-(p + 0.0*s))) for p, s in zip(self.probs_mean_batch, self.probs_std_batch)]
@@ -78,6 +78,6 @@ class CostPredictionRCcar(CostPrediction):
         # for id in xrange(marker.id+1, int(1e4)):
         #     marker_array.markers.append(vm.Marker(id=id, action=marker.DELETE))
 
-        self.debug_cost_prediction_pub.publish(marker_array)
+        self.debug_cost_probcoll_pub.publish(marker_array)
 
         # print('probs in [{0:.2f}, {1:.2f}]'.format(min(costs), max(costs)))

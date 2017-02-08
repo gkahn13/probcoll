@@ -2,9 +2,9 @@ import std_msgs.msg as sm
 
 import general.ros.ros_utils as ros_utils
 
-from rll_quadrotor.policy.policy import Policy
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.utility.logger import get_logger
+from general.policy.policy import Policy
+from general.state_info.sample import Sample
+from general.utility.logger import get_logger
 
 class TeleopMPCPolicyRCcar(Policy):
 

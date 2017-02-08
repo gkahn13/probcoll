@@ -1,6 +1,6 @@
 import abc
 
-from rll_quadrotor.utility.logger import get_logger
+from general.utility.logger import get_logger
 
 from config import params
 

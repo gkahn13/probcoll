@@ -1,8 +1,8 @@
 import abc
 
-from rll_quadrotor.utility.logger import get_logger
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.policy.noise_models import ZeroNoise
+from general.utility.logger import get_logger
+from general.state_info.sample import Sample
+from general.policy.noise_models import ZeroNoise
 
 from config import params
 

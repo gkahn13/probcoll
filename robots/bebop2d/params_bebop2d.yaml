@@ -106,7 +106,7 @@ prediction:
     use_init_cost: True # TODO
     epsilon_greedy: 0
 
-    cost_prediction:
+    cost_probcoll:
       weight: 1e1 # TODO
 #      eval_cost: 'speed * speed * probs_mean + speed * speed * probs_std'
 #      pre_activation: False

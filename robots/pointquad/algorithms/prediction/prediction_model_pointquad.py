@@ -1,18 +1,15 @@
-import os, sys
+import os
 import random
+import sys
 
 import numpy as np
 import tensorflow as tf
 
-from general.algorithms.prediction.prediction_model import PredictionModel
-
-from general.policy.tf.rnn import dynamic_rnn as dynamic_rnn_GK
-from general.policy.tf.rnn_cell import BasicRNNCell as BasicRNNCellDropout
-from general.policy.tf.rnn_cell import BasicLSTMCell as BasicLSTMCellDropout
-
 from config import params
+from general.algorithm.probcoll_model import ProbcollModel
 
-class PredictionModelPointquad(PredictionModel):
+
+class ProbcollModelPointquad(ProbcollModel):
 
     ####################
     ### Initializing ###
@@ -20,7 +17,7 @@ class PredictionModelPointquad(PredictionModel):
 
     def __init__(self, read_only=False, finalize=True):
         dist_eps = params['O']['collision']['buffer']
-        PredictionModel.__init__(self, dist_eps, read_only=read_only, finalize=finalize)
+        ProbcollModel.__init__(self, dist_eps, read_only=read_only, finalize=finalize)
 
     #############
     ### Files ###
@@ -39,7 +36,7 @@ class PredictionModelPointquad(PredictionModel):
         In case you want to pre-process the sample before adding it
         :return: Sample
         """
-        # return PredictionModel._modify_sample(self, sample)
+        # return ProbcollModel._modify_sample(self, sample)
 
         ### move collision observation one time step earlier
         if sample.get_O(t=-1, sub_obs='collision'):
@@ -212,7 +209,7 @@ class PredictionModelPointquad(PredictionModel):
         else:
             ### default no balancing
             self.logger.info('Not rebalancing data')
-            return PredictionModel._balance_data(self, start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)
+            return ProbcollModel._balance_data(self, start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)
 
     #############
     ### Graph ###
@@ -221,17 +218,17 @@ class PredictionModelPointquad(PredictionModel):
     def _get_old_graph_inference(self, graph_type='fc'):
         self.logger.info('Graph type: {0}'.format(graph_type))
         sys.path.append(os.path.dirname(self._code_file))
-        exec('from {0} import {1} as OldPredictionModel'.format(
-            os.path.basename(self._code_file).split('.')[0], 'PredictionModelPointquad'))
+        exec('from {0} import {1} as OldProbcollModel'.format(
+            os.path.basename(self._code_file).split('.')[0], 'ProbcollModelPointquad'))
 
         if graph_type == 'fc':
-            return OldPredictionModel._graph_inference_fc
+            return OldProbcollModel._graph_inference_fc
         if graph_type == 'fc_sparse':
-            return OldPredictionModel._graph_inference_fc_sparse
+            return OldProbcollModel._graph_inference_fc_sparse
         elif graph_type == 'cnn':
-            return OldPredictionModel._graph_inference_cnn
+            return OldProbcollModel._graph_inference_cnn
         elif graph_type == 'rnn':
-            return OldPredictionModel._graph_inference_rnn
+            return OldProbcollModel._graph_inference_rnn
         else:
             raise Exception('graph_type {0} is not valid'.format(graph_type))
 
@@ -1000,8 +997,8 @@ class PredictionModelPointquad(PredictionModel):
     ################
 
     def _create_input(self, X, U, O):
-        return PredictionModel._create_input(self, X, U, O)
+        return ProbcollModel._create_input(self, X, U, O)
 
     def _create_output(self, output):
-        return PredictionModel._create_output(self, output).astype(int)
+        return ProbcollModel._create_output(self, output).astype(int)
 

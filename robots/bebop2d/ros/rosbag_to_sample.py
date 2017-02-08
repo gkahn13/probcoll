@@ -15,7 +15,7 @@ import general.ros.ros_utils as ros_utils
 
 from robots.bebop2d.agent.agent_bebop2d import AgentBebop2d
 
-from rll_quadrotor.state_info.sample import Sample
+from general.state_info.sample import Sample
 
 from config import load_params, params
 

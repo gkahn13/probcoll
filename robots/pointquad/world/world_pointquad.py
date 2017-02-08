@@ -5,10 +5,12 @@ from collections import defaultdict
 
 from general.world.world import World
 
-from rll_quadrotor.utility.utils import posquat_to_pose
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.simulation.environment import Environment
-from rll_quadrotor.utility import transformations as tft
+from general.utility.utils import posquat_to_pose
+from general.state_info.sample import Sample
+from general.utility import transformations as tft
+
+from general.simulation.openrave.rave_env import RaveEnv
+from general.simulation.panda3d.panda3d_env import Panda3dEnv
 
 from config import params
 
@@ -26,7 +28,13 @@ class WorldPointquad(World):
 
         assert(not (self.plot and view_rave))
 
-        self.env = Environment(view_rave=view_rave, meta_data=params)
+        self.rave_env = RaveEnv(view=view_rave)
+
+        if 'camera' in params['O']:
+            self.panda_env = Panda3dEnv(params['O']['camera']['width'],
+                                        params['O']['camera']['height'])
+        else:
+            self.panda_env = None
 
         # self.reset()
         if self.plot:
@@ -39,7 +47,7 @@ class WorldPointquad(World):
     ########################
 
     def reset(self, cond=None, itr=None):
-        self.env.clear()
+        self.clear()
 
         # create obstacles
         for i, obst_descr in enumerate(self.wp['obstacles']):
@@ -63,7 +71,7 @@ class WorldPointquad(World):
                 pose = np.eye(4)
                 pose[:3,3] = np.array(obst_descr['center']) + noise
                 extents = obst_descr['extents']
-                self.env.add_box(pose, extents)
+                self.add_box(pose, extents)
             elif obst_descr['type'] == 'cylinder':
                 pose = np.eye(4)
                 pose[:3,3] = np.array(obst_descr['center']) + noise
@@ -71,7 +79,7 @@ class WorldPointquad(World):
                 height = obst_descr['height']
                 texture = obst_descr['texture']
                 color = obst_descr['color']
-                self.env.add_cylinder(pose, radius, height, texture=texture, color=color)
+                self.add_cylinder(pose, radius, height, texture=texture, color=color)
             elif obst_descr['type'] == 'forest':
                 if cond is None or cond not in self.cond_forest.keys() or self.randomize:
                     self.cond_forest[cond] = self.create_forest(obst_descr)
@@ -79,21 +87,43 @@ class WorldPointquad(World):
                 for cyl_descr in self.cond_forest[cond]:
                     pose = np.eye(4)
                     pose[:3,3] = np.array(cyl_descr['center'])
-                    self.env.add_cylinder(pose,
-                                          cyl_descr['radius'],
-                                          cyl_descr['height'],
-                                          texture=obst_descr['texture'],
-                                          color=obst_descr['color'])
+                    self.add_cylinder(pose,
+                                      cyl_descr['radius'],
+                                      cyl_descr['height'],
+                                      texture=obst_descr['texture'],
+                                      color=obst_descr['color'])
 
             elif obst_descr['type'] == 'hallway':
                 if cond is None or cond not in self.cond_hallway.keys() or self.randomize:
                     self.cond_hallway[cond] = self.create_hallway(obst_descr)
 
                 for wall_descr in self.cond_hallway[cond]:
-                    self.env.add_box(wall_descr['pose'], wall_descr['extents'])
+                    self.add_box(wall_descr['pose'], wall_descr['extents'])
 
             else:
                 raise Exception('Obstacle type {0} not supported'.format(obst_descr['type']))
+
+    def load(self, rave_file, panda_file):
+        self.rave_env.load_file(rave_file)
+        if self.panda_env: self.panda_env.load_file(panda_file)
+
+    def destroy(self):
+        self.rave_env.destroy()
+
+    def clear(self):
+        self.rave_env.clear()
+        if self.panda_env: self.panda_env.clear()
+
+    def add_box(self, pose, extents, name=None):
+        kinbody = self.rave_env.add_box(pose, extents, name=name)
+        if self.panda_env: self.panda_env.add_mesh(kinbody.GetName(), *RaveEnv.get_kinbody_mesh(kinbody))
+
+    def add_cylinder(self, pose, radius, height, name=None, texture=None, color=(1,0,0)):
+        kinbody = self.rave_env.add_cylinder(pose, radius, height, name=name)
+        if self.panda_env: self.panda_env.add_mesh(kinbody.GetName(),
+                                                   *RaveEnv.get_kinbody_mesh(kinbody),
+                                                   texture=texture,
+                                                   color=color)
 
     def create_forest(self, forest_descr, max_time=2.):
         """
@@ -217,7 +247,7 @@ class WorldPointquad(World):
             pos = sample.get_X(t=ti, sub_state='position')
             quat = sample.get_X(t=ti, sub_state='orientation')
             pose = posquat_to_pose(pos, quat)
-            if self.env.is_collision(pose=pose):
+            if self.rave_env.is_collision(pose=pose):
                 return True
             if not ignore_height and pos[-1] < 0:
                 return True
@@ -230,7 +260,7 @@ class WorldPointquad(World):
         quat = x[sample.get_X_idxs(sub_state='orientation')]
         pose = posquat_to_pose(pos, quat)
 
-        robotpos_dist_contactpos = self.env.closest_collision(pose=pose)
+        robotpos_dist_contactpos = self.rave_env.closest_collision(pose=pose)
         if robotpos_dist_contactpos is None:
             return 1e3
         _, dist, _ = robotpos_dist_contactpos
@@ -252,13 +282,11 @@ class WorldPointquad(World):
         plt.show(block=False)
         plt.pause(0.01)
 
-        # raw_input('hallllo')
-
     def update_visualization(self, history_sample, planned_sample, t):
         pose = posquat_to_pose(history_sample.get_X(t=t, sub_state='position'),
                                history_sample.get_X(t=t, sub_state='orientation'))
-        self.env.panda_env.set_camera_pose(pose)
-        self.env.panda_env.get_camera_image()
+        self.panda_env.set_camera_pose(pose)
+        self.panda_env.get_camera_image()
 
         if not self.plot:
             return
@@ -284,8 +312,6 @@ class WorldPointquad(World):
         :type sample: Sample
         :return: 2d np.ndarray
         """
-        rave_env = self.env.rave_env
-
         # if sample is not None:
         #     rave_env.clear_plots()
         #     for t in xrange(sample._T - 1):
@@ -294,7 +320,6 @@ class WorldPointquad(World):
         #         rave_env.plot_point(p_t, color=(1,0,0), size=0.025)
         #         rave_env.plot_segment(p_t, p_tp1, color=(0,0,1))
 
-        import tf.transformations as tft
         cam_pose = tft.euler_matrix(np.pi/2.-np.pi/10., np.pi, np.pi/2.)
         # cam_pose[:2,3] = sample.get_X(t=0, sub_state='position')
         # cam_pose[0,3] += -4.0
@@ -305,7 +330,7 @@ class WorldPointquad(World):
         # rave_env.plot_transform(cam_pose)
 
         try:
-            viewer = rave_env.env.GetViewer()
+            viewer = self.rave_env.env.GetViewer()
             viewer.SendCommand('SetFiguresInCamera 1')
             viewer.SetCamera(cam_pose, 0.01)
             width, height = 640, 480
@@ -317,3 +342,47 @@ class WorldPointquad(World):
         except:
             self._logger.warn('Failed to get image')
             return None
+
+    def interact(self, init_pose=np.eye(4), step=0.1, radstep=0.1):
+        pose = init_pose
+        ch = None
+
+        mapping = {
+            'w': np.array([step, 0, 0, 0, 0, 0]),
+            'x': np.array([-step, 0, 0, 0, 0, 0]),
+            'd': np.array([0, step, 0, 0, 0, 0]),
+            'a': np.array([0, -step, 0, 0, 0, 0]),
+            '+': np.array([0, 0, step, 0, 0, 0]),
+            '-': np.array([0, 0, -step, 0, 0, 0]),
+            'p': np.array([0, 0, 0, radstep, 0, 0]),
+            'o': np.array([0, 0, 0, -radstep, 0, 0]),
+            'l': np.array([0, 0, 0, 0, radstep, 0]),
+            'k': np.array([0, 0, 0, 0, -radstep, 0]),
+            'm': np.array([0, 0, 0, 0, 0, radstep]),
+            'n': np.array([0, 0, 0, 0, 0, -radstep]),
+        }
+        mapping = defaultdict(lambda: np.zeros(6), mapping)
+
+        while ch != 'q':
+            viewer = self.rave_env.env.GetViewer()
+            if viewer is not None:
+                rave_pose = pose.dot(tft.euler_matrix(np.pi / 2., np.pi, np.pi / 2.))
+                viewer.SetCamera(rave_pose, 0.01)
+
+            if self.panda_env:
+                self.panda_env.set_camera_pose(pose)
+                self.panda_env.get_camera_image()
+
+            ch = utils.Getch.getch()
+            pos = pose[:3, 3]
+            rpy = tft.euler_from_matrix(pose)
+
+            pos += mapping[ch][:3]
+            rpy += mapping[ch][3:]
+
+            pose = tft.euler_matrix(*rpy)
+            pose[:3, 3] = pos
+
+            print('pos: {0:.2f}, {1:.2f}, {2:.2f}'.format(*list(pos)))
+            print('rpy: {0:.2f}, {1:.2f}, {2:.2f}'.format(*list(rpy)))
+            print('quaternion: {0}\n'.format(tft.quaternion_from_matrix(pose)))

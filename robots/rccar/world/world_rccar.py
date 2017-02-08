@@ -10,7 +10,7 @@ import general.ros.ros_utils as ros_utils
 
 from general.world.world import World
 
-from rll_quadrotor.state_info.sample import Sample
+from general.state_info.sample import Sample
 
 from config import params
 

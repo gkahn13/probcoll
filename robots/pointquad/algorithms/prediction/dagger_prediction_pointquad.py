@@ -3,12 +3,12 @@ import numpy as np
 
 import openravepy as rave
 
-from general.algorithms.prediction.dagger_prediction import DaggerPrediction
-from general.algorithms.prediction.cost_prediction import CostPredictionGroundTruth
+from general.algorithm.prediction.probcoll import Probcoll
+from general.algorithm.prediction.cost_probcoll import CostProbcollGroundTruth
 from general.traj_opt.conditions import Conditions
 
-from robots.pointquad.algorithms.prediction.prediction_model_pointquad import PredictionModelPointquad
-from robots.pointquad.algorithms.prediction.cost_prediction_pointquad import CostPredictionPointquad
+from robots.pointquad.algorithm.prediction.probcoll_model_pointquad import ProbcollModelPointquad
+from robots.pointquad.algorithm.prediction.cost_probcoll_pointquad import CostProbcollPointquad
 
 from robots.pointquad.dynamics.dynamics_pointquad import DynamicsPointquad
 from robots.pointquad.world.world_pointquad import WorldPointquad
@@ -21,15 +21,15 @@ from rll_quadrotor.policy.random_walk_policy import RandomWalkPolicy
 from rll_quadrotor.policy.random_control_set_policy import RandomControlSetPolicy
 from rll_quadrotor.policy.mpc_policy import MPCPolicy
 from rll_quadrotor.policy.cem_mpc_policy import CEMMPCPolicy
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.utility.utils import to_hist
+from general.state_info.sample import Sample
+from general.utility.utils import to_hist
 
 from config import params
 
-class DaggerPredictionPointquad(DaggerPrediction):
+class ProbcollPointquad(Probcoll):
 
     def __init__(self, read_only=False):
-        DaggerPrediction.__init__(self, read_only=read_only)
+        Probcoll.__init__(self, read_only=read_only)
 
     def _setup(self):
         # if hasattr(self, 'world'):
@@ -38,7 +38,7 @@ class DaggerPredictionPointquad(DaggerPrediction):
         pred_dagger_params = params['prediction']['dagger']
         world_params = params['world']
         cond_params = pred_dagger_params['conditions']
-        cp_params = pred_dagger_params['cost_prediction']
+        cp_params = pred_dagger_params['cost_probcoll']
 
         self.max_iter = pred_dagger_params['max_iter']
         self.world = WorldPointquad(wp=world_params, view_rave=world_params['view_rave'])
@@ -50,7 +50,7 @@ class DaggerPredictionPointquad(DaggerPrediction):
         self.conditions = Conditions(cond_params=cond_params)
 
         ### load prediction neural net (must go after self.world creation, why??)
-        self.bootstrap = PredictionModelPointquad(read_only=self.read_only)
+        self.bootstrap = ProbcollModelPointquad(read_only=self.read_only)
 
         if pred_dagger_params['use_init_cost']:
             self.cost_cp_init = cost_velocity_pointquad(params['mpc']['H'],
@@ -61,12 +61,12 @@ class DaggerPredictionPointquad(DaggerPrediction):
             self.cost_cp_init = None
 
         if not pred_dagger_params['use_ground_truth']:
-            self.cost_cp = CostPredictionPointquad(self.bootstrap, self.agent,
+            self.cost_cp = CostProbcollPointquad(self.bootstrap, self.agent,
                                                    weight=float(cp_params['weight']),
                                                    eval_cost=cp_params['eval_cost'],
                                                    pre_activation=cp_params['pre_activation'])
         else:
-            self.cost_cp = CostPredictionGroundTruth(self.bootstrap,
+            self.cost_cp = CostProbcollGroundTruth(self.bootstrap,
                                                      world=self.world,
                                                      weight=float(cp_params['weight']),
                                                      eval_cost=cp_params['eval_cost'],

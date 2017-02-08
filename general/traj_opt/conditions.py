@@ -2,8 +2,8 @@ import copy
 import itertools
 import numpy as np
 
-import rll_quadrotor.utility.transformations as tft
-from rll_quadrotor.state_info.sample import Sample
+import general.utility.transformations as tft
+from general.state_info.sample import Sample
 
 from config import params
 

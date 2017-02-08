@@ -4,13 +4,13 @@ import numpy as np
 from general.utility.file_manager import FileManager
 from general.traj_opt.conditions import Conditions
 
-from general.algorithms.prediction.prediction_model import PredictionModel
+from general.algorithm.probcoll_model import ProbcollModel
 
-from robots.pointquad.algorithms.prediction.dagger_prediction_pointquad import DaggerPredictionPointquad
+from robots.pointquad.algorithm.prediction.probcoll_pointquad import ProbcollPointquad
 
 from config import params, load_params
 
-class ReplayPredictionPointquad(DaggerPredictionPointquad):
+class ReplayPredictionPointquad(ProbcollPointquad):
 
     def __init__(self):
         np.random.seed(0)
@@ -28,7 +28,7 @@ class ReplayPredictionPointquad(DaggerPredictionPointquad):
         pred_dagger_params['control_noise']['type'] = 'zero'
         pred_dagger_params['epsilon_greedy'] = None
 
-        DaggerPredictionPointquad.__init__(self, read_only=True)
+        ProbcollPointquad.__init__(self, read_only=True)
 
         cond_params = copy.deepcopy(pred_dagger_params['conditions'])
         cond_params['randomize_conds'] = False
@@ -72,7 +72,7 @@ class ReplayPredictionPointquad(DaggerPredictionPointquad):
 
     def replay_itr(self, itr):
         model_file = self._itr_model_file(itr).replace('replay/', '')
-        if not PredictionModel.checkpoint_exists(model_file):
+        if not ProbcollModel.checkpoint_exists(model_file):
             return False
 
         self.logger.info('Replaying itr {0}'.format(itr))

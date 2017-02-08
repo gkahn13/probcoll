@@ -19,7 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.framework import constant_op
+import tensorflow as tf
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
@@ -27,12 +27,11 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import logging_ops
 from tensorflow.python.ops import math_ops
-# from tensorflow.python.ops import rnn_cell
-from general.policy.tf import rnn_cell
 from tensorflow.python.ops import tensor_array_ops
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.util import nest
-import tensorflow as tf
+
+from general.tf import rnn_cell
 
 # pylint: disable=protected-access
 _state_size_with_prefix = rnn_cell._state_size_with_prefix

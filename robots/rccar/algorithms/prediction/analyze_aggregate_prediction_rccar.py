@@ -8,9 +8,9 @@ from matplotlib.patches import Rectangle
 import matplotlib.ticker as ticker
 from matplotlib import gridspec
 
-from general.algorithms.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_crash_speed_video, DataAverageInterpolation
+from general.algorithm.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_crash_speed_video, DataAverageInterpolation
 
-from rll_quadrotor.state_info.sample import Sample
+from general.state_info.sample import Sample
 
 EXP_FOLDER = '/home/gkahn/code/gps_quadrotor/experiments/rccar/'
 # SAVE_FOLDER = '/home/gkahn/Dropbox/Apps/ShareLaTeX/2017_RSS_ProbColl/figures/exps/'

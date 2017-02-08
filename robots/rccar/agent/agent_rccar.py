@@ -10,8 +10,8 @@ from general.agent.agent import Agent
 
 import general.ros.ros_utils as ros_utils
 
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.policy.noise_models import ZeroNoise
+from general.state_info.sample import Sample
+from general.policy.noise_models import ZeroNoise
 
 from config import params
 

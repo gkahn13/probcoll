@@ -6,16 +6,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithms.prediction.analyze_prediction import AnalyzePrediction
+from general.algorithm.prediction.analyze import Analyze
 
 from config import params
 
-class AnalyzePredictionRCcar(AnalyzePrediction):
+class AnalyzeRCcar(Analyze):
 
     def __init__(self, on_replay=False):
-        rospy.init_node('analyze_prediction_rccar', anonymous=True)
+        rospy.init_node('analyze_rccar', anonymous=True)
 
-        AnalyzePrediction.__init__(self, on_replay=on_replay, parent_exp_dir=None)
+        Analyze.__init__(self, on_replay=on_replay, parent_exp_dir=None)
 
     #######################
     ### Data processing ###

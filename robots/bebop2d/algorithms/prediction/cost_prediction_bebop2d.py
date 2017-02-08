@@ -1,7 +1,7 @@
-from general.algorithms.prediction.cost_prediction import CostPrediction
+from general.algorithm.prediction.cost_probcoll import CostProbcoll
 
 
-class CostPredictionBebop2d(CostPrediction):
+class CostProbcollBebop2d(CostProbcoll):
 
     def __init__(self, bootstrap, **kwargs):
-        CostPrediction.__init__(self, bootstrap, **kwargs)
+        CostProbcoll.__init__(self, bootstrap, **kwargs)

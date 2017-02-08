@@ -3,12 +3,12 @@ import os
 import rospy
 import std_msgs.msg as std_msgs
 
-from general.algorithms.prediction.dagger_prediction import DaggerPrediction
+from general.algorithm.prediction.probcoll import Probcoll
 from general.traj_opt.conditions import Conditions
 import general.ros.ros_utils as ros_utils
 
-from robots.rccar.algorithms.prediction.prediction_model_rccar import PredictionModelRCcar
-from robots.rccar.algorithms.prediction.cost_prediction_rccar import CostPredictionRCcar
+from robots.rccar.algorithm.prediction.probcoll_model_rccar import ProbcollModelRCcar
+from robots.rccar.algorithm.prediction.cost_probcoll_rccar import CostProbcollRCcar
 
 from robots.rccar.dynamics.dynamics_rccar import DynamicsRCcar
 from robots.rccar.world.world_rccar import WorldRCcar
@@ -20,23 +20,23 @@ from robots.rccar.policy.teleop_mpc_policy_rccar import TeleopMPCPolicyRCcar
 from robots.rccar.policy.lattice_mpc_policy_rccar import LatticeMPCPolicyRCcar
 from robots.rccar.traj_opt.ilqr.cost.cost_velocity_rccar import cost_velocity_rccar
 
-from rll_quadrotor.state_info.sample import Sample
+from general.state_info.sample import Sample
 from rll_quadrotor.policy.cem_mpc_policy import CEMMPCPolicy
 
 from config import params
 
-class DaggerPredictionRCcar(DaggerPrediction):
+class ProbcollRCcar(Probcoll):
 
     def __init__(self, read_only=False):
-        DaggerPrediction.__init__(self, read_only=read_only)
+        Probcoll.__init__(self, read_only=read_only)
 
     def _setup(self):
-        rospy.init_node('DaggerPredictionRCcar', anonymous=True)
+        rospy.init_node('ProbcollRCcar', anonymous=True)
 
         pred_dagger_params = params['prediction']['dagger']
         world_params = params['world']
         cond_params = pred_dagger_params['conditions']
-        cp_params = pred_dagger_params['cost_prediction']
+        cp_params = pred_dagger_params['cost_probcoll']
 
         self.max_iter = pred_dagger_params['max_iter']
         self.dynamics = DynamicsRCcar()
@@ -48,9 +48,9 @@ class DaggerPredictionRCcar(DaggerPrediction):
         assert(self.world.randomize)
 
         ### load prediction neural net
-        self.bootstrap = PredictionModelRCcar(read_only=self.read_only)
+        self.bootstrap = ProbcollModelRCcar(read_only=self.read_only)
 
-        self.cost_cp = CostPredictionRCcar(self.bootstrap,
+        self.cost_cp = CostProbcollRCcar(self.bootstrap,
                                            weight=float(cp_params['weight']),
                                            eval_cost=cp_params['eval_cost'],
                                            pre_activation=cp_params['pre_activation'])

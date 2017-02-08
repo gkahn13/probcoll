@@ -1,30 +1,30 @@
 import numpy as np
 
-from general.algorithms.prediction.cost_prediction import CostPrediction
+from general.algorithm.prediction.cost_probcoll import CostProbcoll
 
-from rll_quadrotor.planning.ilqr.cost.cost import Cost
-from rll_quadrotor.planning.ilqr.util.approx import CostApprox
-from rll_quadrotor.utility.utils import posquat_to_pose
+from general.planning.cost.cost import Cost
+from general.planning.cost.approx import CostApprox
+from general.utility.utils import posquat_to_pose
 
 from config import params
 
-class CostPredictionPointquad(CostPrediction):
+class CostProbcollPointquad(CostProbcoll):
 
     def __init__(self, bootstrap, agent, **kwargs):
         self.agent = agent # TODO
-        CostPrediction.__init__(self, bootstrap, **kwargs)
+        CostProbcoll.__init__(self, bootstrap, **kwargs)
 
     def eval_batch(self, samples):
         """
         Hardcoded case in which the model
             (1) only depends on state X
             (2) horizon T = 1
-        If above not true, calls CostPrediction.eval_batch
+        If above not true, calls CostProbcoll.eval_batch
         """
-        return CostPrediction.eval_batch(self, samples)
+        return CostProbcoll.eval_batch(self, samples)
 
         # if self.bootstrap.T != 1:
-        #     return CostPrediction.eval_batch(self, samples)
+        #     return CostProbcoll.eval_batch(self, samples)
         #
         # assert(self.bootstrap.T == 1)
         #

@@ -4,8 +4,8 @@ from robots.pointquad.traj_opt.ilqr.cost.cost_velocity_pointquad import cost_vel
 
 from rll_quadrotor.policy.primitives_mpc_policy import PrimitivesMPCPolicy
 
-from rll_quadrotor.policy.policy import Policy
-from rll_quadrotor.state_info.sample import Sample
+from general.policy.policy import Policy
+from general.state_info.sample import Sample
 
 class PrimitivePolicyPointquadAngleSpeed(Policy):
 

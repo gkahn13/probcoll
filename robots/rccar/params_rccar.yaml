@@ -126,7 +126,7 @@ prediction:
     use_init_cost: True # TODO
     epsilon_greedy: 0
 
-    cost_prediction:
+    cost_probcoll:
       weight: 1e3 # TODO
       eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
       pre_activation: True
@@ -171,7 +171,7 @@ rccar:
     camera_info: '/bair_car/down/camera_info'
     # and for debugging
     debug_cost: '/bair_car/debug_cost' # visualization_msgs/MarkerArray
-    debug_cost_prediction: '/bair_car/debug_cost_prediction' # visualization_msgs/MarkerArray
+    debug_cost_probcoll: '/bair_car/debug_cost_probcoll' # visualization_msgs/MarkerArray
 
 ######################################################
 ########### States, controls, observations ###########

@@ -4,26 +4,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithms.prediction.analyze_prediction import AnalyzePrediction
+from general.algorithm.prediction.analyze import Analyze
 import general.utility.colormaps as cmaps
 
-from robots.pointquad.algorithms.prediction.prediction_model_pointquad import PredictionModelPointquad
+from robots.pointquad.algorithm.prediction.probcoll_model_pointquad import ProbcollModelPointquad
 from robots.pointquad.dynamics.dynamics_pointquad import DynamicsPointquad
 from robots.pointquad.world.world_pointquad import WorldPointquad
 from robots.pointquad.agent.agent_pointquad import AgentPointquad
 from robots.pointquad.traj_opt.traj_opt_pointquad import TrajoptPointquad
 from robots.pointquad.policy.primitives_mpc_policy_pointquad import PrimitivesMPCPolicyPointquad
-from robots.pointquad.algorithms.prediction.cost_prediction_pointquad import CostPredictionPointquad
+from robots.pointquad.algorithm.prediction.cost_probcoll_pointquad import CostProbcollPointquad
 
-from rll_quadrotor.state_info.sample import Sample
-from rll_quadrotor.policy.noise_models import ZeroNoise
+from general.state_info.sample import Sample
+from general.policy.noise_models import ZeroNoise
 
 from config import params
 
-class AnalyzePredictionPointquad(AnalyzePrediction):
+class AnalyzePointquad(Analyze):
 
     def __init__(self, on_replay=False):
-        AnalyzePrediction.__init__(self, on_replay=on_replay, parent_exp_dir='/media/gkahn/ExtraDrive1/data/')
+        Analyze.__init__(self, on_replay=on_replay, parent_exp_dir='/media/gkahn/ExtraDrive1/data/')
 
         self.world = WorldPointquad()
         self.world.env.clear()
@@ -36,7 +36,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
     ### Data processing ###
     #######################
 
-    def _evaluate_prediction_model(self):
+    def _evaluate_probcoll_model(self):
         ### get prediction model evaluations for all iterations
         itr = 0
         itrs_Xs, itrs_prob_means, itrs_prob_stds, itrs_costs = [], [], [], []
@@ -45,7 +45,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
             model_file = self._itr_model_file(itr)
             if not os.path.exists(model_file):
                 break
-            bootstrap = PredictionModelPointquad(read_only=True, finalize=False)
+            bootstrap = ProbcollModelPointquad(read_only=True, finalize=False)
             bootstrap.load(model_file=model_file)
 
             wd = self._load_world_file(itr, 0, 0)
@@ -75,7 +75,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
 
                 samples.append(s)
 
-            cp_params = params['prediction']['dagger']['cost_prediction']
+            cp_params = params['prediction']['dagger']['cost_probcoll']
             eval_cost = cp_params['eval_cost']
             pre_activation = cp_params['pre_activation']
             probs_mean_batch, probs_std_batch = bootstrap.eval_sample_batch(samples,
@@ -123,7 +123,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
             model_file = self._itr_model_file(itr)
             if not os.path.exists(model_file):
                 break
-            bootstrap = PredictionModelPointquad(read_only=True, finalize=False)
+            bootstrap = ProbcollModelPointquad(read_only=True, finalize=False)
             bootstrap.load(model_file=model_file)
 
             wd = self._load_world_file(itr, 0, 0)
@@ -134,8 +134,8 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
                 self.world.env.add_box(pose, extents)
 
             ### create MPC
-            cp_params = params['prediction']['dagger']['cost_prediction']
-            cost_cp = CostPredictionPointquad(bootstrap, None,
+            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cost_cp = CostProbcollPointquad(bootstrap, None,
                                               weight=float(cp_params['weight']),
                                               eval_cost=cp_params['eval_cost'],
                                               pre_activation=cp_params['pre_activation'])
@@ -184,7 +184,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
 
 
             ### evaluate on grid
-            cp_params = params['prediction']['dagger']['cost_prediction']
+            cp_params = params['prediction']['dagger']['cost_probcoll']
             eval_cost = cp_params['eval_cost']
             pre_activation = cp_params['pre_activation']
             probs_mean_batch, probs_std_batch = bootstrap.eval_sample_batch(samples,
@@ -222,11 +222,11 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
 
         return itrs_Xs, itrs_thetas, itrs_speeds, itrs_prob_means, itrs_prob_stds, itrs_costs
 
-    def _evaluate_prediction_model_on_samples(self, bootstrap, itr, samples, mpcs):
+    def _evaluate_probcoll_model_on_samples(self, bootstrap, itr, samples, mpcs):
         ### load NN
         H = params['prediction']['model']['T']
         model_file = self._itr_model_file(itr)
-        if not PredictionModelPointquad.checkpoint_exists(model_file):
+        if not ProbcollModelPointquad.checkpoint_exists(model_file):
             return [None]*len(samples), [None]*len(samples)
 
         bootstrap.load(model_file=model_file)
@@ -246,7 +246,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
 
         return means, stds
 
-    def _evaluate_prediction_model_groundtruth(self):
+    def _evaluate_probcoll_model_groundtruth(self):
         """
         For each primitive, execute the primitive for T timesteps to obtain ground truth, and compare label
         """
@@ -259,7 +259,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
             model_file = self._itr_model_file(itr)
             if not os.path.exists(model_file):
                 break
-            bootstrap = PredictionModelPointquad(read_only=True, finalize=False)
+            bootstrap = ProbcollModelPointquad(read_only=True, finalize=False)
             bootstrap.load(model_file=model_file)
 
             wd = self._load_world_file(itr, 0, 0)
@@ -270,8 +270,8 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
                 self.world.env.add_box(pose, extents)
 
             ### create MPC
-            cp_params = params['prediction']['dagger']['cost_prediction']
-            cost_cp = CostPredictionPointquad(bootstrap, None,
+            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cost_cp = CostProbcollPointquad(bootstrap, None,
                                               weight=float(cp_params['weight']),
                                               eval_cost=cp_params['eval_cost'],
                                               pre_activation=cp_params['pre_activation'])
@@ -440,10 +440,10 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
         pkl_dict['U'] = [[s.get_U() for s in samples_itr] for samples_itr in samples_itrs]
 
         # mpcs_itrs = self._load_mpcs()
-        # bootstrap = PredictionModelPointquad(read_only=True, finalize=False)
+        # bootstrap = ProbcollModelPointquad(read_only=True, finalize=False)
         # means_itrs, stds_itrs = [], []
         # for i, (samples, mpcs) in enumerate(zip(samples_itrs, mpcs_itrs)):
-        #     means, stds = self._evaluate_prediction_model_on_samples(bootstrap, i, samples, mpcs)
+        #     means, stds = self._evaluate_probcoll_model_on_samples(bootstrap, i, samples, mpcs)
         #     means_itrs.append(means)
         #     stds_itrs.append(stds)
         # bootstrap.close()
@@ -465,8 +465,8 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
         with open(self._plot_stats_file_pkl, 'w') as f:
             pickle.dump(pkl_dict, f)
 
-    def _plot_prediction_model(self):
-        itrs_Xs, itrs_prob_means, itrs_prob_stds, itrs_costs = self._evaluate_prediction_model()
+    def _plot_probcoll_model(self):
+        itrs_Xs, itrs_prob_means, itrs_prob_stds, itrs_costs = self._evaluate_probcoll_model()
         samples = self._load_samples()
 
         samples = samples[:len(itrs_Xs)]
@@ -643,7 +643,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
         f_std_hist.savefig(self._plot_pred_std_hist_file, dpi=400)
 
     def _plot_prediction_groundtruth(self):
-        itrs_gt_crashes, itrs_pred_crashes, positions, speeds_angles = self._evaluate_prediction_model_groundtruth()
+        itrs_gt_crashes, itrs_pred_crashes, positions, speeds_angles = self._evaluate_probcoll_model_groundtruth()
 
         sqrt_num_axes = int(np.ceil(np.sqrt(len(itrs_gt_crashes))))
         f, axes = plt.subplots(sqrt_num_axes, sqrt_num_axes, figsize=(25, 25))
@@ -721,7 +721,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
 
             wd = self._load_worlds()[i][0]
 
-            means, stds = self._evaluate_prediction_model_on_samples(i, itr_samples, itr_mpcs)
+            means, stds = self._evaluate_probcoll_model_on_samples(i, itr_samples, itr_mpcs)
 
             ### plot samples
             for axes_row, colors_row in zip((axes_mean.ravel(), axes_std.ravel()), (means, stds)):
@@ -835,7 +835,7 @@ class AnalyzePredictionPointquad(AnalyzePrediction):
             # self._plot_samples_prediction()
         if plot_single:
             print('Plotting single')
-            self._plot_prediction_model()
+            self._plot_probcoll_model()
         if plot_traj:
             print('Plotting traj')
             self._plot_prediction_trajectory_model()

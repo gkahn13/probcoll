@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithms.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_cum_crash_speeds, plot_boxplot_xvels, plot_safety_vs_performance, plot_crash_timeline, plot_crash_speed_video
+from general.algorithm.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_cum_crash_speeds, plot_boxplot_xvels, plot_safety_vs_performance, plot_crash_timeline, plot_crash_speed_video
 
 EXP_FOLDER = '/media/gkahn/ExtraDrive1/data/bebop2d/'
 SAVE_FOLDER = '/home/gkahn/Dropbox/Apps/ShareLaTeX/2017_RSS_ProbColl/figures/exps/'

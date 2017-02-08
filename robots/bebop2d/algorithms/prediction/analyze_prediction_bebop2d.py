@@ -6,10 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithms.prediction.analyze_prediction import AnalyzePrediction
+from general.algorithm.prediction.analyze import Analyze
 
-from robots.bebop2d.algorithms.prediction.prediction_model_bebop2d import PredictionModelBebop2d
-from robots.bebop2d.algorithms.prediction.cost_prediction_bebop2d import CostPredictionBebop2d
+from robots.bebop2d.algorithm.prediction.probcoll_model_bebop2d import ProbcollModelBebop2d
+from robots.bebop2d.algorithm.prediction.cost_probcoll_bebop2d import CostProbcollBebop2d
 from robots.bebop2d.traj_opt.ilqr.cost.cost_velocity_bebop2d import cost_velocity_bebop2d
 from robots.bebop2d.dynamics.dynamics_bebop2d import DynamicsBebop2d
 from robots.bebop2d.world.world_bebop2d import WorldBebop2d
@@ -18,16 +18,16 @@ from robots.bebop2d.traj_opt.traj_opt_bebop2d import TrajoptBebop2d
 from robots.bebop2d.policy.primitives_mpc_policy_bebop2d import PrimitivesMPCPolicyBebop2d
 
 from rll_quadrotor.policy.cem_mpc_policy import CEMMPCPolicy
-from rll_quadrotor.policy.noise_models import ZeroNoise
+from general.policy.noise_models import ZeroNoise
 
 from config import params
 
-class AnalyzePredictionBebop2d(AnalyzePrediction):
+class AnalyzeBebop2d(Analyze):
 
     def __init__(self, on_replay=False):
-        rospy.init_node('analyze_prediction_bebop2d', anonymous=True)
+        rospy.init_node('analyze_bebop2d', anonymous=True)
 
-        AnalyzePrediction.__init__(self, on_replay=on_replay, parent_exp_dir='/media/gkahn/ExtraDrive1/data/')
+        Analyze.__init__(self, on_replay=on_replay, parent_exp_dir='/media/gkahn/ExtraDrive1/data/')
 
         self.world = WorldBebop2d(None, wp=params['world'])
         self.dynamics = DynamicsBebop2d()
@@ -83,14 +83,14 @@ class AnalyzePredictionBebop2d(AnalyzePrediction):
 
             ### load NN
             model_file = self._itr_model_file(itr)
-            if not PredictionModelBebop2d.checkpoint_exists(model_file):
+            if not ProbcollModelBebop2d.checkpoint_exists(model_file):
                 break
-            bootstrap = PredictionModelBebop2d(read_only=True, finalize=False)
+            bootstrap = ProbcollModelBebop2d(read_only=True, finalize=False)
             bootstrap.load(model_file=model_file)
 
             ### create MPC
-            cp_params = params['prediction']['dagger']['cost_prediction']
-            cost_cp = CostPredictionBebop2d(bootstrap,
+            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cost_cp = CostProbcollBebop2d(bootstrap,
                                             weight=float(cp_params['weight']),
                                             eval_cost=cp_params['eval_cost'],
                                             pre_activation=cp_params['pre_activation'])

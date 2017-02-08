@@ -6,8 +6,8 @@ import bebop_msgs.msg as bebop_msgs
 
 import general.ros.ros_utils as ros_utils
 
-from rll_quadrotor.policy.policy import Policy
-from rll_quadrotor.utility.logger import get_logger
+from general.policy.policy import Policy
+from general.utility.logger import get_logger
 
 class TeleopMPCPolicyBebop2d(Policy):
 

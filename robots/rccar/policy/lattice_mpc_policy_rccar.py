@@ -9,8 +9,8 @@ from robots.rccar.traj_opt.ilqr.cost.cost_velocity_rccar import cost_velocity_rc
 
 from rll_quadrotor.policy.primitives_mpc_policy import PrimitivesMPCPolicy
 
-from rll_quadrotor.policy.policy import Policy
-from rll_quadrotor.state_info.sample import Sample
+from general.policy.policy import Policy
+from general.state_info.sample import Sample
 
 class LatticePolicyRCcar(Policy):
     def __init__(self, T, meta_data, U, dynamics):

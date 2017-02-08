@@ -7,7 +7,7 @@ import matplotlib.cm as cm
 
 
 
-from general.algorithms.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_cum_crash_speeds, plot_boxplot_xvels, plot_safety_vs_performance, plot_crash_speed_video
+from general.algorithm.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_cum_crash_speeds, plot_boxplot_xvels, plot_safety_vs_performance, plot_crash_speed_video
 
 EXP_FOLDER_SSD = '/home/gkahn/code/gps_quadrotor/experiments/pointquad'
 EXP_FOLDER_HDD = '/media/gkahn/ExtraDrive1/data/pointquad/'

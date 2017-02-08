@@ -4,10 +4,8 @@ import pickle, yaml, shutil
 import numpy as np
 import scipy, scipy.misc
 import h5py
-from base_classes import FixedSingleton
-from gps_assert import *
 
-from rll_quadrotor.utility.logger import get_logger
+from general.utility.logger import get_logger
 
 from config import params, path
 
