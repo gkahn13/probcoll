@@ -10,8 +10,8 @@ class Agent(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, dynamics):
-        self.dynamics = dynamics
-        self.logger = get_logger(self.__class__.__name__, 'info')
+        self._dynamics = dynamics
+        self._logger = get_logger(self.__class__.__name__, 'info')
 
     def sample_policy(self, x0, policy, T=None, **policy_args):
         """
@@ -41,7 +41,7 @@ class Agent(object):
 
             # propagate dynamics
             if t < T-1:
-                x_tp1 = self.dynamics.evolve(x_t, u_t)
+                x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
 
         return policy_sample

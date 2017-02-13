@@ -19,7 +19,7 @@ class PrimitivePolicyRCcarSteerVelocity(Policy):
 
         self.steers = steers
         self.vels = vels
-        self.dynamics = dynamics
+        self._dynamics = dynamics
 
     def act(self, x, obs, t, noise, ref_traj=None):
         ### create desired path (radiates outward)
@@ -36,7 +36,7 @@ class PrimitivePolicyRCcarSteerVelocity(Policy):
         for t in xrange(T-1):
             u_t = traj.get_U(t=t)
             x_t = traj.get_X(t=t)
-            x_tp1 = self.dynamics.evolve(x_t, u_t)
+            x_tp1 = self._dynamics.evolve(x_t, u_t)
 
             traj.set_X(x_tp1, t=t+1)
 

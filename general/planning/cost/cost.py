@@ -21,9 +21,5 @@ class Cost(object):
         """
         raise NotImplementedError("Must be implemented in subclass")
 
-    def eval_vec(self, x, u):
-        sample = Sample(1)
-        sample.set_X(x, t=0)
-        sample.set_U(u, t=0)
-        cst = self.eval(sample)
-        return cst
+    def eval_batch(self, samples):
+        return [self.eval(sample) for sample in samples]

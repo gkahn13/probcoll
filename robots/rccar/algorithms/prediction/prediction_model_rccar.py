@@ -50,7 +50,7 @@ class ProbcollModelRCcar(ProbcollModel):
                 # new_sample.set_X(sample.get_X(t=slice(0, T_sample-t_forward)), t=slice(0, T_sample-t_forward))
                 sample = new_sample
             except:
-                self.logger.debug('Modify sample exception')
+                self._logger.debug('Modify sample exception')
 
         return [sample]
 
@@ -77,9 +77,9 @@ class ProbcollModelRCcar(ProbcollModel):
             else:
                 samples_no_coll.append(i)
 
-        self.logger.info('Percentage samples ending in collision: {0:.2f}'.format(
+        self._logger.info('Percentage samples ending in collision: {0:.2f}'.format(
             len(samples_coll) / float(len(samples_coll) + len(samples_no_coll))))
-        self.logger.info('Percentage with P(coll < {0:.2f}) = {1:f}'.format(self.dist_eps,
+        self._logger.info('Percentage with P(coll < {0:.2f}) = {1:f}'.format(self.dist_eps,
                                                                             len(idxs_coll) / float(
                                                                                 len(idxs_coll) + len(idxs_no_coll))))
 
@@ -89,7 +89,7 @@ class ProbcollModelRCcar(ProbcollModel):
         if bd_param['type'] == 'collision':# and len(samples_coll) >= 2 and len(samples_no_coll) >= 2:
             resample_param = bd_param['collision']
             pct_coll = resample_param['pct_coll']
-            self.logger.info('Rebalancing data to be {0:.2f}% collision'.format(100 * pct_coll))
+            self._logger.info('Rebalancing data to be {0:.2f}% collision'.format(100 * pct_coll))
 
             ### split by traj
             ### ensure both training and test have at least one collision and no collision
@@ -185,7 +185,7 @@ class ProbcollModelRCcar(ProbcollModel):
 
         else:
             ### default no balancing
-            self.logger.info('Not rebalancing data')
+            self._logger.info('Not rebalancing data')
             return ProbcollModel._balance_data(self, start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)
 
     #############
@@ -193,7 +193,7 @@ class ProbcollModelRCcar(ProbcollModel):
     #############
 
     def _get_old_graph_inference(self, graph_type='fc'):
-        self.logger.info('Graph type: {0}'.format(graph_type))
+        self._logger.info('Graph type: {0}'.format(graph_type))
         sys.path.append(os.path.dirname(self._code_file))
         exec('from {0} import {1} as OldProbcollModel'.format(
             os.path.basename(self._code_file).split('.')[0], 'ProbcollModelRCcar'))

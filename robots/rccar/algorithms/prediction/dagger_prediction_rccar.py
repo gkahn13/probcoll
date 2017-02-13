@@ -38,19 +38,19 @@ class ProbcollRCcar(Probcoll):
         cond_params = pred_dagger_params['conditions']
         cp_params = pred_dagger_params['cost_probcoll']
 
-        self.max_iter = pred_dagger_params['max_iter']
-        self.dynamics = DynamicsRCcar()
-        self.agent = AgentRCcar(self.dynamics)
-        self.world = WorldRCcar(self.agent, self._bag_file, wp=world_params)
-        self.trajopt = TrajoptRCcar(self.dynamics, self.world, self.agent)
-        self.conditions = Conditions(cond_params=cond_params)
+        self._max_iter = pred_dagger_params['max_iter']
+        self._dynamics = DynamicsRCcar()
+        self._agent = AgentRCcar(self._dynamics)
+        self._world = WorldRCcar(self._agent, self._bag_file, wp=world_params)
+        self._trajopt = TrajoptRCcar(self._dynamics, self._world, self._agent)
+        self._conditions = Conditions(cond_params=cond_params)
 
-        assert(self.world.randomize)
+        assert(self._world.randomize)
 
         ### load prediction neural net
-        self.bootstrap = ProbcollModelRCcar(read_only=self.read_only)
+        self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
 
-        self.cost_cp = CostProbcollRCcar(self.bootstrap,
+        self._cost_probcoll = CostProbcollRCcar(self._probcoll_model,
                                            weight=float(cp_params['weight']),
                                            eval_cost=cp_params['eval_cost'],
                                            pre_activation=cp_params['pre_activation'])
@@ -76,17 +76,17 @@ class ProbcollRCcar(Probcoll):
 
     def _reset_world(self, itr, cond, rep):
         if cond == 0 and rep == 0:
-            self.logger.info('Press A or B to start')
+            self._logger.info('Press A or B to start')
             self._ros_is_good_rollout()
         back_up = self.coll_callback.get() is not None # only back up if experienced a crash
-        self.world.reset(back_up, itr=itr, cond=cond, rep=rep)
+        self._world.reset(back_up, itr=itr, cond=cond, rep=rep)
 
     def _update_world(self, sample, t):
         return
 
     def _is_good_rollout(self, sample, t):
-        self.agent.execute_control(None) # stop the car        
-        self.logger.info('Is good rollout? (A for yes, B for no)')
+        self._agent.execute_control(None) # stop the car
+        self._logger.info('Is good rollout? (A for yes, B for no)')
         return self._ros_is_good_rollout()
 
     def _ros_is_good_rollout(self):
@@ -111,42 +111,42 @@ class ProbcollRCcar(Probcoll):
         sample0.set_X(x0, t=0)
         self._update_world(sample0, 0)
 
-        self.logger.info('\t\t\tCreating MPC')
+        self._logger.info('\t\t\tCreating MPC')
 
-        if self.planner_type == 'primitives':
+        if self._planner_type == 'primitives':
             additional_costs = []
-            mpc_policy = PrimitivesMPCPolicyRCcar(self.trajopt,
-                                                  self.cost_cp,
+            mpc_policy = PrimitivesMPCPolicyRCcar(self._trajopt,
+                                                  self._cost_probcoll,
                                                   additional_costs=additional_costs,
                                                   meta_data=params,
                                                   use_threads=False,
                                                   plot=True,
                                                   epsilon_greedy=params['prediction']['dagger']['epsilon_greedy'])
-        elif self.planner_type == 'cem':
-            costs = [self.cost_cp,
+        elif self._planner_type == 'cem':
+            costs = [self._cost_probcoll,
                      cost_velocity_rccar(params['mpc']['H'],
                                          params['trajopt']['cost_velocity']['u_des'],
                                          params['trajopt']['cost_velocity']['u_weights'],
                                          weight_scale=1.0)]
-            mpc_policy = CEMMPCPolicy(self.world,
-                                      self.dynamics,
+            mpc_policy = CEMMPCPolicy(self._world,
+                                      self._dynamics,
                                       costs,
                                       meta_data=params)
-        elif self.planner_type == 'straight':
+        elif self._planner_type == 'straight':
             mpc_policy = StraightPolicyRCcar(meta_data=params)
-        elif self.planner_type == 'teleop':
+        elif self._planner_type == 'teleop':
             mpc_policy = TeleopMPCPolicyRCcar(meta_data=params)
-        elif self.planner_type == 'lattice':
+        elif self._planner_type == 'lattice':
             additional_costs = []
-            mpc_policy = LatticeMPCPolicyRCcar(self.trajopt,
-                                               self.cost_cp,
+            mpc_policy = LatticeMPCPolicyRCcar(self._trajopt,
+                                               self._cost_probcoll,
                                                additional_costs=additional_costs,
                                                meta_data=params,
                                                use_threads=False,
                                                plot=True,
                                                epsilon_greedy=params['prediction']['dagger']['epsilon_greedy'])
         else:
-            raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self.planner_type))
+            raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))
 
         return mpc_policy
 
@@ -156,5 +156,5 @@ class ProbcollRCcar(Probcoll):
 
     def _get_world_info(self):
         ### just returns empty dict, but function call terminates bag recording
-        return self.world.get_info()
+        return self._world.get_info()
 

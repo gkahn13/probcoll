@@ -20,7 +20,7 @@ class PrimitivePolicyBebop2dAngleSpeed(Policy):
 
         self.theta = theta
         self.speed = speed
-        self.dynamics = dynamics
+        self._dynamics = dynamics
 
     def act(self, x, obs, t, noise, ref_traj=None):
         ### create desired path (radiates outward)
@@ -35,7 +35,7 @@ class PrimitivePolicyBebop2dAngleSpeed(Policy):
         linearvel = [speed * np.cos(theta), speed * np.sin(theta)]
         for t in xrange(T-1):
             x_t = traj.get_X(t=t)
-            x_tp1 = self.dynamics.evolve(x_t, linearvel)
+            x_tp1 = self._dynamics.evolve(x_t, linearvel)
 
             traj.set_X(x_tp1, t=t+1)
             traj.set_U(linearvel, t=t)

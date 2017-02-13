@@ -61,7 +61,7 @@ class AgentBebop2d(Agent):
 
             # propagate dynamics
             if t < T-1:
-                x_tp1 = self.dynamics.evolve(x_t, u_t)
+                x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
             rate.sleep()
 

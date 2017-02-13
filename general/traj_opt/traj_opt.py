@@ -8,9 +8,9 @@ class Trajopt(object):
         :type world: World
         :type agent: Agent
         """
-        self.dynamics = dynamics
-        self.world = world
-        self.agent = agent
+        self._dynamics = dynamics
+        self._world = world
+        self._agent = agent
 
     @abc.abstractmethod
     def plan(self, x0, additional_costs=[]):

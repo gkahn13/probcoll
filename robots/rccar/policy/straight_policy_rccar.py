@@ -7,7 +7,7 @@ class StraightPolicyRCcar(Policy):
     def __init__(self, meta_data):
         use_obs = False
         Policy.__init__(self, meta_data['mpc']['H'], use_obs, meta_data)
-        self.logger = get_logger(self.__class__.__name__, 'warn')
+        self._logger = get_logger(self.__class__.__name__, 'warn')
 
     def act(self, x, obs, t, noise, ref_traj=None):
         s = Sample(meta_data=self._meta_data, T=2)

@@ -111,10 +111,10 @@ class ProbcollModel:
         self.save_dir = os.path.join(self.fm.dir, 'prediction')
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
-        self.logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
+        self._logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
 
         self.random_seed = params['random_seed']
-        for k, v in params['prediction']['model'].items():
+        for k, v in params['model'].items():
             setattr(self, k, v)
 
         self.dX = len(self.X_idxs())
@@ -133,9 +133,9 @@ class ProbcollModel:
 
         code_file_exists = os.path.exists(self._code_file)
         if code_file_exists:
-            self.logger.info('Creating OLD graph')
+            self._logger.info('Creating OLD graph')
         else:
-            self.logger.info('Creating NEW graph')
+            self._logger.info('Creating NEW graph')
             shutil.copyfile(self._this_file, self._code_file)
         self._graph_inference = self._get_old_graph_inference(graph_type=self.graph_type)
 
@@ -225,7 +225,7 @@ class ProbcollModel:
         random.shuffle(npz_fnames)
         for npz_fname in npz_fnames:
             ### load samples
-            # self.logger.debug('\tOpening {0}'.format(npz_fname))
+            # self._logger.debug('\tOpening {0}'.format(npz_fname))
 
             samples = Sample.load(npz_fname)
             random.shuffle(samples)
@@ -492,8 +492,8 @@ class ProbcollModel:
             tfrecords_val = self.npz_fnames[-1].replace('.npz', '_val_' + self._hash + '.tfrecords')
             preprocess_fname = self.npz_fnames[-1].replace('.npz', '_mean_' + self._hash + '.npz')
 
-            self.logger.info('Current npz_fnames: {0}'.format(self.npz_fnames))
-            self.logger.info('Generating and saving to {0}'.format(tfrecords_train))
+            self._logger.info('Current npz_fnames: {0}'.format(self.npz_fnames))
+            self._logger.info('Generating and saving to {0}'.format(tfrecords_train))
             ### load samples
             random.shuffle(self.npz_fnames)
             start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample = self._load_samples(self.npz_fnames)
@@ -502,7 +502,7 @@ class ProbcollModel:
             bootstrap_start_idxs_by_val_sample, X_by_val_sample, U_by_val_sample, O_by_val_sample, output_by_val_sample = \
                 self._balance_data(start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)
             ### save train/val tfrecords
-            self.logger.info('Saving tfrecords')
+            self._logger.info('Saving tfrecords')
             self._save_tfrecords(tfrecords_train, bootstrap_start_idxs_by_train_sample,
                                  X_by_train_sample, U_by_train_sample, O_by_train_sample, output_by_train_sample)
             self._save_tfrecords(tfrecords_val, bootstrap_start_idxs_by_val_sample,
@@ -522,7 +522,7 @@ class ProbcollModel:
             for npz, tfrecords_train, tfrecords_val, mean in zip(npz_fnames,
                                                                  tfrecords_train_fnames, tfrecords_val_fnames, preprocess_fnames):
                 if not os.path.exists(tfrecords_train) or not os.path.exists(tfrecords_val):
-                    self.logger.info('Generating and saving to {0}'.format(tfrecords_train))
+                    self._logger.info('Generating and saving to {0}'.format(tfrecords_train))
                     ### load samples
                     start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample = \
                         self._load_samples([npz])
@@ -539,7 +539,7 @@ class ProbcollModel:
                     self._save_preprocess(mean, X_by_train_sample, U_by_train_sample, O_by_train_sample)
 
                 else:
-                    self.logger.info('{0} already exists'.format(tfrecords_train))
+                    self._logger.info('{0} already exists'.format(tfrecords_train))
 
             self.npz_fnames += npz_fnames
             self.tfrecords_train_fnames += tfrecords_train_fnames
@@ -943,7 +943,7 @@ class ProbcollModel:
             self.coord = tf.train.Coordinator()
             self.threads = tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
 
-        self.logger.debug('Flushing queue')
+        self._logger.debug('Flushing queue')
         self._flush_queue()
 
         ### create plotter
@@ -1001,7 +1001,7 @@ class ProbcollModel:
                 val_values = defaultdict(list)
                 val_nums = defaultdict(float)
 
-                self.logger.debug('\tComputing validation...')
+                self._logger.debug('\tComputing validation...')
                 while True:
                     val_cost, val_cross_entropy, \
                     val_err, val_err_coll, val_err_nocoll, \
@@ -1030,7 +1030,7 @@ class ProbcollModel:
                 plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
                 plotter.plot()
 
-                self.logger.debug(
+                self._logger.debug(
                     'Epoch {0:d},  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f} ({7:.2f} s per {8:04d} samples)'.format(
                         train_epoch + 1,
                         100 * np.mean(val_values['err']),
@@ -1045,7 +1045,7 @@ class ProbcollModel:
                 for k, v in train_fnames_dict.items():
                     fnames_condensed[k.split(self._hash)[0]] += v
                 for k, v in sorted(fnames_condensed.items(), key=lambda x: x[1]):
-                    self.logger.debug('\t\t\t{0} : {1}'.format(k, v))
+                    self._logger.debug('\t\t\t{0} : {1}'.format(k, v))
 
                 epoch_start = time.time()
 
@@ -1087,7 +1087,7 @@ class ProbcollModel:
                 plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
                 plotter.plot()
 
-                self.logger.debug('\tepoch {0:d}/{1:d}, step pct: {2:.1f}%,  error: {3:5.2f}%,  error coll: {4:5.2f}%,  error nocoll: {5:5.2f}%,  pct coll: {6:4.1f}%,  cost: {7:4.2f}, ce: {8:4.2f}'.format(
+                self._logger.debug('\tepoch {0:d}/{1:d}, step pct: {2:.1f}%,  error: {3:5.2f}%,  error coll: {4:5.2f}%,  error nocoll: {5:5.2f}%,  pct coll: {6:4.1f}%,  cost: {7:4.2f}, ce: {8:4.2f}'.format(
                     train_epoch, self.epochs,
                     100 * step / float(self.steps),
                     100 * np.mean(train_values['err']),

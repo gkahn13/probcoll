@@ -15,36 +15,28 @@ class Probcoll:
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, read_only=False):
-        self.use_cp_cost = True
-        self.planner_type = params['prediction']['dagger']['planner_type']
-        assert(self.planner_type == 'primitives' or
-               self.planner_type == 'cem' or
-               self.planner_type == 'ilqr' or
-               self.planner_type == 'randomwalk' or
-               self.planner_type == 'randomcontrolset' or
-               self.planner_type == 'teleop' or
-               self.planner_type == 'straight' or
-               self.planner_type == 'lattice')
-        self.read_only = read_only
+        self._use_cp_cost = True
+        self._planner_type = params['probcoll']['planner_type']
+        self._read_only = read_only
 
         self._setup()
 
-        self.logger = get_logger(self.__class__.__name__, 'info',
-                                 os.path.join(self.bootstrap.save_dir, 'dagger.txt'))
+        self._logger = get_logger(self.__class__.__name__, 'info',
+                                 os.path.join(self._probcoll_model.save_dir, 'dagger.txt'))
 
     @abc.abstractmethod
     def _setup(self):
         ### load prediction neural net
-        self.bootstrap = None
+        self._probcoll_model = None
 
-        self.cost_cp = None
+        self._cost_probcoll = None
 
-        self.max_iter = None
-        self.world = None
-        self.dynamics = None
-        self.agent = None
-        self.trajopt = None
-        self.conditions = None
+        self._max_iter = None
+        self._world = None
+        self._dynamics = None
+        self._agent = None
+        self._trajopt = None
+        self._conditions = None
 
         raise NotImplementedError('Implement in subclass')
 
@@ -78,7 +70,7 @@ class Probcoll:
 
     @property
     def _save_dir(self):
-        return os.path.abspath(self.bootstrap.save_dir)
+        return os.path.abspath(self._probcoll_model.save_dir)
 
     def _itr_dir(self, itr, create=True):
         assert(type(itr) is int)
@@ -140,7 +132,7 @@ class Probcoll:
             train neural network
         """
         ### find last model file
-        for model_start_itr in xrange(self.max_iter-1, -1, -1):
+        for model_start_itr in xrange(self._max_iter-1, -1, -1):
             model_file = self._itr_model_file(model_start_itr, create=False)
             if ProbcollModel.checkpoint_exists(model_file):
                 model_start_itr += 1
@@ -148,7 +140,7 @@ class Probcoll:
         else:
             model_file = None
             ### find last samples
-        for samples_start_itr in xrange(self.max_iter-1, -1, -1):
+        for samples_start_itr in xrange(self._max_iter-1, -1, -1):
             sample_file = self._itr_samples_file(samples_start_itr, create=False)
             if os.path.exists(sample_file):
                 samples_start_itr += 1
@@ -160,53 +152,53 @@ class Probcoll:
 
         ### load neural nets
         if model_file is not None:
-            self.logger.info('Loading model {0}'.format(model_file))
-            self.bootstrap.load(model_file=model_file)
+            self._logger.info('Loading model {0}'.format(model_file))
+            self._probcoll_model.load(model_file=model_file)
 
         ### load previous data
         if samples_start_itr > 0:
             prev_sample_files = [self._itr_samples_file(itr) for itr in xrange(samples_start_itr)]
             assert (os.path.exists(f) for f in prev_sample_files)
-            self.bootstrap.add_data(prev_sample_files)
+            self._probcoll_model.add_data(prev_sample_files)
         ### load initial dataset
         init_data_folder = params['prediction']['dagger'].get('init_data', None)
         if init_data_folder is not None:
-            self.logger.info('Adding initial data')
+            self._logger.info('Adding initial data')
             ext = os.path.splitext(self._itr_samples_file(0))[-1]
             fnames = [fname for fname in os.listdir(init_data_folder) if ext in fname]
             for fname in fnames:
-                self.logger.info('\t{0}'.format(fname))
-            self.bootstrap.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
+                self._logger.info('\t{0}'.format(fname))
+            self._probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
 
         ### if any data and haven't trained on it already, train on it
         if (model_start_itr == samples_start_itr - 1) or \
             (samples_start_itr == 0 and model_start_itr == 0 and init_data_folder is not None):
             old_model_file = None if samples_start_itr <= 0 else self._itr_model_file(model_start_itr)
-            self.bootstrap.train(old_model_file=old_model_file,
+            self._probcoll_model.train(old_model_file=old_model_file,
                                  new_model_file=self._itr_model_file(model_start_itr),
-                                 epochs=self.bootstrap.epochs)
+                                 epochs=self._probcoll_model.epochs)
         start_itr = samples_start_itr
 
         ### training loop
-        for itr in xrange(start_itr, self.max_iter):
-            self.logger.info('')
-            self.logger.info('=== Itr {0}'.format(itr))
-            self.logger.info('')
+        for itr in xrange(start_itr, self._max_iter):
+            self._logger.info('')
+            self._logger.info('=== Itr {0}'.format(itr))
+            self._logger.info('')
 
-            self.logger.info('Itr {0} flying'.format(itr))
+            self._logger.info('Itr {0} flying'.format(itr))
             self._run_itr(itr)
 
             if itr == 0 and False: # TODO
                 # on first itr, don't want to train (so we can visualize)
-                self.bootstrap.save(model_file=self._itr_model_file(itr))
+                self._probcoll_model.save(model_file=self._itr_model_file(itr))
             else:
-                if self.planner_type != 'randomwalk':
-                    self.logger.info('Itr {0} adding data'.format(itr))
-                    self.bootstrap.add_data([self._itr_samples_file(itr)])
-                    self.logger.info('Itr {0} training probability of collision'.format(itr))
-                    self.bootstrap.train(old_model_file=self._itr_model_file(itr-1),
+                if self._planner_type != 'randomwalk':
+                    self._logger.info('Itr {0} adding data'.format(itr))
+                    self._probcoll_model.add_data([self._itr_samples_file(itr)])
+                    self._logger.info('Itr {0} training probability of collision'.format(itr))
+                    self._probcoll_model.train(old_model_file=self._itr_model_file(itr-1),
                                          new_model_file=self._itr_model_file(itr),
-                                         epochs=self.bootstrap.epochs if itr > 1 else params['prediction']['dagger']['init_epochs'])
+                                         epochs=self._probcoll_model.epochs if itr > 1 else params['prediction']['dagger']['init_epochs'])
 
     def _run_itr(self, itr):
         T = params['prediction']['dagger']['T']
@@ -216,16 +208,16 @@ class Probcoll:
         world_infos = []
         mpc_infos = []
 
-        self.conditions.reset()
-        for cond in xrange(self.conditions.length):
+        self._conditions.reset()
+        for cond in xrange(self._conditions.length):
             rep = 0
-            while rep < self.conditions.repeats:
+            while rep < self._conditions.repeats:
                 # self._setup() # recreate everything so openrave doesn't get bogged down # TODO
-                self.logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
-                if (cond == 0 and rep == 0) or self.world.randomize:
+                self._logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
+                if (cond == 0 and rep == 0) or self._world.randomize:
                     self._reset_world(itr, cond, rep)
 
-                x0 = self.conditions.get_cond(cond, rep=rep)
+                x0 = self._conditions.get_cond(cond, rep=rep)
                 sample_T = Sample(meta_data=params, T=T)
                 sample_T.set_X(x0, t=0)
 
@@ -234,13 +226,13 @@ class Probcoll:
 
                 start = time.time()
                 for t in xrange(T):
-                    self.logger.info('\t\t\tt: {0}'.format(t))
+                    self._logger.info('\t\t\tt: {0}'.format(t))
                     # raw_input('Press enter to continue')
                     self._update_world(sample_T, t)
 
                     x0 = sample_T.get_X(t=t)
 
-                    rollout = self.agent.sample_policy(x0, mpc_policy, noise=control_noise, T=1)
+                    rollout = self._agent.sample_policy(x0, mpc_policy, noise=control_noise, T=1)
 
                     u = rollout.get_U(t=0)
                     o = rollout.get_O(t=0)
@@ -248,32 +240,32 @@ class Probcoll:
                     if label_with_noise or (control_noise is False):
                         u_label = u
                     else:
-                        u_label = self.agent.sample_policy(x0, mpc_policy, noise=ZeroNoise(params), T=1).get_U(t=0)
+                        u_label = self._agent.sample_policy(x0, mpc_policy, noise=ZeroNoise(params), T=1).get_U(t=0)
 
                     sample_T.set_U(u_label, t=t)
                     sample_T.set_O(o, t=t)
 
-                    if self.world.is_collision(sample_T, t=t):
-                        self.logger.warning('\t\t\tCrashed at t={0}'.format(t))
+                    if self._world.is_collision(sample_T, t=t):
+                        self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
                         break
 
                     if t < T-1:
-                        x_tp1 = self.dynamics.evolve(x0, u)
+                        x_tp1 = self._dynamics.evolve(x0, u)
                         sample_T.set_X(x_tp1, t=t+1)
 
                     if hasattr(mpc_policy, '_curr_traj'):
-                        self.world.update_visualization(sample_T, mpc_policy._curr_traj, t)
-                    # self.world.get_image(rollout)
+                        self._world.update_visualization(sample_T, mpc_policy._curr_traj, t)
+                    # self._world.get_image(rollout)
 
                 else:
-                    self.logger.info('\t\t\tLasted for t={0}'.format(t))
+                    self._logger.info('\t\t\tLasted for t={0}'.format(t))
 
                 sample = sample_T.match(slice(0, t + 1))
                 world_info = self._get_world_info()
                 mpc_info = mpc_policy.get_info()
 
                 if not self._is_good_rollout(sample, t):
-                    self.logger.warning('\t\t\tNot good rollout. Repeating rollout.'.format(t))
+                    self._logger.warning('\t\t\tNot good rollout. Repeating rollout.'.format(t))
                     continue
 
                 samples.append(sample)
@@ -282,7 +274,7 @@ class Probcoll:
 
                 assert(samples[-1].isfinite())
                 elapsed = time.time() - start
-                self.logger.info('\t\t\tFinished cond {0} rep {1} ({2:.1f}s, {3:.3f}x real-time)'.format(cond,
+                self._logger.info('\t\t\tFinished cond {0} rep {1} ({2:.1f}s, {3:.3f}x real-time)'.format(cond,
                                                                                                          rep,
                                                                                                          elapsed,
                                                                                                          t*params['dt']/elapsed))

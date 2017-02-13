@@ -17,7 +17,7 @@ from config import params
 
 class WorldPointquad(World):
 
-    def __init__(self, wp=None, view_rave=False):
+    def __init__(self, wp=None, **kwargs):
         World.__init__(self, wp=wp)
 
         self.randomize = self.wp['randomize']
@@ -26,6 +26,7 @@ class WorldPointquad(World):
         self.cond_forest = defaultdict(list)
         self.cond_hallway = defaultdict(list)
 
+        view_rave = kwargs.get('view_rave', self.wp['view_rave'])
         assert(not (self.plot and view_rave))
 
         self.rave_env = RaveEnv(view=view_rave)

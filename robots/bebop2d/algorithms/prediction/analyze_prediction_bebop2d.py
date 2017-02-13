@@ -29,17 +29,17 @@ class AnalyzeBebop2d(Analyze):
 
         Analyze.__init__(self, on_replay=on_replay, parent_exp_dir='/media/gkahn/ExtraDrive1/data/')
 
-        self.world = WorldBebop2d(None, wp=params['world'])
-        self.dynamics = DynamicsBebop2d()
-        self.agent = AgentBebop2d(self.dynamics)
-        self.trajopt = TrajoptBebop2d(self.dynamics, self.world, self.agent)
+        self._world = WorldBebop2d(None, wp=params['world'])
+        self._dynamics = DynamicsBebop2d()
+        self._agent = AgentBebop2d(self._dynamics)
+        self._trajopt = TrajoptBebop2d(self._dynamics, self._world, self._agent)
 
     def _create_mpc(self, cost_cp):
         # planner_type = params['prediction']['dagger']['planner_type']
         planner_type = 'primitives' # TODO
         if planner_type == 'primitives':
             additional_costs = []
-            mpc_policy = PrimitivesMPCPolicyBebop2d(self.trajopt,
+            mpc_policy = PrimitivesMPCPolicyBebop2d(self._trajopt,
                                                     cost_cp,
                                                     additional_costs=additional_costs,
                                                     meta_data=params,
@@ -57,7 +57,7 @@ class AnalyzeBebop2d(Analyze):
                 raise Exception('No additional cost function in yaml file')
             costs = [cost_cp] + additional_costs
             mpc_policy = CEMMPCPolicy(None,
-                                      self.dynamics,
+                                      self._dynamics,
                                       costs,
                                       meta_data=params)
         else:

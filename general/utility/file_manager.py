@@ -66,7 +66,7 @@ class FileManager(object):
         :param continue_writing: can continue writing to this folder
         """
         self._logger = get_logger(self.__class__.__name__, 'debug')
-        self.read_only = read_only
+        self._read_only = read_only
         self._filename_pattern = _FILE_PATTERN
         if parent_exp_dir is None:
             self.parent_exp_dir = os.path.join(
@@ -116,7 +116,7 @@ class FileManager(object):
     def _get_dir(self, d):
         assert not os.path.isfile(d), 'attempted to overwrite file or dir'
         if not os.path.isdir(d):
-            if not self.read_only:
+            if not self._read_only:
                 os.makedirs(d)
             else:
                 print 'attempted access to non-existing dir %s' % d

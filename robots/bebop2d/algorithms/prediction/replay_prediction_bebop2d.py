@@ -37,9 +37,9 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
         cond_params = copy.deepcopy(pred_dagger_params['conditions'])
         cond_params['repeats'] = 100
 
-        self.conditions = Conditions(cond_params=cond_params)
+        self._conditions = Conditions(cond_params=cond_params)
 
-        self.cost_cp_init = None
+        self._cost_probcoll_init = None
 
     #############
     ### Files ###
@@ -59,9 +59,9 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
     #####################
 
     def _reset_world(self, itr, cond, rep):
-        self.agent.execute_control(None) # stop bebop
+        self._agent.execute_control(None) # stop bebop
         self.bad_rollout_callback.get() # to clear it
-        self.world.reset(itr=itr, cond=cond, rep=rep, record=False)
+        self._world.reset(itr=itr, cond=cond, rep=rep, record=False)
 
     #########################
     ### Create controller ###
@@ -73,21 +73,21 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
         sample0.set_X(x0, t=0)
         self._update_world(sample0, 0)
 
-        self.logger.info('\t\t\tCreating MPC')
+        self._logger.info('\t\t\tCreating MPC')
 
-        if self.planner_type == 'primitives':
+        if self._planner_type == 'primitives':
             additional_costs = []
-            mpc_policy = PrimitivesMPCPolicyBebop2d(self.trajopt,
-                                                    self.cost_cp,
+            mpc_policy = PrimitivesMPCPolicyBebop2d(self._trajopt,
+                                                    self._cost_probcoll,
                                                     additional_costs=additional_costs,
                                                     meta_data=params,
                                                     use_threads=False,
                                                     plot=True,
                                                     epsilon_greedy=params['prediction']['dagger']['epsilon_greedy'])
-        elif self.planner_type == 'teleop':
+        elif self._planner_type == 'teleop':
             mpc_policy = TeleopMPCPolicyBebop2d(params)
         else:
-            raise NotImplementedError('planner_type {0} not implemented for bebop2d'.format(self.planner_type))
+            raise NotImplementedError('planner_type {0} not implemented for bebop2d'.format(self._planner_type))
 
         return mpc_policy
 
@@ -105,8 +105,8 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
         if not ProbcollModel.checkpoint_exists(model_file):
             return False
 
-        self.logger.info('Replaying itr {0}'.format(itr))
-        self.bootstrap.load(model_file=model_file)
+        self._logger.info('Replaying itr {0}'.format(itr))
+        self._probcoll_model.load(model_file=model_file)
         self._run_itr(itr)
         # self._run_itr_analyze(itr)
 
@@ -118,14 +118,14 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
         world_infos = []
         mpc_infos = []
 
-        self.conditions.reset()
-        for cond in xrange(self.conditions.length):
-            for rep in xrange(self.conditions.repeats):
-                self.logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
-                if (cond == 0 and rep == 0) or self.world.randomize:
+        self._conditions.reset()
+        for cond in xrange(self._conditions.length):
+            for rep in xrange(self._conditions.repeats):
+                self._logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
+                if (cond == 0 and rep == 0) or self._world.randomize:
                     self._reset_world(itr, cond, rep)
 
-                x0 = self.conditions.get_cond(cond, rep=rep)
+                x0 = self._conditions.get_cond(cond, rep=rep)
                 sample_T = Sample(meta_data=params, T=T)
                 sample_T.set_X(x0, t=0)
 
@@ -137,7 +137,7 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
 
                     x0 = sample_T.get_X(t=t)
 
-                    rollout = self.agent.sample_policy(x0, mpc_policy, noise=control_noise, T=1)
+                    rollout = self._agent.sample_policy(x0, mpc_policy, noise=control_noise, T=1)
 
                     u = rollout.get_U(t=0)
                     o = rollout.get_O(t=0)
@@ -147,10 +147,10 @@ class ReplayPredictionBebop2d(ProbcollBebop2d):
                     sample_T.set_O(o, t=t)
 
                     if hasattr(mpc_policy, '_curr_traj'):
-                        self.world.update_visualization(sample_T, mpc_policy._curr_traj, t)
+                        self._world.update_visualization(sample_T, mpc_policy._curr_traj, t)
 
                 else:
-                    self.logger.info('\t\t\tLasted for t={0}'.format(t))
+                    self._logger.info('\t\t\tLasted for t={0}'.format(t))
 
                 samples.append(sample_T)
                 world_infos.append(self._get_world_info())

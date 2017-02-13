@@ -12,15 +12,15 @@ from config import params
 
 class AgentPointquad(Agent):
     def __init__(self, world, dynamics, obs_noise=False, dyn_noise=False):
-        self.world = world
-        self.dynamics = dynamics
+        self._world = world
+        self._dynamics = dynamics
         self.meta_data = params
         self.obs_noise = obs_noise
         self.dyn_noise = dyn_noise
 
         self.depth_sensor = None
         if 'laserscan' in self.meta_data['O']:
-            self.depth_sensor = DepthSensor(self.world.rave_env,
+            self.depth_sensor = DepthSensor(self._world.rave_env,
                                             self.meta_data['O']['laserscan']['fov'],
                                             1.,  # arbitrary
                                             self.meta_data['O']['laserscan']['dim'],
@@ -29,17 +29,17 @@ class AgentPointquad(Agent):
 
         self.camera = None
         if 'camera' in self.meta_data['O']:
-            self.camera = self.world.panda_env
+            self.camera = self._world.panda_env
 
         self.cage_sensor = None
         if 'cage' in self.meta_data['O']:
-            self.cage_sensor = CageSensor(self.world.rave_env,
+            self.cage_sensor = CageSensor(self._world.rave_env,
                                           self.meta_data['O']['cage']['dim'],
                                           self.meta_data['O']['cage']['range'])
 
         self.sd_sensor = None
         if 'signed_distance' in self.meta_data['O']:
-            self.sd_sensor = SignedDistanceSensor(self.world.rave_env,
+            self.sd_sensor = SignedDistanceSensor(self._world.rave_env,
                                                   self.meta_data['O']['signed_distance']['extents'],
                                                   self.meta_data['O']['signed_distance']['sizes'],
                                                   self.meta_data['O']['signed_distance']['max_dist'])
@@ -80,7 +80,7 @@ class AgentPointquad(Agent):
 
             # propagate dynamics
             if t < T-1:
-                x_tp1 = self.dynamics.evolve(x_t, u_t)
+                x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
 
             x_tm1 = x_t
@@ -111,7 +111,7 @@ class AgentPointquad(Agent):
         # hacky way to make sure sensors don't see robot
 
         if 'collision' in self.meta_data['O']:
-            is_collision = self.world.is_collision(pose=origin)
+            is_collision = self._world.is_collision(pose=origin)
             obs_sample.set_O([float(is_collision)], t=0, sub_obs='collision')
         if self.depth_sensor:
             zbuffer = self.depth_sensor.read(origin, plot=False).ravel()

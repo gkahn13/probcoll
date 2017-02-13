@@ -17,7 +17,7 @@ from config import params
 class WorldRCcar(World):
 
     def __init__(self, agent, bag_file_func, wp=None):
-        self.agent = agent
+        self._agent = agent
         self.bag = None
         self.bag_lock = threading.Lock()
         self.bag_file_func = bag_file_func
@@ -42,7 +42,7 @@ class WorldRCcar(World):
                 rospy.Subscriber(topic, rostype, callback=self._bag_callback, callback_args=(topic,))
 
     def reset(self, back_up, itr=None, cond=None, rep=None, record=True):
-        self.agent.execute_control(None) # stop the car
+        self._agent.execute_control(None) # stop the car
         assert(itr is not None and cond is not None and rep is not None)
 
         ### back car up straight and slow
@@ -56,10 +56,10 @@ class WorldRCcar(World):
 
             start = time.time()
             while time.time() - start < self.wp['back_up']['duration']:
-                self.agent.execute_control(u)
+                self._agent.execute_control(u)
                 time.sleep(0.1)
 
-            self.agent.execute_control(None)
+            self._agent.execute_control(None)
 
             time.sleep(1.0)
 
@@ -112,5 +112,5 @@ class WorldRCcar(World):
     def _ros_collision_callback(self, msg):
         ### immediately stop the car if it's the first collision
         if self.num_collisions == 0:
-            self.agent.execute_control(None)
+            self._agent.execute_control(None)
         self.num_collisions += 1

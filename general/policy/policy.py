@@ -12,12 +12,11 @@ class Policy(UncopyableClass):
     """
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, T, use_obs):
-        self._T = T
-        self._use_obs = use_obs
+    def __init__(self):
+        pass
 
     @abc.abstractmethod
-    def act(self, x, obs, t, noise=False):
+    def act(self, x, obs, t, noise):
         """
         Return the action under this policy given current state or observation
         """

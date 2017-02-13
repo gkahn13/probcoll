@@ -17,7 +17,7 @@ class LatticePolicyRCcar(Policy):
         Policy.__init__(self, T, False, meta_data)
 
         self.U = U
-        self.dynamics = dynamics
+        self._dynamics = dynamics
 
     def act(self, x, obs, t, noise, ref_traj=None):
         ### create desired path (radiates outward)
@@ -27,7 +27,7 @@ class LatticePolicyRCcar(Policy):
         traj.set_X(x, t=0)
         traj.set_O(obs, t=0)
         traj.set_U(self.U, t=slice(0, self._T))
-        traj.rollout(self.dynamics)
+        traj.rollout(self._dynamics)
 
         self._curr_traj = traj
 

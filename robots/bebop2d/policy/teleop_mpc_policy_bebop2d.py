@@ -14,7 +14,7 @@ class TeleopMPCPolicyBebop2d(Policy):
     def __init__(self, meta_data):
         use_obs = False
         Policy.__init__(self, meta_data['mpc']['H'], use_obs, meta_data)
-        self.logger = get_logger(self.__class__.__name__, 'warn')
+        self._logger = get_logger(self.__class__.__name__, 'warn')
 
         self.cmd_vel_callback = ros_utils.RosCallbackAll(meta_data['bebop']['topics']['cmd_vel'],
                                                          geometry_msgs.Twist,
@@ -31,7 +31,7 @@ class TeleopMPCPolicyBebop2d(Policy):
     def act(self, x, obs, t, noise, ref_traj=None):
         vel_msgs = self.cmd_vel_callback.get()
         if len(vel_msgs) < 2:
-            self.logger.warn('Using measured_vel')
+            self._logger.warn('Using measured_vel')
             measured_vel = self.measured_vel_callback.get()
             if measured_vel is not None:
                 self.last_measured_vel = measured_vel

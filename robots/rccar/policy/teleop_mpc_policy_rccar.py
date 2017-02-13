@@ -11,7 +11,7 @@ class TeleopMPCPolicyRCcar(Policy):
     def __init__(self, meta_data):
         use_obs = False
         Policy.__init__(self, meta_data['mpc']['H'], use_obs, meta_data)
-        self.logger = get_logger(self.__class__.__name__, 'warn')
+        self._logger = get_logger(self.__class__.__name__, 'warn')
 
         rccar_topics = meta_data['rccar']['topics']
         self.teleop_cmd_steer_callback = \
