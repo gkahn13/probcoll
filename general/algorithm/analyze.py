@@ -44,7 +44,7 @@ class Analyze:
 
     @property
     def _plot_stats_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'stats_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'stats_{0}.png'.format(params['exp_name']))
 
     @property
     def _plot_stats_file_pkl(self):
@@ -52,33 +52,33 @@ class Analyze:
 
     @property
     def _plot_pred_mean_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'pred_mean_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'pred_mean_{0}.png'.format(params['exp_name']))
 
     @property
     def _plot_pred_std_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'pred_std_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'pred_std_{0}.png'.format(params['exp_name']))
 
     @property
     def _plot_pred_cost_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'pred_cost_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'pred_cost_{0}.png'.format(params['exp_name']))
 
     @property
     def _plot_pred_std_hist_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'pred_std_hist_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'pred_std_hist_{0}.png'.format(params['exp_name']))
 
     def _plot_mean_samples_prediction_file(self, itr):
-        return os.path.join(self._save_dir, self._image_folder, 'mean_samples_prediction_itr{0}_{0}.png'.format(itr, params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'mean_samples_prediction_itr{0}_{0}.png'.format(itr, params['exp_name']))
 
     def _plot_std_samples_prediction_file(self, itr):
-        return os.path.join(self._save_dir, self._image_folder, 'std_samples_prediction_itr{0}_{0}.png'.format(itr, params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'std_samples_prediction_itr{0}_{0}.png'.format(itr, params['exp_name']))
 
     @property
     def _plot_samples_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'samples_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'samples_{0}.png'.format(params['exp_name']))
 
     @property
     def _plot_pred_groundtruth_file(self):
-        return os.path.join(self._save_dir, self._image_folder, 'pred_groundtruth_{0}.png'.format(params['exp_folder']))
+        return os.path.join(self._save_dir, self._image_folder, 'pred_groundtruth_{0}.png'.format(params['exp_name']))
 
     def _itr_load_samples(self, itr):
         fname = os.path.join(self._itr_dir(itr), 'samples_itr_{0}.npz'.format(itr))

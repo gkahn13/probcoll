@@ -41,7 +41,7 @@ probcoll:
   epsilon_greedy: 0
 
   cost:
-    weight: 1e2
+    weight: 1e5
     eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
     pre_activation: True
 
@@ -78,7 +78,7 @@ model:
 
   graph_type: 'fc' # fc / cnn / rnn
   num_bootstrap: 2 # TODO
-  dropout: 0.8 # pct keep (None if no dropout)
+  dropout: # pct keep (None if no dropout)
   reg: 0.
 
   # what to use as input to prediction model
@@ -96,7 +96,7 @@ model:
   batch_size: 16
   display_batch: 20
   epochs: 20
-  steps: 2000
+  steps: 2500
   val_pct: 0.2
 
   # preprocessing

@@ -1,6 +1,6 @@
 import abc
 
-import os, pickle, time
+import os, pickle, time, shutil
 import numpy as np
 
 from general.algorithm.probcoll_model import ProbcollModel
@@ -22,7 +22,9 @@ class Probcoll:
         self._setup()
 
         self._logger = get_logger(self.__class__.__name__, 'info',
-                                 os.path.join(self._probcoll_model.save_dir, 'dagger.txt'))
+                                  os.path.join(self._probcoll_model.save_dir, 'dagger.txt'))
+        shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
+
 
     @abc.abstractmethod
     def _setup(self):

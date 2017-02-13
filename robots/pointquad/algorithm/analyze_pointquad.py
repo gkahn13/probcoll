@@ -22,13 +22,13 @@ from config import params
 class AnalyzePointquad(Analyze):
 
     def __init__(self, on_replay=False):
-        Analyze.__init__(self, on_replay=on_replay, parent_exp_dir='/media/gkahn/ExtraDrive1/data/')
+        Analyze.__init__(self, on_replay=on_replay, parent_exp_dir=None)#'/media/gkahn/ExtraDrive1/data/')
 
         self._world = WorldPointquad()
-        self._world.env.clear()
+        self._world.clear()
 
         self._dynamics = DynamicsPointquad()
-        self._agent = AgentPointquad(self._world, self._dynamics, dyn_noise=params['prediction']['dagger']['dyn_noise'])
+        self._agent = AgentPointquad(self._world, self._dynamics, dyn_noise=params['probcoll']['dyn_noise'])
 
     #######################
     ### Data processing ###
@@ -54,7 +54,7 @@ class AnalyzePointquad(Analyze):
                 self._world.env.add_box(pose, extents)
 
             default_sample = Sample(meta_data=params, T=bootstrap.T)
-            for k, v in params['prediction']['dagger']['conditions']['default'].items():
+            for k, v in params['probcoll']['conditions']['default'].items():
                 default_sample.set_X(v, t=slice(0, bootstrap.T), sub_state=k)
 
             ### evaluate on grid
@@ -73,7 +73,7 @@ class AnalyzePointquad(Analyze):
 
                 samples.append(s)
 
-            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cp_params = params['probcoll']['cost_probcoll']
             eval_cost = cp_params['eval_cost']
             pre_activation = cp_params['pre_activation']
             probs_mean_batch, probs_std_batch = bootstrap.eval_sample_batch(samples,
@@ -132,7 +132,7 @@ class AnalyzePointquad(Analyze):
                 self._world.env.add_box(pose, extents)
 
             ### create MPC
-            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cp_params = params['probcoll']['cost_probcoll']
             cost_cp = CostProbcollPointquad(bootstrap, None,
                                               weight=float(cp_params['weight']),
                                               eval_cost=cp_params['eval_cost'],
@@ -145,7 +145,7 @@ class AnalyzePointquad(Analyze):
                                                     plot=False)
 
             default_sample = Sample(meta_data=params, T=bootstrap.T)
-            for k, v in params['prediction']['dagger']['conditions']['default'].items():
+            for k, v in params['probcoll']['conditions']['default'].items():
                 default_sample.set_X(v, t=slice(0, bootstrap.T), sub_state=k)
 
             ### evaluate on grid
@@ -182,7 +182,7 @@ class AnalyzePointquad(Analyze):
 
 
             ### evaluate on grid
-            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cp_params = params['probcoll']['cost_probcoll']
             eval_cost = cp_params['eval_cost']
             pre_activation = cp_params['pre_activation']
             probs_mean_batch, probs_std_batch = bootstrap.eval_sample_batch(samples,
@@ -222,7 +222,7 @@ class AnalyzePointquad(Analyze):
 
     def _evaluate_probcoll_model_on_samples(self, bootstrap, itr, samples, mpcs):
         ### load NN
-        H = params['prediction']['model']['T']
+        H = params['model']['T']
         model_file = self._itr_model_file(itr)
         if not ProbcollModelPointquad.checkpoint_exists(model_file):
             return [None]*len(samples), [None]*len(samples)
@@ -268,7 +268,7 @@ class AnalyzePointquad(Analyze):
                 self._world.env.add_box(pose, extents)
 
             ### create MPC
-            cp_params = params['prediction']['dagger']['cost_probcoll']
+            cp_params = params['probcoll']['cost']
             cost_cp = CostProbcollPointquad(bootstrap, None,
                                               weight=float(cp_params['weight']),
                                               eval_cost=cp_params['eval_cost'],
@@ -281,7 +281,7 @@ class AnalyzePointquad(Analyze):
                                                       plot=False)
 
             default_sample = Sample(meta_data=params, T=bootstrap.T)
-            for k, v in params['prediction']['dagger']['conditions']['default'].items():
+            for k, v in params['probcoll']['conditions']['default'].items():
                 default_sample.set_X(v, t=slice(0, bootstrap.T), sub_state=k)
 
             ### speeds/angles
@@ -358,7 +358,7 @@ class AnalyzePointquad(Analyze):
         crash_speed_means = []
         crash_speed_stds = []
         for samples in samples_itrs:
-            crashes = [s._T < params['prediction']['dagger']['T'] - 1 for s in samples]
+            crashes = [s._T < params['probcoll']['T'] - 1 for s in samples]
             final_speeds = [np.linalg.norm(s.get_U(t=-1)) for s in samples]
             speeds = [final_speed for crash, final_speed in zip(crashes, final_speeds) if crash]
             crash_speed_itrs.append(speeds)
@@ -379,7 +379,7 @@ class AnalyzePointquad(Analyze):
         ### cumulative energy
         crash_speeds = []
         for samples in samples_itrs:
-            crashes = [s._T < params['prediction']['dagger']['T'] - 1 for s in samples]
+            crashes = [s._T < params['probcoll']['T'] - 1 for s in samples]
             final_speeds = [np.linalg.norm(s.get_U(t=-1)) for s in samples]
             crash_speeds.append([crash * final_speed for crash, final_speed in zip(crashes, final_speeds)])
         crash_speeds = np.array(crash_speeds)
