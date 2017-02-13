@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithm.prediction.analyze import Analyze
+from general.algorithm.analyze import Analyze
 
 from config import params
 

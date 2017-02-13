@@ -22,6 +22,12 @@ class Policy(UncopyableClass):
         """
         raise NotImplementedError()
 
+    def get_info(self):
+        """
+        Keeps track of relevant info for saving
+        """
+        return dict()
+
 
 class GaussianPolicy(object):
     def get_noise(self, noise):

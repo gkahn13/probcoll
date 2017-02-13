@@ -4,16 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithm.prediction.analyze import Analyze
+from general.algorithm.analyze import Analyze
 import general.utility.colormaps as cmaps
 
-from robots.pointquad.algorithm.prediction.probcoll_model_pointquad import ProbcollModelPointquad
+from robots.pointquad.algorithm.probcoll_model_pointquad import ProbcollModelPointquad
 from robots.pointquad.dynamics.dynamics_pointquad import DynamicsPointquad
 from robots.pointquad.world.world_pointquad import WorldPointquad
 from robots.pointquad.agent.agent_pointquad import AgentPointquad
-from robots.pointquad.traj_opt.traj_opt_pointquad import TrajoptPointquad
 # from robots.pointquad.policy.primitives_mpc_policy_pointquad import PrimitivesMPCPolicyPointquad
-from robots.pointquad.algorithm.prediction.cost_probcoll_pointquad import CostProbcollPointquad
+from robots.pointquad.algorithm.cost_probcoll_pointquad import CostProbcollPointquad
 
 from general.state_info.sample import Sample
 from general.policy.noise_models import ZeroNoise
@@ -30,7 +29,6 @@ class AnalyzePointquad(Analyze):
 
         self._dynamics = DynamicsPointquad()
         self._agent = AgentPointquad(self._world, self._dynamics, dyn_noise=params['prediction']['dagger']['dyn_noise'])
-        self._trajopt = TrajoptPointquad(self._dynamics, self._world, self._agent)
 
     #######################
     ### Data processing ###

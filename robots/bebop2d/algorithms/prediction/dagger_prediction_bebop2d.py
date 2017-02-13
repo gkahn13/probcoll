@@ -2,24 +2,20 @@ import os
 
 import rospy
 import std_msgs.msg as std_msgs
+from general.algorithm.probcoll import Probcoll
+from robots.bebop2d.algorithm.cost_probcoll_bebop2d import CostProbcollBebop2d
+from robots.bebop2d.algorithm.probcoll_model_bebop2d import ProbcollModelBebop2d
 
-from general.algorithm.prediction.probcoll import Probcoll
-from general.traj_opt.conditions import Conditions
 import general.ros.ros_utils as ros_utils
-
-from robots.bebop2d.algorithm.prediction.probcoll_model_bebop2d import ProbcollModelBebop2d
-from robots.bebop2d.algorithm.prediction.cost_probcoll_bebop2d import CostProbcollBebop2d
-
-from robots.bebop2d.dynamics.dynamics_bebop2d import DynamicsBebop2d
-from robots.bebop2d.world.world_bebop2d import WorldBebop2d
+from config import params
+from general.state_info.conditions import Conditions
+from general.state_info.sample import Sample
 from robots.bebop2d.agent.agent_bebop2d import AgentBebop2d
-from robots.bebop2d.traj_opt.traj_opt_bebop2d import TrajoptBebop2d
+from robots.bebop2d.dynamics.dynamics_bebop2d import DynamicsBebop2d
 from robots.bebop2d.policy.primitives_mpc_policy_bebop2d import PrimitivesMPCPolicyBebop2d
 from robots.bebop2d.policy.teleop_mpc_policy_bebop2d import TeleopMPCPolicyBebop2d
-
-from general.state_info.sample import Sample
-
-from config import params
+from robots.bebop2d.traj_opt.traj_opt_bebop2d import TrajoptBebop2d
+from robots.bebop2d.world.world_bebop2d import WorldBebop2d
 
 class ProbcollBebop2d(Probcoll):
 

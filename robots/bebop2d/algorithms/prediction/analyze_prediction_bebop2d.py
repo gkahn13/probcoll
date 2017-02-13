@@ -6,10 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from general.algorithm.prediction.analyze import Analyze
+from general.algorithm.analyze import Analyze
 
-from robots.bebop2d.algorithm.prediction.probcoll_model_bebop2d import ProbcollModelBebop2d
-from robots.bebop2d.algorithm.prediction.cost_probcoll_bebop2d import CostProbcollBebop2d
+from robots.bebop2d.algorithm.probcoll_model_bebop2d import ProbcollModelBebop2d
+from robots.bebop2d.algorithm.cost_probcoll_bebop2d import CostProbcollBebop2d
 from robots.bebop2d.traj_opt.ilqr.cost.cost_velocity_bebop2d import cost_velocity_bebop2d
 from robots.bebop2d.dynamics.dynamics_bebop2d import DynamicsBebop2d
 from robots.bebop2d.world.world_bebop2d import WorldBebop2d

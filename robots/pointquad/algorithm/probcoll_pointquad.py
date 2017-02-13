@@ -1,24 +1,19 @@
 import numpy as np
-
 import openravepy as rave
 
-from general.algorithm.probcoll import Probcoll
-from general.traj_opt.conditions import Conditions
-
-from robots.pointquad.algorithm.probcoll_model_pointquad import ProbcollModelPointquad
-from robots.pointquad.algorithm.cost_probcoll_pointquad import CostProbcollPointquad
-
-from robots.pointquad.dynamics.dynamics_pointquad import DynamicsPointquad
-from robots.pointquad.world.world_pointquad import WorldPointquad
-from robots.pointquad.agent.agent_pointquad import AgentPointquad
-from robots.pointquad.traj_opt.traj_opt_pointquad import TrajoptPointquad
-from robots.pointquad.planning.primitives_pointquad import PrimitivesPointquad
-from robots.pointquad.traj_opt.ilqr.cost.cost_velocity_pointquad import cost_velocity_pointquad
-
-from general.state_info.sample import Sample
-from general.policy.open_loop_policy import OpenLoopPolicy
-
 from config import params
+from general.algorithm.probcoll import Probcoll
+from general.policy.open_loop_policy import OpenLoopPolicy
+from general.state_info.conditions import Conditions
+from general.state_info.sample import Sample
+from robots.pointquad.agent.agent_pointquad import AgentPointquad
+from robots.pointquad.algorithm.cost_probcoll_pointquad import CostProbcollPointquad
+from robots.pointquad.algorithm.probcoll_model_pointquad import ProbcollModelPointquad
+from robots.pointquad.dynamics.dynamics_pointquad import DynamicsPointquad
+from robots.pointquad.planning.cost.cost_velocity_pointquad import cost_velocity_pointquad
+from robots.pointquad.planning.primitives_pointquad import PrimitivesPointquad
+from robots.pointquad.world.world_pointquad import WorldPointquad
+
 
 class ProbcollPointquad(Probcoll):
 
@@ -35,9 +30,8 @@ class ProbcollPointquad(Probcoll):
         self._world = WorldPointquad()
         self._dynamics = DynamicsPointquad()
         self._agent = AgentPointquad(self._world, self._dynamics,
-                                    obs_noise=probcoll_params['obs_noise'],
-                                    dyn_noise=probcoll_params['dyn_noise'])
-        self._trajopt = TrajoptPointquad(self._dynamics, self._world, self._agent)
+                                     obs_noise=probcoll_params['obs_noise'],
+                                     dyn_noise=probcoll_params['dyn_noise'])
         self._conditions = Conditions(cond_params=probcoll_params['conditions'])
 
         ### load prediction neural net
@@ -51,7 +45,7 @@ class ProbcollPointquad(Probcoll):
     def _reset_world(self, itr, cond, rep):
         self._world.reset(cond=cond)
 
-        rave_bodies = [b for b in self._world.env.rave_env.env.GetBodies() if not b.IsRobot()]
+        rave_bodies = [b for b in self._world.rave_env.env.GetBodies() if not b.IsRobot()]
 
         self._rave_cyl_bodies = []
         self._rave_cyl_poses = []
@@ -131,9 +125,9 @@ class ProbcollPointquad(Probcoll):
 
     def _get_world_info(self):
         return {
-                'cyl_poses': self.rave_cyl_poses,
-                'cyl_radii': self.rave_cyl_radii,
-                'cyl_heights': self.rave_cyl_heights,
-                'box_poses': self.rave_box_poses,
-                'box_extents': self.rave_box_extents
+                'cyl_poses': self._rave_cyl_poses,
+                'cyl_radii': self._rave_cyl_radii,
+                'cyl_heights': self._rave_cyl_heights,
+                'box_poses': self._rave_box_poses,
+                'box_extents': self._rave_box_extents
             }

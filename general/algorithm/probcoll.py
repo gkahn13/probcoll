@@ -35,7 +35,6 @@ class Probcoll:
         self._world = None
         self._dynamics = None
         self._agent = None
-        self._trajopt = None
         self._conditions = None
 
         raise NotImplementedError('Implement in subclass')
@@ -70,7 +69,7 @@ class Probcoll:
 
     @property
     def _save_dir(self):
-        return os.path.abspath(self._probcoll_model.save_dir)
+        return os.path.join(params['exp_dir'], params['exp_name'])
 
     def _itr_dir(self, itr, create=True):
         assert(type(itr) is int)
@@ -161,7 +160,7 @@ class Probcoll:
             assert (os.path.exists(f) for f in prev_sample_files)
             self._probcoll_model.add_data(prev_sample_files)
         ### load initial dataset
-        init_data_folder = params['prediction']['dagger'].get('init_data', None)
+        init_data_folder = params['probcoll'].get('init_data', None)
         if init_data_folder is not None:
             self._logger.info('Adding initial data')
             ext = os.path.splitext(self._itr_samples_file(0))[-1]
@@ -188,21 +187,16 @@ class Probcoll:
             self._logger.info('Itr {0} flying'.format(itr))
             self._run_itr(itr)
 
-            if itr == 0 and False: # TODO
-                # on first itr, don't want to train (so we can visualize)
-                self._probcoll_model.save(model_file=self._itr_model_file(itr))
-            else:
-                if self._planner_type != 'randomwalk':
-                    self._logger.info('Itr {0} adding data'.format(itr))
-                    self._probcoll_model.add_data([self._itr_samples_file(itr)])
-                    self._logger.info('Itr {0} training probability of collision'.format(itr))
-                    self._probcoll_model.train(old_model_file=self._itr_model_file(itr-1),
-                                         new_model_file=self._itr_model_file(itr),
-                                         epochs=self._probcoll_model.epochs if itr > 1 else params['prediction']['dagger']['init_epochs'])
+            self._logger.info('Itr {0} adding data'.format(itr))
+            self._probcoll_model.add_data([self._itr_samples_file(itr)])
+            self._logger.info('Itr {0} training probability of collision'.format(itr))
+            self._probcoll_model.train(old_model_file=self._itr_model_file(itr-1),
+                                 new_model_file=self._itr_model_file(itr),
+                                 epochs=self._probcoll_model.epochs)
 
     def _run_itr(self, itr):
-        T = params['prediction']['dagger']['T']
-        label_with_noise = params['prediction']['dagger']['label_with_noise']
+        T = params['probcoll']['T']
+        label_with_noise = params['probcoll']['label_with_noise']
 
         samples = []
         world_infos = []
@@ -226,8 +220,7 @@ class Probcoll:
 
                 start = time.time()
                 for t in xrange(T):
-                    self._logger.info('\t\t\tt: {0}'.format(t))
-                    # raw_input('Press enter to continue')
+                    # self._logger.info('\t\t\tt: {0}'.format(t))
                     self._update_world(sample_T, t)
 
                     x0 = sample_T.get_X(t=t)
@@ -287,7 +280,7 @@ class Probcoll:
         self._reset_world(itr, 0, 0) # leave the world as it was
 
     def _create_control_noise(self):
-        cn_params = params['prediction']['dagger']['control_noise']
+        cn_params = params['probcoll']['control_noise']
 
         if cn_params['type'] == 'zero':
             ControlNoiseClass = ZeroNoise

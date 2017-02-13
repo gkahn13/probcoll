@@ -8,7 +8,7 @@ from matplotlib.patches import Rectangle
 import matplotlib.ticker as ticker
 from matplotlib import gridspec
 
-from general.algorithm.prediction.analyze_aggregate_prediction import load_pickles, flatten_list, plot_crash_speed_video, DataAverageInterpolation
+from general.algorithm.analyze_aggregate_prediction import load_pickles, flatten_list, plot_crash_speed_video, DataAverageInterpolation
 
 from general.state_info.sample import Sample
 

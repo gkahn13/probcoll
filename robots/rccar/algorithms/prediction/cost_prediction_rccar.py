@@ -6,7 +6,7 @@ import geometry_msgs.msg as gm
 
 import matplotlib.cm as cm
 
-from general.algorithm.prediction.cost_probcoll import CostProbcoll
+from general.algorithm.cost_probcoll import CostProbcoll
 
 from config import params
 

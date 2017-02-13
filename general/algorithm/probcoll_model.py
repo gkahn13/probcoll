@@ -12,9 +12,6 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
-from general.utility.file_manager import FileManager
-from general.utility.utils import TimeIt
-
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 
@@ -107,8 +104,7 @@ class ProbcollModel:
     def __init__(self, dist_eps, read_only=False, finalize=True):
         self.dist_eps = dist_eps
 
-        self.fm = FileManager(exp_folder=params['exp_folder'], read_only=read_only, continue_writing=True)
-        self.save_dir = os.path.join(self.fm.dir, 'prediction')
+        self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         self._logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
@@ -153,15 +149,14 @@ class ProbcollModel:
 
     @property
     def _code_file(self):
-        return os.path.join(os.path.abspath(self.save_dir),
-                            'probcoll_model_{0}.py'.format(os.path.basename(self.fm._dir)))
+        return os.path.join(os.path.abspath(self.save_dir), 'probcoll_model_{0}.py'.format(params['exp_name']))
 
     @property
     def _hash(self):
         """ Anything that if changed, need to re-save the data """
         d = {}
 
-        pm_params = params['prediction']['model']
+        pm_params = params['model']
         for key in ('T', 'num_bootstrap', 'val_pct', 'X_order', 'U_order', 'O_order', 'output_order', 'balance',
                     'aggregate_save_data', 'save_type'):
             d[key] = pm_params[key]

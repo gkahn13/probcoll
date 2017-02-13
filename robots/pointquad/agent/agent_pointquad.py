@@ -57,12 +57,11 @@ class AgentPointquad(Agent):
             T = policy._T
         policy_sample = Sample(meta_data=self.meta_data, T=T)
 
-        x_tm1 = np.copy(x0)
         policy_sample.set_X(x0, t=0)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
-            o_t = self.get_observation(x_tm1, x_t)
+            o_t = self.get_observation(x_t)
             u_t = policy.act(x_t, o_t, t, **policy_args)
             if self.dyn_noise:
                 noise = []
@@ -83,8 +82,6 @@ class AgentPointquad(Agent):
                 x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
 
-            x_tm1 = x_t
-
         return policy_sample
 
     def reset(self, x):
@@ -100,6 +97,9 @@ class AgentPointquad(Agent):
     def get_observation(self, x, noise=True):
         """ Observation model """
         obs_sample = Sample(meta_data=self.meta_data, T=2)
+        for sub_state in self.meta_data['X']['order']:
+            idxs = obs_sample.get_X_idxs(sub_state=sub_state)
+            obs_sample.set_X(x[idxs], t=0, sub_state=sub_state)
         for sub_state in [s for s in self.meta_data['X']['order'] if s in self.meta_data['O']['order']]:
             idxs = obs_sample.get_X_idxs(sub_state=sub_state)
             obs_sample.set_O(x[idxs], t=0, sub_obs=sub_state)
@@ -111,7 +111,7 @@ class AgentPointquad(Agent):
         # hacky way to make sure sensors don't see robot
 
         if 'collision' in self.meta_data['O']:
-            is_collision = self._world.is_collision(pose=origin)
+            is_collision = self._world.is_collision(obs_sample, t=0)
             obs_sample.set_O([float(is_collision)], t=0, sub_obs='collision')
         if self.depth_sensor:
             zbuffer = self.depth_sensor.read(origin, plot=False).ravel()

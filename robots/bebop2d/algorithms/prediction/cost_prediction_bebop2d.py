@@ -1,4 +1,4 @@
-from general.algorithm.prediction.cost_probcoll import CostProbcoll
+from general.algorithm.cost_probcoll import CostProbcoll
 
 
 class CostProbcollBebop2d(CostProbcoll):

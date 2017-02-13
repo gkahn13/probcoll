@@ -3,8 +3,8 @@
 dt: 0.2
 random_seed: 0
 
-exp_dir: pointquad
-exp_folder: test
+exp_dir: '/home/gkahn/code/probcoll/experiments/pointquad'
+exp_name: test
 
 ##########################
 ### Probcoll algorithm ###
@@ -12,7 +12,7 @@ exp_folder: test
 
 probcoll:
   T: 30 # timesteps per trajectory
-  max_iter: 20
+  max_iter: 10
   planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
 
   dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
@@ -34,8 +34,7 @@ probcoll:
   label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
   obs_noise: True # boolean use noise or not
 
-  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
-  init_epochs: 20
+#  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
 
   use_ground_truth: False
   use_init_cost: True # TODO
@@ -60,8 +59,8 @@ probcoll:
 
     range:
       position:
-        min: [0, -0.8, 0.5] # TODO -0.8
-        max: [0, 0.8, 0.5] # TODO 0.8
+        min: [0, -0.8, 0.5] # TODO
+        max: [0, 0.8, 0.5] # TODO
         num: [1, 20, 1] # TODO
 
     perturb: # repetition perturbations
@@ -90,15 +89,18 @@ model:
 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.3
+  gpu_fraction: 0.8
   reset_every_train: True # every time train is called, reinitialize weights?
   early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
   learning_rate: 0.001
   batch_size: 16
   display_batch: 20
   epochs: 20
-  steps: 2000 # TODO
+  steps: 2000
   val_pct: 0.2
+
+  # preprocessing
+  use_O_orth: False
 
   # how to resample data
   aggregate_save_data: True # put all data into one file?

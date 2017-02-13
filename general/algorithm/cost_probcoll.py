@@ -17,8 +17,10 @@ class CostProbcoll(Cost):
         self.probs_mean_batch = None
         self.probs_std_batch = None
 
-    def eval_batch(self, samples,
-                   speed_func=lambda s: np.linalg.norm(s.get_U(), axis=1).mean()):
+    def eval(self, sample, speed_func=lambda s: np.linalg.norm(s.get_U(), axis=1).mean()):
+        return self.eval_batch([sample], speed_func=speed_func)[0]
+
+    def eval_batch(self, samples, speed_func=lambda s: np.linalg.norm(s.get_U(), axis=1).mean()):
         """
         If some samples are None, returns an np.inf filled CostApprox at that index
         """

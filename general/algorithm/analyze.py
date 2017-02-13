@@ -1,8 +1,6 @@
 import abc
 import os, pickle
 
-from general.utility.file_manager import FileManager
-
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 
@@ -12,15 +10,14 @@ class Analyze:
 
     def __init__(self, on_replay=False, parent_exp_dir=None):
         self.on_replay = on_replay
-        self._fm = FileManager(exp_folder=params['exp_folder'], read_only=True, parent_exp_dir=parent_exp_dir)
+        self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
 
-        yamls = [fname for fname in os.listdir(self._fm.dir) if '.yaml' in fname and '~' not in fname]
+        yamls = [fname for fname in os.listdir(self._save_dir) if '.yaml' in fname and '~' not in fname]
         assert(len(yamls) == 1)
-        yaml_path = os.path.join(self._fm.dir, yamls[0])
+        yaml_path = os.path.join(self._save_dir, yamls[0])
         load_params(yaml_path)
         params['yaml_path'] = yaml_path
 
-        self._save_dir = os.path.join(self._fm.dir, 'prediction')
         if self.on_replay:
             self._save_dir = os.path.join(self._save_dir, 'replay')
 
@@ -117,7 +114,7 @@ class Analyze:
         self._logger.info('Loaded {0} iterations of samples'.format(len(samples_itrs)))
 
         ### load initial dataset
-        init_data_folder = params['prediction']['dagger'].get('init_data', None)
+        init_data_folder = params['probcoll'].get('init_data', None)
         if init_data_folder is not None:
             if itr == 0:
                 samples_itrs.append([])

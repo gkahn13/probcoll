@@ -78,7 +78,7 @@ class ProbcollModelPointquad(ProbcollModel):
         # return new_samples
 
     def _balance_data(self, start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-        bd_param = params['prediction']['model']['balance']
+        bd_param = params['model']['balance']
 
         ### split idxs into those with collisions and those without
         samples_coll, samples_no_coll = [], []
@@ -223,8 +223,6 @@ class ProbcollModelPointquad(ProbcollModel):
 
         if graph_type == 'fc':
             return OldProbcollModel._graph_inference_fc
-        if graph_type == 'fc_sparse':
-            return OldProbcollModel._graph_inference_fc_sparse
         elif graph_type == 'cnn':
             return OldProbcollModel._graph_inference_cnn
         elif graph_type == 'rnn':
@@ -233,159 +231,8 @@ class ProbcollModelPointquad(ProbcollModel):
             raise Exception('graph_type {0} is not valid'.format(graph_type))
 
     @staticmethod
-    def _graph_inference_fc_sparse(name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-                                   X_mean, U_mean, O_mean, dropout, meta_data,
-                                   reuse=False, random_seed=None, finalize=True, tf_debug={}):
-        assert (name == 'train' or name == 'val' or name == 'eval')
-        num_bootstrap = len(bootstrap_X_inputs)
-
-        dropout_placeholders = [] if name == 'eval' else None
-
-        with tf.name_scope(name + '_inference'):
-            tf.set_random_seed(random_seed)
-
-            input_layers = []
-            weights = []
-            biases = []
-            with tf.name_scope('create_inputs_and_variables'):
-                for b in xrange(num_bootstrap):
-                    ### inputs
-                    x_input_b = bootstrap_X_inputs[b]
-                    u_input_b = bootstrap_U_inputs[b]
-                    o_input_b = bootstrap_O_inputs[b]
-
-                    dX = x_input_b.get_shape()[2].value
-                    dU = u_input_b.get_shape()[2].value
-                    dO = o_input_b.get_shape()[1].value
-                    T = x_input_b.get_shape()[1].value
-                    n_output = 1
-
-                    ### concatenate inputs
-                    with tf.name_scope('inputs_b{0}'.format(b)):
-                        concat_list = []
-                        if dO > 0:
-                            with tf.variable_scope('means', reuse=reuse or b > 0):
-                                tf_O_mean = tf.get_variable('O_mean', shape=[1, len(O_mean)], trainable=False,
-                                                            dtype=tf.float32,
-                                                            initializer=tf.constant_initializer(
-                                                                O_mean.reshape((1, len(O_mean)))))
-
-                            concat_list.append(o_input_b - tf_O_mean)
-                        if dX > 0:
-                            with tf.variable_scope('means', reuse=reuse or b > 0):
-                                tf_X_mean = tf.get_variable('X_mean', shape=[1, len(X_mean)], trainable=False,
-                                                            dtype=tf.float32,
-                                                            initializer=tf.constant_initializer(
-                                                                X_mean.reshape((1, len(X_mean)))))
-
-                            x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
-                            x_input_flat_b -= tf.tile(tf_X_mean, [1, T])  # subtract mean
-                            concat_list.append(x_input_flat_b)
-                        if dU > 0:
-                            with tf.variable_scope('means', reuse=reuse or b > 0):
-                                tf_U_mean = tf.get_variable('U_mean', shape=[1, len(U_mean)], trainable=False,
-                                                            dtype=tf.float32,
-                                                            initializer=tf.constant_initializer(
-                                                                U_mean.reshape((1, len(U_mean)))))
-
-                            u_input_flat_b = tf.reshape(u_input_b, [-1, T * dU])
-                            u_input_flat_b -= tf.tile(tf_U_mean, [1, T])  # subtract mean
-                            concat_list.append(u_input_flat_b)
-                        input_layer = tf.concat(1, concat_list)
-
-                    n_input = input_layer.get_shape()[-1].value
-
-                    ### weights
-                    with tf.variable_scope('inference_vars_{0}'.format(b), reuse=reuse):
-                        weights_b = [
-                            tf.get_variable('w_hidden_0_b{0}'.format(b), [n_input, 40],
-                                            initializer=tf.contrib.layers.xavier_initializer()),
-                            tf.get_variable('w_hidden_1_b{0}'.format(b), [40, 40],
-                                            initializer=tf.contrib.layers.xavier_initializer()),
-                            tf.get_variable('w_output_b{0}'.format(b), [40, n_output],
-                                            initializer=tf.contrib.layers.xavier_initializer()),
-                        ]
-                        biases_b = [
-                            tf.get_variable('b_hidden_0_b{0}'.format(b), [40], initializer=tf.constant_initializer(0.)),
-                            tf.get_variable('b_hidden_1_b{0}'.format(b), [40], initializer=tf.constant_initializer(0.)),
-                            tf.get_variable('b_output_b{0}'.format(b), [n_output], initializer=tf.constant_initializer(0.)),
-                        ]
-
-                    ### weight decays
-                    for v in weights_b + biases_b:
-                        tf.add_to_collection('weight_decays', 0.5 * tf.reduce_mean(v ** 2))
-
-                    input_layers.append(input_layer)
-                    weights.append(weights_b)
-                    biases.append(biases_b)
-
-            ### combine input_layers/weights/biases
-            combined_input_layers = tf.concat(1, input_layers)
-            combined_biases = [tf.concat(0, biases_i) for biases_i in np.array(biases).T.tolist()]
-            combined_weights = []
-            for i in xrange(len(weights[0])):
-                weights_i = [weights_b[i] for weights_b in weights]
-                shapes_i = [w_i.get_shape().as_list() for w_i in weights_i]
-                sparse_shape = (sum(zip(*shapes_i)[0]), sum(zip(*shapes_i)[1]))
-
-                start_dim0, start_dim1 = 0, 0
-                sparse_indices = []
-                for shape in shapes_i:
-                    sparse_indices += (np.indices(shape).reshape((2, np.prod(shape))).T + (start_dim0, start_dim1)).tolist()
-                    start_dim0 += shape[0]
-                    start_dim1 += shape[1]
-
-                sparse_values = tf.concat(0, [tf.reshape(w_i, [-1]) for w_i in weights_i])
-
-                combined_weights.append(tf.SparseTensor(indices=sparse_indices, values=sparse_values, shape=sparse_shape))
-
-            ### fully connected relus
-            def sparse_matmul(layer, weight):
-                weight_shape = weight.get_shape().as_list()
-                weight_T = tf.sparse_transpose(weight)
-                weight_T = tf.SparseTensor(indices=weight_T.indices, values=weight_T.values,
-                                           shape=(weight_shape[1], weight_shape[0]))
-                return tf.transpose(tf.sparse_tensor_dense_matmul(weight_T, tf.transpose(layer)))
-
-            with tf.name_scope('network'):
-                layer = combined_input_layers
-                for i, (weight, bias) in enumerate(zip(combined_weights[:-1], combined_biases[:-1])):
-                    with tf.name_scope('hidden_{0}'.format(i)):
-                        layer = tf.nn.relu(tf.add(sparse_matmul(layer, weight), bias))
-                        if dropout is not None:
-                            assert (type(dropout) is float and 0 <= dropout and dropout <= 1.0)
-                            if name == 'eval':
-                                dp = tf.placeholder('float', [None, layer.get_shape()[1].value])
-                                layer = tf.mul(layer, dp)
-                                dropout_placeholders.append(dp)
-                            else:
-                                layer = tf.nn.dropout(layer, dropout)
-
-            with tf.name_scope('scope_output_pred'):
-                ### sigmoid
-                output_mat = tf.add(sparse_matmul(layer, combined_weights[-1]), combined_biases[-1])
-                output_pred = tf.sigmoid(output_mat, name='output_pred')
-
-            bootstrap_output_mats = tf.split(1, num_bootstrap, output_mat)
-            bootstrap_output_preds = tf.split(1, num_bootstrap, output_pred)
-
-            ### combination of all the bootstraps
-            with tf.name_scope('combine_bootstraps'):
-                output_pred_mean = (1 / float(num_bootstrap)) * tf.add_n(bootstrap_output_preds,
-                                                                         name='output_pred_mean')
-                std_normalize = (1 / float(num_bootstrap - 1)) if num_bootstrap > 1 else 1
-                output_pred_std = tf.sqrt(std_normalize * tf.add_n(
-                    [tf.square(tf.sub(output_pred_b, output_pred_mean)) for output_pred_b in bootstrap_output_preds]))
-
-                output_mat_mean = (1 / float(num_bootstrap)) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
-                output_mat_std = tf.sqrt(std_normalize * tf.add_n(
-                    [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
-
-        return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std, bootstrap_output_mats, dropout_placeholders
-
-    @staticmethod
     def _graph_inference_fc(name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-                            X_mean, U_mean, O_mean, dropout, meta_data,
+                            X_mean, X_orth, U_mean, U_orth, O_mean, O_orth, dropout, meta_data,
                             reuse=False, random_seed=None, finalize=True, tf_debug={}):
         assert(name == 'train' or name == 'val' or name == 'eval')
         num_bootstrap = len(bootstrap_X_inputs)
@@ -407,20 +254,27 @@ class ProbcollModelPointquad(ProbcollModel):
                 dU = u_input_b.get_shape()[2].value
                 dO = o_input_b.get_shape()[1].value
                 T = x_input_b.get_shape()[1].value
+                # batch_size = x_input_b.get_shape()[0].value
+                batch_size = tf.shape(x_input_b)[0]
                 n_output = 1
 
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
+                    # import IPython; IPython.embed()
                     if dO > 0:
-                        concat_list.append(o_input_b - O_mean)
+                        concat_list.append(tf.matmul(o_input_b - O_mean, O_orth))
                     if dX > 0:
+                        X_orth_batch = tf.tile(tf.expand_dims(X_orth, 0),
+                                               [batch_size, 1, 1])
+                        x_input_b = tf.batch_matmaul(x_input_b - X_mean, X_orth_batch)
                         x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
-                        x_input_flat_b -= tf.tile(X_mean, [1, T]) # subtract mean
                         concat_list.append(x_input_flat_b)
                     if dU > 0:
+                        U_orth_batch= tf.tile(tf.expand_dims(U_orth, 0),
+                                              [batch_size, 1, 1])
+                        u_input_b = tf.batch_matmul(u_input_b - U_mean, U_orth_batch)
                         u_input_flat_b = tf.reshape(u_input_b, [-1, T * dU])
-                        u_input_flat_b -= tf.tile(U_mean, [1, T]) # subtract mean
                         concat_list.append(u_input_flat_b)
                     input_layer = tf.concat(1, concat_list)
 
@@ -489,8 +343,8 @@ class ProbcollModelPointquad(ProbcollModel):
         bootstrap_output_preds = []
 
         ### hard-code camera
-        assert(len(meta_data['prediction']['model']['O_order']) == 1 and
-               meta_data['prediction']['model']['O_order'][0] == 'camera')
+        assert(len(meta_data['model']['O_order']) == 1 and
+               meta_data['model']['O_order'][0] == 'camera')
         cam_width = meta_data['O']['camera']['width']
         cam_height = meta_data['O']['camera']['height']
 
@@ -645,8 +499,8 @@ class ProbcollModelPointquad(ProbcollModel):
         bootstrap_output_preds = []
 
         ### hard-code camera
-        assert(len(meta_data['prediction']['model']['O_order']) == 1 and
-               meta_data['prediction']['model']['O_order'][0] == 'camera')
+        assert(len(meta_data['model']['O_order']) == 1 and
+               meta_data['model']['O_order'][0] == 'camera')
         cam_width = meta_data['O']['camera']['width']
         cam_height = meta_data['O']['camera']['height']
 

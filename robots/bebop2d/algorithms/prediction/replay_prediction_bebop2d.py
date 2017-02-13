@@ -1,29 +1,27 @@
-import os, copy
+import copy
+import os
+
 import numpy as np
+from robots.bebop2d.algorithm.probcoll_bebop2d import ProbcollBebop2d
 
-from general.utility.file_manager import FileManager
-from general.traj_opt.conditions import Conditions
-
+from config import params, load_params
 from general.algorithm.probcoll_model import ProbcollModel
-
-from robots.bebop2d.algorithm.prediction.probcoll_bebop2d import ProbcollBebop2d
+from general.state_info.conditions import Conditions
+from general.state_info.sample import Sample
 from robots.bebop2d.policy.primitives_mpc_policy_bebop2d import PrimitivesMPCPolicyBebop2d
 from robots.bebop2d.policy.teleop_mpc_policy_bebop2d import TeleopMPCPolicyBebop2d
 
-from general.state_info.sample import Sample
-
-from config import params, load_params
 
 class ReplayPredictionBebop2d(ProbcollBebop2d):
 
     def __init__(self):
         np.random.seed(0)
 
-        self._fm = FileManager(exp_folder=params['exp_folder'], read_only=True)
+        self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
 
-        yamls = [fname for fname in os.listdir(self._fm.dir) if '.yaml' in fname and '~' not in fname]
+        yamls = [fname for fname in os.listdir(self._save_dir) if '.yaml' in fname and '~' not in fname]
         assert (len(yamls) == 1)
-        yaml_path = os.path.join(self._fm.dir, yamls[0])
+        yaml_path = os.path.join(self._save_dir, yamls[0])
         load_params(yaml_path)
         params['yaml_path'] = yaml_path
 
