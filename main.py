@@ -5,7 +5,6 @@
 import argparse
 import os
 import numpy as np, random
-import IPython
 from config import load_params, set_params, params
 
 # try:
