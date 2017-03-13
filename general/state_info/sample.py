@@ -1,6 +1,6 @@
 import os.path
 import numpy as np
-
+import IPython
 from general.utility.utils import posquats_to_poses
 
 from config import params as meta_data
@@ -38,6 +38,7 @@ class Sample(object):
 
     def set_U(self, u, t, sub_control=None):
         idxs = self.get_U_idxs(sub_control)
+        # IPython.embed()
         assert(np.array(u).shape[-1] == idxs.stop - idxs.start)
         self._U[t,idxs] = np.copy(u)
 
@@ -133,9 +134,10 @@ class Sample(object):
         x_idxs = self.get_X_idxs(sub_state=sub_state)
         return x_idxs.stop - x_idxs.start
 
+
     def get_X_idxs(self, sub_state=None):
         if sub_state is None: return slice(0, self._xdim)
-
+        # IPython.embed()
         assert(sub_state in self._meta_data['X'])
         start = self._meta_data['X'][sub_state]['idx']
         dim = self._meta_data['X'][sub_state]['dim']

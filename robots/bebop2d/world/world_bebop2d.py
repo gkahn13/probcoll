@@ -2,7 +2,7 @@ import threading
 
 import rospy, rosbag, rostopic
 import std_msgs.msg as std_msgs
-
+import IPython
 import general.ros.ros_utils as ros_utils
 
 from general.world.world import World
@@ -29,7 +29,6 @@ class WorldBebop2d(World):
 
     def reset(self, itr=None, cond=None, rep=None, record=True):
         assert(itr is not None and cond is not None and rep is not None)
-
         ### wait for user to say start
         self._logger.info('Press start')
         while self._ros_start_rollout.get() is None and not rospy.is_shutdown():

@@ -7,11 +7,13 @@ class DynamicsBebop2d(Dynamics):
     def __init__(self):
         Dynamics.__init__(self)
 
-        self.A = np.array([[0., 0.],
-                           [0., 0.]])
-
-        self.B = np.array([[1., 0.],
-                           [0., 1.]])
+        # self.A = np.array([[0., 0.],
+        #                    [0., 0.]])
+        #
+        # self.B = np.array([[1., 0.],
+        #                    [0., 1.]])
+        self.A = np.zeros([3,3])
+        self.B = np.eye(3)
 
     def evolve(self, x, u, fx=None, fu=None, f0=None):
         """

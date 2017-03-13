@@ -1,5 +1,5 @@
 import os, copy, pickle
-import IPython
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -459,9 +459,10 @@ class AnalyzePointquad(Analyze):
         if not os.path.exists(os.path.dirname(self._plot_stats_file)):
             os.makedirs(os.path.dirname(self._plot_stats_file))
         f.savefig(self._plot_stats_file)
+
         with open(self._plot_stats_file_pkl, 'w') as f:
             pickle.dump(pkl_dict, f)
-        print "Analyze plot saved to {0}".format(self._plot_stats_file_pkl)
+
     def _plot_probcoll_model(self):
         itrs_Xs, itrs_prob_means, itrs_prob_stds, itrs_costs = self._evaluate_probcoll_model()
         samples = self._load_samples()

@@ -315,7 +315,7 @@ class WorldPointquad(World):
         """
         # if sample is not None:
         #     rave_env.clear_plots()
-        #     for t in xrange(sample._T - 1):
+        #     for t in xrange(sample._T -self._ 1):
         #         p_t = list(sample.get_X(t=t, sub_state='position'))
         #         p_tp1 = list(sample.get_X(t=t+1, sub_state='position'))
         #         rave_env.plot_point(p_t, color=(1,0,0), size=0.025)

@@ -1,5 +1,5 @@
 import abc
-
+import IPython
 import os, pickle
 import random, time
 import itertools
@@ -11,12 +11,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
-import IPython
+
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 
 from config import params
-import IPython
+
 class MLPlotter:
     """
     Plot/save machine learning data
@@ -103,12 +103,14 @@ class ProbcollModel:
 
     def __init__(self, dist_eps, read_only=False, finalize=True):
         self.dist_eps = dist_eps
+
         self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         self._logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
 
         self.random_seed = params['random_seed']
+        # IPython.embed()
         for k, v in params['model'].items():
             setattr(self, k, v)
 
@@ -661,10 +663,10 @@ class ProbcollModel:
                     self.tf_debug['output_{0}_b{1}'.format(i, b)] = bootstrap_outputs[b][-1]
 
             for b in xrange(self.num_bootstrap):
-                bootstrap_X_inputs[b] = tf.concat(bootstrap_X_inputs[b], 0)
-                bootstrap_U_inputs[b] = tf.concat(bootstrap_U_inputs[b], 0)
-                bootstrap_O_inputs[b] = tf.concat(bootstrap_O_inputs[b], 0)
-                bootstrap_outputs[b] = tf.concat(bootstrap_outputs[b], 0)
+                bootstrap_X_inputs[b] = tf.concat(0, bootstrap_X_inputs[b])
+                bootstrap_U_inputs[b] = tf.concat(0, bootstrap_U_inputs[b])
+                bootstrap_O_inputs[b] = tf.concat(0, bootstrap_O_inputs[b])
+                bootstrap_outputs[b] = tf.concat(0, bootstrap_outputs[b])
 
         return fname_batch, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs, \
                filename_queue, filename_place, filename_var
@@ -741,8 +743,7 @@ class ProbcollModel:
 
                 ### cost
                 with tf.name_scope('cost_b{0}'.format(b)):
-                    # IPython.embed()
-                    cross_entropy_b = tf.nn.sigmoid_cross_entropy_with_logits(labels = output_mat_b, logits = output_b)
+                    cross_entropy_b = tf.nn.sigmoid_cross_entropy_with_logits(output_mat_b, output_b)
                     costs.append(cross_entropy_b)
                 ### accuracy
                 with tf.name_scope('err_b{0}'.format(b)):
@@ -758,7 +759,7 @@ class ProbcollModel:
                     num_errs_on_nocoll += tf.reduce_sum((1 - output_b) * output_incorrect_b)
 
             with tf.name_scope('total'):
-                cross_entropy = tf.reduce_mean(tf.concat(costs, 0))
+                cross_entropy = tf.reduce_mean(tf.concat(0, costs))
                 weight_decay = reg * tf.add_n(tf.get_collection('weight_decays'))
                 cost = cross_entropy + weight_decay
                 err = (1. / tf.cast(num_coll + num_nocoll, tf.float32)) * (num_errs_on_coll + num_errs_on_nocoll)
@@ -880,12 +881,11 @@ class ProbcollModel:
         self._graph_init_vars()
 
         # Set logs writer into folder /tmp/tensorflow_logs
-        # merged = tf.merge_all_summaries()
-        merged = tf.summary.merge_all()
-        # writer = tf.train.SummaryWriter('/tmp', graph_def=self.sess.graph_def)
+        merged = tf.merge_all_summaries()
+        writer = tf.train.SummaryWriter('/tmp', graph_def=self.sess.graph_def)
+
         self.saver = tf.train.Saver(max_to_keep=None)
-        # writer = tf.summary.FileWriter(logdir = '/tmp', graph_def = self.sess.graph_def)
-        # self.saver =  tf.train.SummarySaverHook(save_steps=1e4, summary_writer = writer, summary_op=merged)
+
     @abc.abstractmethod
     def _get_old_graph_inference(self):
         raise NotImplementedError('Implement in subclass')

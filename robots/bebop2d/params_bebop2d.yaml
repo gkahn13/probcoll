@@ -3,9 +3,69 @@
 dt: 0.5
 random_seed: 0
 
-exp_dir: bebop2d
-run: prediction # gps, dagger, replay, prediction
-exp_folder: exp101
+exp_dir: '/home/bding/Desktop/probcoll/experiments/bebop2d'
+exp_name: test
+#run: prediction # gps, dagger, replay, prediction
+
+##########################
+### Probcoll algorithm ###
+##########################
+
+probcoll:
+  T: 10 # timesteps per trajectory
+  max_iter: 10
+  planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
+
+  dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
+  control_noise:
+    type: 'gaussian' # zero / gaussian / OU / smoothedgaussian
+
+    zero: {}
+    gaussian:
+      std: [0.1, 0.1, 0]
+    smoothedgaussian:
+      std: [0.1, 0.1, 0]
+      T: 30
+    ou:
+      std: [0.1, 0.1, 0]
+      mean: [0.25, 0.0, 0.0]
+      theta: 0.15
+
+
+  label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
+  obs_noise: True # boolean use noise or not
+
+#  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
+
+  use_ground_truth: False
+  use_init_cost: True # TODO
+  epsilon_greedy: 0
+
+  cost:
+    weight: 1e5
+    eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
+    pre_activation: True
+
+  conditions:
+    repeats: 20 # TODO
+    num_test: 1
+    randomize_conds: False
+    randomize_reps: True
+
+    default:
+      linearvel: [0., 0, 0.0]
+
+    range:
+      linearvel:
+        min: [0, 0, 0]
+        max: [0, 0, 0]
+        num: [1, 1, 1]
+
+    perturb: # repetition perturbations
+      linearvel: [0.0, 0.0, 0.0]
+
+
+
 
 #######################################################
 ################ objective + optimizer ################
@@ -49,88 +109,99 @@ world:
 ########### Prediction ###########
 ##################################
 
-prediction:
-  model:
-    T: 4 # how many timesteps to predict
+model:
+  T: 4 # how many timesteps to predict
 
-    graph_type: 'fc' # fc / cnn / rnn
-    num_bootstrap: 5 # 5
-    dropout: 0.95 # pct keep (None if no dropout)
-    reg: 0.
+  graph_type: 'fc' # fc / cnn / rnn
+  num_bootstrap: 5 # 5
+  dropout: 0.95 # pct keep (None if no dropout)
+  reg: 0.
 
-    # what to use as input to prediction model
-    X_order: []
-    U_order: ['linearvel']
-    O_order: ['camera']
-    output_order: ['collision'] # taken from observations O
-    use_O_orth: False
+  # what to use as input to prediction model
+  X_order: []
+  U_order: ['linearvel']
+  O_order: ['camera']
+  output_order: ['collision'] # taken from observations O
+  use_O_orth: False
 
-    # NN training parameters
-    device: 1
-    gpu_fraction: 0.4
-    reset_every_train: True # every time train is called, reinitialize weights?
-    early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
-    learning_rate: 0.001
-    batch_size: 16
-    display_batch: 5
-    epochs: 100
-    steps: 800
-    val_pct: 0.2
+  # NN training parameters
+  device: 1
+  gpu_fraction: 0.4
+  reset_every_train: True # every time train is called, reinitialize weights?
+  early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
+  learning_rate: 0.001
+  batch_size: 16
+  display_batch: 5
+  epochs: 100
+  steps: 800
+  val_pct: 0.2
 
-    # how to resample data
-    aggregate_save_data: True # put all data into one file?
-    save_type: 'fixedlen' # varlen / fixedlen
-    balance:
-      type: collision # none, collision, uncertainty
+  # how to resample data
+  aggregate_save_data: True # put all data into one file?
+  save_type: 'fixedlen' # varlen / fixedlen
+  balance:
+    type: collision # none, collision, uncertainty
 
-      collision:
-        pct_coll: 0.5
+    collision:
+      pct_coll: 0.5
 
-  dagger:
-    T: 10 # timesteps per trajectory
-    max_iter: 10
-    planner_type: 'primitives' # primitives / teleop
 
-    control_noise:
-      type: 'zero' # zero / gaussian / OU / smoothedgaussian
+#################################################
+### Planning objective and optimizer settings ###
+#################################################
 
-      zero: {}
-      gaussian:
-        std: [0.1, 0.1]
+planning:
+  cost_velocity:
+    velocity: [0.5, 0., 0.]
+    weights: [1., 0.0, 0.]
 
-    label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+#prediction:
+#
+#  dagger:
+#    T: 10 # timesteps per trajectory
+#    max_iter: 10
+#    planner_type: 'primitives' # primitives / teleop
+#
+#    control_noise:
+#      type: 'zero' # zero / gaussian / OU / smoothedgaussian
+#
+#      zero: {}
+#      gaussian:
+#        std: [0.1, 0.1]
+#
+#    label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+#
+##    init_data: '/home/gkahn/code/gps_quadrotor/experiments/bebop2d/lfd_cmd_vel_init'
+#    init_epochs: 100
+#
+#    use_init_cost: True # TODO
+#    epsilon_greedy: 0
+#
+#    cost_probcoll:
+#      weight: 1e1 # TODO
+##      eval_cost: 'speed * speed * probs_mean + speed * speed * probs_std'
+##      pre_activation: False
+#
+#      eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
+#      pre_activation: True
 
-#    init_data: '/home/gkahn/code/gps_quadrotor/experiments/bebop2d/lfd_cmd_vel_init'
-    init_epochs: 100
-
-    use_init_cost: True # TODO
-    epsilon_greedy: 0
-
-    cost_probcoll:
-      weight: 1e1 # TODO
-#      eval_cost: 'speed * speed * probs_mean + speed * speed * probs_std'
-#      pre_activation: False
-
-      eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
-      pre_activation: True
-
-    conditions:
-      repeats: 20 # TODO
-      num_test: 1
-      randomize_conds: False
-      randomize_reps: True
-
-      default:
-        linearvel: [0., 0]
-
-      range:
-        linearvel:
-          min: [0, 0]
-          max: [0, 0]
-          num: [1, 1]
-
-      perturb: # repetition perturbations
-        linearvel: [0.0, 0.0]
+#    conditions:
+#      repeats: 20 # TODO
+#      num_test: 1
+#      randomize_conds: False
+#      randomize_reps: True
+#
+#      default:
+#        linearvel: [0., 0]
+#
+#      range:
+#        linearvel:
+#          min: [0, 0]
+#          max: [0, 0]
+#          num: [1, 1]
+#
+#      perturb: # repetition perturbations
+#        linearvel: [0.0, 0.0]
 
 bebop:
   topics:
@@ -152,16 +223,23 @@ bebop:
 ######################################################
 
 X:
-  dim: 2
+  dim: 3
   order: ['linearvel']
 
-  linearvel: {idx: 0, dim: 2}
+  linearvel: {idx: 0, dim: 3}
+#  dim: 13
+#  order: ['position', 'orientation', 'linearvel', 'angularvel']
+#
+#  position:    {idx: 0,  dim: 3}
+#  orientation: {idx: 3,  dim: 4} # wxyz
+#  linearvel:   {idx: 7,  dim: 3}
+#  angularvel:  {idx: 10, dim: 3}
 
 U:
-  dim: 2
+  dim: 3
   order: ['linearvel']
 
-  linearvel: {idx: 0, dim: 2}
+  linearvel: {idx: 0, dim: 3}
 
 O:
   dim: 257

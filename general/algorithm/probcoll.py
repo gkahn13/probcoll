@@ -2,9 +2,9 @@ import abc
 
 import os, pickle, time, shutil
 import numpy as np
-
+import IPython
 from general.algorithm.probcoll_model import ProbcollModel
-
+import IPython
 from config import params
 
 from general.policy.noise_models import ZeroNoise, GaussianNoise, UniformNoise, OUNoise, SmoothedGaussianNoise
@@ -150,7 +150,7 @@ class Probcoll:
         assert (model_start_itr == samples_start_itr or
                 model_start_itr == samples_start_itr - 1 or
                 (model_start_itr == 1 and samples_start_itr == 0))
-
+        # IPython.embed()
         ### load neural nets
         if model_file is not None:
             self._logger.info('Loading model {0}'.format(model_file))
@@ -211,6 +211,7 @@ class Probcoll:
                 # self._setup() # recreate everything so openrave doesn't get bogged down # TODO
                 self._logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
                 if (cond == 0 and rep == 0) or self._world.randomize:
+                    # IPython.embed()
                     self._reset_world(itr, cond, rep)
 
                 x0 = self._conditions.get_cond(cond, rep=rep)
