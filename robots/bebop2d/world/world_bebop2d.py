@@ -6,7 +6,6 @@ import IPython
 import general.ros.ros_utils as ros_utils
 
 from general.world.world import World
-
 from config import params
 
 class WorldBebop2d(World):
