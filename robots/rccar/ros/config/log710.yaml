@@ -26,14 +26,14 @@ teleop:
     cmd_vel:
         type: topic
         message_type: "std_msgs/Float32"
-        topic_name: cmd/vel
+        topic_name: cmd/motor
         deadman_buttons: [7] # RT
         axis_mappings: 
             -
                 axis: 1
                 target: data
-                scale: 12.0
-                offset: 0.0
+                scale: 49.5
+                offset: 49.5
     cmd_steer:
         type: topic
         message_type: "std_msgs/Float32"
@@ -43,8 +43,8 @@ teleop:
             -
                 axis: 2
                 target: data
-                scale: 40.0
-                offset: 50.0
+                scale: 49.5
+                offset: 49.5
     good_rollout_LT:
         type: topic
         message_type: "std_msgs/Empty"

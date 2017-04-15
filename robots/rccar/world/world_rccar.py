@@ -3,8 +3,12 @@ import threading, time
 import numpy as np
 
 import rospy, rosbag, rostopic
-import std_msgs.msg as std_msgs
-# import geometry_msgs.msg as gm_msgs
+import std_msgs
+
+try:
+    import bair_car.srv 
+except:
+    pass
 
 import general.ros.ros_utils as ros_utils
 
@@ -27,12 +31,13 @@ class WorldRCcar(World):
 
         rccar_topics = params['rccar']['topics']
         ### ROS publishers
-        self._cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.Float32, queue_size=10)
-        self._cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.Float32, queue_size=10)
+        self._ros_reset_pub = rospy.Publisher(rccar_topics['reset'], std_msgs.msg.Empty, queue_size = 100)
+        self._cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
+        self._cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
         ### ROS subscribers
-        self._ros_collision = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.Empty)
+        self._ros_collision = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
         self._ros_collision_sub = rospy.Subscriber(rccar_topics['collision'],
-                                                   std_msgs.Empty,
+                                                   std_msgs.msg.Empty,
                                                    callback=self._ros_collision_callback)
         self.num_collisions = 0
         # self._ros_accel = ros_utils.RosCallbackMostRecent(rccar_topics['accel'], gm_msgs.Vector3)
@@ -45,6 +50,7 @@ class WorldRCcar(World):
         self._agent.execute_control(None) # stop the car
         assert(itr is not None and cond is not None and rep is not None)
 
+        # TODO add sim backup
         ### back car up straight and slow
         if back_up:
             self._logger.info('Backing the car up')
@@ -66,13 +72,21 @@ class WorldRCcar(World):
         ### record
         if record:
             self._start_record_bag(itr, cond, rep)
-
-        ### reset indicators
-        self._ros_collision.get()
-        self.num_collisions = 0
+        
+        ### TODO add a flag
+        self._ros_reset_pub.publish(std_msgs.msg.Empty())
+        
+        if not self._agent.sim:
+            ### reset indicators
+            self._ros_collision.get()
+            self.num_collisions = 0
 
     def is_collision(self, sample, t=None):
-        return self._ros_collision.get() is not None
+        #return False
+        if self._agent.sim:
+            return self._agent.sim_coll
+        else:
+            return self._ros_collision.get() is not None
 
     def update_visualization(self, history_sample, planned_sample, t):
         pass
@@ -111,6 +125,7 @@ class WorldRCcar(World):
 
     def _ros_collision_callback(self, msg):
         ### immediately stop the car if it's the first collision
-        if self.num_collisions == 0:
-            self._agent.execute_control(None)
-        self.num_collisions += 1
+        if self._agent.sim_coll:
+            if self.num_collisions == 0:
+                self._agent.execute_control(None)
+            self.num_collisions += 1

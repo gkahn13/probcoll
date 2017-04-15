@@ -55,7 +55,7 @@ class ProbcollModelRCcar(ProbcollModel):
         return [sample]
 
     def _balance_data(self, start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-        bd_param = params['prediction']['model']['balance']
+        bd_param = params['model']['balance']
 
         ### split idxs into those with collisions and those without
         samples_coll, samples_no_coll = [], []

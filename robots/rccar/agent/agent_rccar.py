@@ -2,33 +2,48 @@ import numpy as np
 import cv2
 
 import rospy
-import sensor_msgs.msg as sensor_msgs
-import std_msgs.msg as std_msgs
+import sensor_msgs
+import std_msgs
 import cv_bridge
 
-from general.agent.agent import Agent
+try:
+    import bair_car.srv
+except:
+    pass
 
+from general.agent.agent import Agent
+from config import params
 import general.ros.ros_utils as ros_utils
 
 from general.state_info.sample import Sample
 from general.policy.noise_models import ZeroNoise
-
-from config import params
 
 class AgentRCcar(Agent):
 
     def __init__(self, dynamics):
         Agent.__init__(self, dynamics)
         rccar_topics = params['rccar']['topics']
+        self.sim = params['rccar']['sim']
+       
+        if self.sim:
+            service = params['rccar']['srv']
+            rospy.wait_for_service(service)
+            self.srv = rospy.ServiceProxy(service, bair_car.srv.sim_env)
+            # TODO use depth
+            data =  self.srv(reset=True)
+            self.sim_coll, self.sim_image = data.coll, data.image
+            self.sim_vel = 0.0
+            self.sim_steer = 0.0
+            self.sim_reset = False
 
         ### subscribers
-        self.image_callback = ros_utils.RosCallbackAll(rccar_topics['camera'], sensor_msgs.Image,
+        self.image_callback = ros_utils.RosCallbackAll(rccar_topics['camera'], sensor_msgs.msg.Image,
                                                        max_num_msgs=2, clear_msgs=False)
-        self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.Empty)
+        self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
 
         ### publishers
-        self.cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.Float32, queue_size=10)
-        self.cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.Float32, queue_size=10)
+        self.cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
+        self.cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
 
         self.cv_bridge = cv_bridge.CvBridge()
 
@@ -61,10 +76,14 @@ class AgentRCcar(Agent):
             if t < T-1:
                 x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
-            rate.sleep()
-
-            # see if collision in the past cycle
-            policy_sample.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
+           
+            # In sim we do not have cycles
+            if self.sim:
+                policy_sample.set_O([int(self.sim_coll)], t=t, sub_obs='collision')
+            else:
+                rate.sleep()
+                # see if collision in the past cycle
+                policy_sample.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
 
         return policy_sample
 
@@ -74,25 +93,29 @@ class AgentRCcar(Agent):
     def get_observation(self, x):
         obs_sample = Sample(meta_data=params, T=2)
 
-        ### collision
-        coll_time = self.coll_callback.get()
-        is_coll = coll_time is not None
-        obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
+        if self.sim:
+            is_coll = self.sim_coll
+            image_msg = self.sim_image
+        else:
+            ### collision
+            coll_time = self.coll_callback.get()
+            is_coll = coll_time is not None
 
-        ### camera
-        image_msgs = self.image_callback.get()
-        assert(len(image_msgs) > 0)
-        ### keep only those before the collision
-        if is_coll:
-            image_msgs_filt = [im for im in image_msgs if im.header.stamp.to_sec() < coll_time.to_sec()]
-            if len(image_msgs_filt) == 0:
-                image_msgs_filt = [image_msgs[-1]]
-            image_msgs = image_msgs_filt
-        image_msg = image_msgs[-1]
+            ### camera
+            image_msgs = self.image_callback.get()
+            assert(len(image_msgs) > 0)
+            ### keep only those before the collision
+            if is_coll:
+                image_msgs_filt = [im for im in image_msgs if im.header.stamp.to_sec() < coll_time.to_sec()]
+                if len(image_msgs_filt) == 0:
+                    image_msgs_filt = [image_msgs[-1]]
+                image_msgs = image_msgs_filt
+            image_msg = image_msgs[-1]
         im = AgentRCcar.process_image(image_msg, self.cv_bridge)
         # im = np.zeros((params['O']['camera']['height'], params['O']['camera']['width']), dtype=np.float32)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
-
+        obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
+        
         return obs_sample.get_O(t=0)
 
     @staticmethod
@@ -110,8 +133,16 @@ class AgentRCcar(Agent):
     def execute_control(self, u):
         if u is not None:
             s = Sample(meta_data=params, T=2)
-            self.cmd_steer_pub.publish(std_msgs.Float32(u[s.get_U_idxs('cmd_steer')][0]))
-            self.cmd_vel_pub.publish(std_msgs.Float32(u[s.get_U_idxs('cmd_vel')][0]))
+            steer = u[s.get_U_idxs('cmd_steer')][0]
+            vel = u[s.get_U_idxs('cmd_vel')][0]
+            self.cmd_steer_pub.publish(std_msgs.msg.Float32(steer))
+            self.cmd_vel_pub.publish(std_msgs.msg.Float32(vel))
+            if self.sim:
+                data= self.srv(steer=steer, vel=vel)
         else:
-            self.cmd_steer_pub.publish(std_msgs.Float32(50.))
-            self.cmd_vel_pub.publish(std_msgs.Float32(0.))
+            self.cmd_steer_pub.publish(std_msgs.msg.Float32(49.5))
+            self.cmd_vel_pub.publish(std_msgs.msg.Float32(0.))
+            if self.sim:
+                data = self.srv(reset=True)
+        if self.sim:
+            self.sim_coll, self.sim_image = data.coll, data.image
