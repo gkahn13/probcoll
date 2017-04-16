@@ -8,6 +8,7 @@ import tensorflow as tf
 from general.algorithm.probcoll_model import ProbcollModel
 
 from config import params
+import IPython
 
 class ProbcollModelBebop2d(ProbcollModel):
 
@@ -240,6 +241,10 @@ class ProbcollModelBebop2d(ProbcollModel):
         bootstrap_output_mats = []
         bootstrap_output_preds = []
         dropout_placeholders = [] if name == 'eval' else None
+        ### neural network parameters
+
+        hidden_layer = params['model']['hidden_layer']
+        activation = params['model']['activation']
 
         with tf.name_scope(name + '_inference'):
             tf.set_random_seed(random_seed)
@@ -279,17 +284,16 @@ class ProbcollModelBebop2d(ProbcollModel):
                     input_layer = tf.concat(1, concat_list)
 
                 n_input = input_layer.get_shape()[-1].value
-
                 ### weights
                 with tf.variable_scope('inference_vars_{0}'.format(b), reuse=reuse):
                     weights_b = [
-                        tf.get_variable('w_hidden_0_b{0}'.format(b), [n_input, 40], initializer=tf.contrib.layers.xavier_initializer()),
-                        tf.get_variable('w_hidden_1_b{0}'.format(b), [40, 40], initializer=tf.contrib.layers.xavier_initializer()),
-                        tf.get_variable('w_output_b{0}'.format(b), [40, n_output], initializer=tf.contrib.layers.xavier_initializer()),
+                        tf.get_variable('w_hidden_0_b{0}'.format(b), [n_input, hidden_layer], initializer=tf.contrib.layers.xavier_initializer()),
+                        tf.get_variable('w_hidden_1_b{0}'.format(b), [hidden_layer, hidden_layer], initializer=tf.contrib.layers.xavier_initializer()),
+                        tf.get_variable('w_output_b{0}'.format(b), [hidden_layer, n_output], initializer=tf.contrib.layers.xavier_initializer()),
                     ]
                     biases_b = [
-                        tf.get_variable('b_hidden_0_b{0}'.format(b), [40], initializer=tf.constant_initializer(0.)),
-                        tf.get_variable('b_hidden_1_b{0}'.format(b), [40], initializer=tf.constant_initializer(0.)),
+                        tf.get_variable('b_hidden_0_b{0}'.format(b), [hidden_layer], initializer=tf.constant_initializer(0.)),
+                        tf.get_variable('b_hidden_1_b{0}'.format(b), [hidden_layer], initializer=tf.constant_initializer(0.)),
                         tf.get_variable('b_output_b{0}'.format(b), [n_output], initializer=tf.constant_initializer(0.)),
                     ]
 
@@ -301,7 +305,10 @@ class ProbcollModelBebop2d(ProbcollModel):
                 layer = input_layer
                 for i, (weight, bias) in enumerate(zip(weights_b[:-1], biases_b[:-1])):
                     with tf.name_scope('hidden_{0}_b{1}'.format(i, b)):
-                        layer = tf.nn.relu(tf.add(tf.matmul(layer, weight), bias))
+                        if activation == 'relu':
+                            layer = tf.nn.relu(tf.add(tf.matmul(layer, weight), bias))
+                        else:
+                            return NotImplementedError("no activation function found")
                         if dropout is not None:
                             assert(type(dropout) is float and 0 <= dropout and dropout <= 1.0)
                             if name == 'eval':

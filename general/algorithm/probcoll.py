@@ -10,7 +10,6 @@ from config import params
 from general.policy.noise_models import ZeroNoise, GaussianNoise, UniformNoise, OUNoise, SmoothedGaussianNoise
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
-
 class Probcoll:
     __metaclass__ = abc.ABCMeta
 
@@ -136,6 +135,7 @@ class Probcoll:
         for model_start_itr in xrange(self._max_iter-1, -1, -1):
             model_file = self._itr_model_file(model_start_itr, create=False)
             if ProbcollModel.checkpoint_exists(model_file):
+                # IPython.embed()
                 model_start_itr += 1
                 break
         else:

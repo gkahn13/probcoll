@@ -145,6 +145,10 @@ model:
     collision:
       pct_coll: 0.5
 
+  # neural network parameters
+  hidden_layer: 25
+  activation: relu
+
 
 #################################################
 ### Planning objective and optimizer settings ###

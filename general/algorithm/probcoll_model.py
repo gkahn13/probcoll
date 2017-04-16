@@ -851,7 +851,6 @@ class ProbcollModel:
                                                                     tf_debug=self.tf_debug)
             d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'] = \
                 self._graph_cost(name, d['output_mats'], d['outputs'], reg=self.reg)
-
         ### optimizer
         self.d_train['optimizer'], self.d_train['grads'], self.d_train['optimizer_vars'] = \
             self._graph_optimize(self.d_train['cost'])
