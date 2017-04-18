@@ -3,7 +3,7 @@
 dt: 0.2
 random_seed: 0
 
-exp_dir: '/home/gkahn/code/probcoll/experiments/pointquad'
+exp_dir: '/home/bding/Desktop/probcoll/experiments/pointquad'
 exp_name: test
 
 ##########################
@@ -110,6 +110,10 @@ model:
 
     collision:
       pct_coll: 0.5
+
+  # neural network parameters
+  hidden_layer: 40
+  activation: relu
 
 #################################################
 ### Planning objective and optimizer settings ###

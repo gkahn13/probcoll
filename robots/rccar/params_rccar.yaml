@@ -71,6 +71,8 @@ model:
 
   
   graph_type: 'fc' # fc / cnn / rnn
+  hidden_layer: 40
+  activation: tanh
   num_bootstrap: 1 # 5
   dropout: 0.95 # pct keep (None if no dropout)
   reg: 0.

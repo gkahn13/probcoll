@@ -19,8 +19,13 @@ from config import params
 
 class AgentBebop2d(Agent):
 
-    def __init__(self, dynamics):
+    def __init__(self,  world, dynamics, obs_noise=False, dyn_noise=False):
         Agent.__init__(self, dynamics)
+        self._world = world
+        self.meta_data = params
+        self.obs_noise = obs_noise
+        self.dyn_noise = dyn_noise
+
         bebop_topics = params['bebop']['topics']
 
         ### subscribers
@@ -51,7 +56,7 @@ class AgentBebop2d(Agent):
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
             u_t = policy.act(x_t, o_t, t, noise=noise)
-            if params['prediction']['dagger']['planner_type'] != 'teleop': # TODO hack
+            if params['probcoll']['planner_type'] != 'teleop': # TODO hack
                 self.execute_control(u_t)
 
             # record

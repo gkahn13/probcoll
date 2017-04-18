@@ -8,8 +8,9 @@ import tensorflow as tf
 from general.algorithm.probcoll_model import ProbcollModel
 
 from config import params
+import IPython
 
-class ProbcollModelPointquad(ProbcollModel):
+class ProbcollModelBebop2d(ProbcollModel):
 
     ####################
     ### Initializing ###
@@ -219,7 +220,7 @@ class ProbcollModelPointquad(ProbcollModel):
         self._logger.info('Graph type: {0}'.format(graph_type))
         sys.path.append(os.path.dirname(self._code_file))
         exec('from {0} import {1} as OldProbcollModel'.format(
-            os.path.basename(self._code_file).split('.')[0], 'ProbcollModelPointquad'))
+            os.path.basename(self._code_file).split('.')[0], 'ProbcollModelBebop2d'))
 
         if graph_type == 'fc':
             return OldProbcollModel._graph_inference_fc
@@ -240,12 +241,11 @@ class ProbcollModelPointquad(ProbcollModel):
         bootstrap_output_mats = []
         bootstrap_output_preds = []
         dropout_placeholders = [] if name == 'eval' else None
-
+        ### neural network parameters
 
         hidden_layer = params['model']['hidden_layer']
         activation = params['model']['activation']
-        
-        
+
         with tf.name_scope(name + '_inference'):
             tf.set_random_seed(random_seed)
 
@@ -284,7 +284,6 @@ class ProbcollModelPointquad(ProbcollModel):
                     input_layer = tf.concat(1, concat_list)
 
                 n_input = input_layer.get_shape()[-1].value
-
                 ### weights
                 with tf.variable_scope('inference_vars_{0}'.format(b), reuse=reuse):
                     weights_b = [
@@ -824,17 +823,14 @@ class ProbcollModelPointquad(ProbcollModel):
             # output_pred_std = tf.sqrt(std_normalize * tf.add_n(
             #     [tf.square(tf.sigmoid(tf.sub(output_mat_b, output_mat_mean))) for output_mat_b in output_mats])) # TODO chug through nn or not?
 
-            # cost = (1 / float(num_bootstrap)) * tf.add_n(costs, name='cost')
+            cost = (1 / float(num_bootstrap)) * tf.add_n(costs, name='cost')
             accuracy = (1 / float(num_bootstrap)) * tf.add_n(accuracies, name='accuracy')
             x_grad, u_grad = [0] * n_output, [0] * n_output
             # for i in xrange(n_output):
             #     x_grad[i] = (1 / float(num_bootstrap)) * tf.add_n(np.array(x_grads)[:, i].tolist())
             #     u_grad[i] = (1 / float(num_bootstrap)) * tf.add_n(np.array(u_grads)[:, i].tolist())
 
-            optimizer = []
-            for bootstrap_cost in costs:
-                optimizer.append(tf.train.AdamOptimizer().minimize(cost))
-            # optimizer = tf.train.AdamOptimizer().minimize(cost)
+            optimizer = tf.train.AdamOptimizer().minimize(cost)
 
             ### initialize graph
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction)

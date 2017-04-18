@@ -7,6 +7,7 @@ from collections import defaultdict
 import hashlib
 import numpy as np
 import tensorflow as tf
+import sys
 
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
@@ -661,7 +662,6 @@ class ProbcollModel:
                                                                     tf_debug=self.tf_debug)
             d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'] = \
                 self._graph_cost(name, d['output_mats'], d['outputs'], reg=self.reg)
-
         ### optimizer
         self.d_train['optimizer'], self.d_train['grads'], self.d_train['optimizer_vars'] = \
             self._graph_optimize(self.d_train['cost'])
@@ -696,17 +696,129 @@ class ProbcollModel:
 
         self.saver = tf.train.Saver(max_to_keep=None)
 
-    @abc.abstractmethod
-    def _get_old_graph_inference(self):
-        raise NotImplementedError('Implement in subclass')
+    def _get_old_graph_inference(self, graph_type='fc'):
+        self._logger.info('Graph type: {0}'.format(graph_type))
+        sys.path.append(os.path.dirname(self._code_file))
+        exec('from {0} import {1} as OldProbcollModel'.format(
+            os.path.basename(self._code_file).split('.')[0], 'ProbcollModel'))
 
-    # @staticmethod
-    # @abc.abstractmethod
+        if graph_type == 'fc':
+            return OldProbcollModel._graph_inference_fc
+        else:
+            raise Exception('graph_type {0} is not valid'.format(graph_type))
 
-    # def _graph_inference(name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-    #                      X_mean, U_mean, O_mean, dropout, meta_data,
-    #                      reuse=False, random_seed=None, finalize=True, tf_debug={}):
-    #     raise NotImplementedError('Implement in subclass')
+    @staticmethod
+    def _graph_inference_fc(name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
+                            X_mean, X_orth, U_mean, U_orth, O_mean, O_orth, dropout, meta_data,
+                            reuse=False, random_seed=None, finalize=True, tf_debug={}):
+        assert(name == 'train' or name == 'val' or name == 'eval')
+        num_bootstrap = len(bootstrap_X_inputs)
+
+        bootstrap_output_mats = []
+        bootstrap_output_preds = []
+        dropout_placeholders = [] if name == 'eval' else None
+
+
+        hidden_layer = params['model']['hidden_layer']
+        activation = params['model']['activation']
+        
+        
+        with tf.name_scope(name + '_inference'):
+            tf.set_random_seed(random_seed)
+
+            for b in xrange(num_bootstrap):
+                ### inputs
+                x_input_b = bootstrap_X_inputs[b]
+                u_input_b = bootstrap_U_inputs[b]
+                o_input_b = bootstrap_O_inputs[b]
+
+                dX = x_input_b.get_shape()[2].value
+                dU = u_input_b.get_shape()[2].value
+                dO = o_input_b.get_shape()[1].value
+                T = x_input_b.get_shape()[1].value
+                # batch_size = x_input_b.get_shape()[0].value
+                batch_size = tf.shape(x_input_b)[0]
+                n_output = 1
+
+                ### concatenate inputs
+                with tf.name_scope('inputs_b{0}'.format(b)):
+                    concat_list = []
+                    # import IPython; IPython.embed()
+                    if dO > 0:
+                        concat_list.append(tf.matmul(o_input_b - O_mean, O_orth))
+                    if dX > 0:
+                        X_orth_batch = tf.tile(tf.expand_dims(X_orth, 0),
+                                               [batch_size, 1, 1])
+                        x_input_b = tf.batch_matmaul(x_input_b - X_mean, X_orth_batch)
+                        x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
+                        concat_list.append(x_input_flat_b)
+                    if dU > 0:
+                        U_orth_batch= tf.tile(tf.expand_dims(U_orth, 0),
+                                              [batch_size, 1, 1])
+                        u_input_b = tf.batch_matmul(u_input_b - U_mean, U_orth_batch)
+                        u_input_flat_b = tf.reshape(u_input_b, [-1, T * dU])
+                        concat_list.append(u_input_flat_b)
+                    input_layer = tf.concat(1, concat_list)
+
+                n_input = input_layer.get_shape()[-1].value
+
+                ### weights
+                with tf.variable_scope('inference_vars_{0}'.format(b), reuse=reuse):
+                    weights_b = [
+                        tf.get_variable('w_hidden_0_b{0}'.format(b), [n_input, hidden_layer], initializer=tf.contrib.layers.xavier_initializer()),
+                        tf.get_variable('w_hidden_1_b{0}'.format(b), [hidden_layer, hidden_layer], initializer=tf.contrib.layers.xavier_initializer()),
+                        tf.get_variable('w_output_b{0}'.format(b), [hidden_layer, n_output], initializer=tf.contrib.layers.xavier_initializer()),
+                    ]
+                    biases_b = [
+                        tf.get_variable('b_hidden_0_b{0}'.format(b), [hidden_layer], initializer=tf.constant_initializer(0.)),
+                        tf.get_variable('b_hidden_1_b{0}'.format(b), [hidden_layer], initializer=tf.constant_initializer(0.)),
+                        tf.get_variable('b_output_b{0}'.format(b), [n_output], initializer=tf.constant_initializer(0.)),
+                    ]
+
+                ### weight decays
+                for v in weights_b + biases_b:
+                    tf.add_to_collection('weight_decays', 0.5 * tf.reduce_mean(v ** 2))
+
+                ### fully connected relus
+                layer = input_layer
+                for i, (weight, bias) in enumerate(zip(weights_b[:-1], biases_b[:-1])):
+                    with tf.name_scope('hidden_{0}_b{1}'.format(i, b)):
+                        if activation == 'relu':
+                            layer = tf.nn.relu(tf.add(tf.matmul(layer, weight), bias))
+                        elif activation == 'tanh':
+                            layer = tf.nn.tanh(tf.add(tf.matmul(layer, weight), bias))
+                        else:
+                            return NotImplementedError("no activation function found")
+                        if dropout is not None:
+                            assert(type(dropout) is float and 0 <= dropout and dropout <= 1.0)
+                            if name == 'eval':
+                                dp = tf.placeholder('float', [None, layer.get_shape()[1].value])
+                                layer = tf.mul(layer, dp)
+                                dropout_placeholders.append(dp)
+                            else:
+                                layer = tf.nn.dropout(layer, dropout)
+
+                with tf.name_scope('scope_output_pred_b{0}'.format(b)):
+                    ### sigmoid
+                    # layer = tf.nn.l2_normalize(layer, 1) # TODO
+                    output_mat_b = tf.add(tf.matmul(layer, weights_b[-1]), biases_b[-1])
+                    output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
+
+                bootstrap_output_mats.append(output_mat_b)
+                bootstrap_output_preds.append(output_pred_b)
+
+            ### combination of all the bootstraps
+            with tf.name_scope('combine_bootstraps'):
+                output_pred_mean = (1 / float(num_bootstrap)) * tf.add_n(bootstrap_output_preds, name='output_pred_mean')
+                std_normalize = (1 / float(num_bootstrap - 1)) if num_bootstrap > 1 else 1
+                output_pred_std = tf.sqrt(std_normalize * tf.add_n(
+                    [tf.square(tf.sub(output_pred_b, output_pred_mean)) for output_pred_b in bootstrap_output_preds]))
+
+                output_mat_mean = (1 / float(num_bootstrap)) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
+                output_mat_std = tf.sqrt(std_normalize * tf.add_n(
+                    [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
+
+        return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std, bootstrap_output_mats, dropout_placeholders
 
     ################
     ### Training ###

@@ -27,10 +27,5 @@ class PrimitivesRCcar(Primitives):
                     sample.set_U(linearvel2, t=slice(self._H//3, (self._H*2)//3))
                     sample.set_U(linearvel3, t=slice((self._H*2)//3, self._H))
                     samples.append(sample)
-
-#        for steer1 in steers:
-#            sample = Sample(T=self._H)
-#            linearvel1 = [steer1, 20.]
-#            sample.set_U(linearvel1, t=slice(0, self._H))
-#            samples.append(sample)
+        
         return samples
