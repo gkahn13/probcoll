@@ -113,12 +113,12 @@ class AgentRCcar(Agent):
                 image_msgs = image_msgs_filt
             image_msg = image_msgs[-1]
         im = AgentRCcar.process_image(image_msg, self.cv_bridge)
-	ros_image = self.cv_bridge.cv2_to_imgmsg((im*255).astype(np.uint8), "mono8")
+        ros_image = self.cv_bridge.cv2_to_imgmsg(im, "mono8")
+#	ros_image = self.cv_bridge.cv2_to_imgmsg((im*255).astype(np.uint8), "mono8")
         self.pred_image_pub.publish(ros_image)
         # im = np.zeros((params['O']['camera']['height'], params['O']['camera']['width']), dtype=np.float32)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
         obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
-        
         return obs_sample.get_O(t=0)
 
     @staticmethod
@@ -126,11 +126,17 @@ class AgentRCcar(Agent):
         def rgb2gray(rgb):
             return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
-        image = rgb2gray(cvb.imgmsg_to_cv2(image_msg).astype(np.float32))
-        im = (1./255.) * cv2.resize(image,
-                                    (params['O']['camera']['height'], params['O']['camera']['width']),
-                                    interpolation=cv2.INTER_AREA) # TODO how does this deal with aspect ratio
-        
+        image = rgb2gray(cvb.imgmsg_to_cv2(image_msg)).astype(np.uint8)
+        im = cv2.resize(
+            image,
+            (params['O']['camera']['height'], params['O']['camera']['width']),
+            interpolation=cv2.INTER_AREA) #TODO how does this deal with aspect ratio 
+#        image = rgb2gray(cvb.imgmsg_to_cv2(image_msg).astype(np.float32))
+#        im = (1./255.) * cv2.resize(image,
+#                                    (params['O']['camera']['height'], params['O']['camera']['width']),
+#                                    interpolation=cv2.INTER_AREA) # TODO how does this deal with aspect ratio
+#       
+#        import ipdb; ipdb.set_trace()
         return im
 
     def execute_control(self, u):

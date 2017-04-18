@@ -15,9 +15,9 @@ class Sample(object):
         self._odim = self._meta_data['O']['dim']
         self._T = kwargs['T'] if 'T' in kwargs else self._meta_data['T']
 
-        self._X = kwargs.get('X', np.full((self._T, self._xdim), np.nan, dtype=np.float64))
-        self._U = kwargs.get('U', np.full((self._T, self._udim), np.nan, dtype=np.float64))
-        self._O = kwargs.get('O', np.full((self._T, self._odim), np.nan, dtype=np.float64))
+        self._X = kwargs.get('X', np.full((self._T, self._xdim), np.nan, dtype=np.float32))
+        self._U = kwargs.get('U', np.full((self._T, self._udim), np.nan, dtype=np.float32))
+        self._O = kwargs.get('O', np.full((self._T, self._odim), np.nan, dtype=np.uint8))
 
         assert(self._X.shape == (self._T, self._xdim))
         assert(self._U.shape == (self._T, self._udim))
@@ -168,7 +168,7 @@ class Sample(object):
         return slice(start, start+dim)
 
     def create_x(self, x_dict):
-        x = np.nan * np.ones(self._xdim, dtype=np.float64)
+        x = np.nan * np.ones(self._xdim, dtype=np.float32)
 
         sub_states = self._meta_data['X']['order']
         for sub_state, val in x_dict.items():

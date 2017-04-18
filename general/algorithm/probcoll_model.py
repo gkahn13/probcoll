@@ -221,7 +221,7 @@ class ProbcollModel:
                     X = sample.get_X()[:, self.X_idxs(p=s_params)]
                     U = sample.get_U()[:, self.U_idxs(p=s_params)]
                     O = sample.get_O()[:, self.O_idxs(p=s_params)]
-                    output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.int32)
+                    output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
                     buffer_len = 1
                     if len(X) < 1 + buffer_len: # used to be self.T, but now we are extending
                         continue
@@ -248,7 +248,8 @@ class ProbcollModel:
                         U = U[:-1]
                         O = O[:-1]
                         output = output[:-1]
-                    
+                   
+                    # Only add if non-collision part is long enough
                     if len(X) >= self.T:
                         no_coll_data["X"].append(X)
                         no_coll_data["U"].append(U)
@@ -306,9 +307,9 @@ class ProbcollModel:
                 }
                 feature['X'] = _floatlist_feature(np.ravel(X[j:j+self.T]).tolist())
                 feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
-                feature['O'] = _floatlist_feature(np.ravel(O[j]).tolist())
-                feature['output'] = _int64list_feature(np.ravel(output[j+self.T-1]).tolist())
-                
+                # TODO figure out how to keep types properly
+                feature['O'] = _bytes_feature(np.ravel(O[j]).tostring())
+                feature['output'] = _bytes_feature(np.ravel(output[j+self.T-1]).tostring())
                 example = tf.train.Example(features=tf.train.Features(feature=feature))
                 writer.write(example.SerializeToString())
                 record_num += 1
@@ -486,9 +487,8 @@ class ProbcollModel:
 
             features['X'] = tf.FixedLenFeature([self.dX * self.T], tf.float32)
             features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
-            features['O'] = tf.FixedLenFeature([self.dO], tf.float32)
-            features['output'] = tf.FixedLenFeature([1], tf.int64)
-            
+            features['O'] = tf.FixedLenFeature([], tf.string)
+            features['output'] = tf.FixedLenFeature([], tf.string)
             # TODO make sure this works
             # Figure out how to do arbitrary split across batchsize
             inputs = [None, None]
@@ -504,8 +504,8 @@ class ProbcollModel:
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
                                      for b in xrange(self.num_bootstrap)]
-                bootstrap_O_input = [parsed_example[b]['O'] for b in xrange(self.num_bootstrap)]
-                bootstrap_output = [parsed_example[b]['output'] for b in xrange(self.num_bootstrap)]
+                bootstrap_O_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O'], tf.uint8), (self.dO,)) for b in xrange(self.num_bootstrap)]
+                bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.doutput,))  for b in xrange(self.num_bootstrap)]
                 inputs[i] = (fname,) + tuple(bootstrap_X_input + bootstrap_U_input + bootstrap_O_input + bootstrap_output)
 
             shuffled = tf.train.shuffle_batch_join(
@@ -525,10 +525,10 @@ class ProbcollModel:
 
     def _graph_inputs_outputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
-            bootstrap_X_inputs = [tf.placeholder('float', [None, self.T, self.dX]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_U_inputs = [tf.placeholder('float', [None, self.T, self.dU]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_O_inputs = [tf.placeholder('float', [None, self.dO]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_outputs = [tf.placeholder('float', [None]) for _ in xrange(self.num_bootstrap)]
+            bootstrap_X_inputs = [tf.placeholder('float32', [None, self.T, self.dX]) for _ in xrange(self.num_bootstrap)]
+            bootstrap_U_inputs = [tf.placeholder('float32', [None, self.T, self.dU]) for _ in xrange(self.num_bootstrap)]
+            bootstrap_O_inputs = [tf.placeholder('uint8', [None, self.dO]) for _ in xrange(self.num_bootstrap)]
+            bootstrap_outputs = [tf.placeholder('uint8', [None]) for _ in xrange(self.num_bootstrap)]
 
         return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs
 
@@ -730,20 +730,20 @@ class ProbcollModel:
                 ### inputs
                 x_input_b = bootstrap_X_inputs[b]
                 u_input_b = bootstrap_U_inputs[b]
-                o_input_b = bootstrap_O_inputs[b]
-
+                o_input_b = tf.cast(bootstrap_O_inputs[b], tf.float32) / 255.
+                
+                o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis = 0)
+                
                 dX = x_input_b.get_shape()[2].value
                 dU = u_input_b.get_shape()[2].value
                 dO = o_input_b.get_shape()[1].value
                 T = x_input_b.get_shape()[1].value
-                # batch_size = x_input_b.get_shape()[0].value
                 batch_size = tf.shape(x_input_b)[0]
                 n_output = 1
 
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
-                    # import IPython; IPython.embed()
                     if dO > 0:
                         concat_list.append(tf.matmul(o_input_b - O_mean, O_orth))
                     if dX > 0:
@@ -1035,7 +1035,7 @@ class ProbcollModel:
             X_input, U_input, O_input = self._create_input(X, U, O)
             X_input = X_input[:self.T]
             U_input = U_input[:self.T]
-            O_input = O_input[0]
+            O_input = O_input[0].astype(np.uint8)
             assert(not np.isnan(X_input).any())
             assert(not np.isnan(U_input).any())
             assert(not np.isnan(O_input).any())

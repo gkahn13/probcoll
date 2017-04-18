@@ -40,7 +40,7 @@ probcoll:
     pre_activation: True
 
   conditions:
-    repeats: 20 # TODO
+    repeats: 10 # TODO
     num_test: 1
     randomize_conds: False
     randomize_reps: True
@@ -72,7 +72,7 @@ model:
   
   graph_type: 'fc' # fc / cnn / rnn
   hidden_layer: 40
-  activation: tanh
+  activation: relu
   num_bootstrap: 1 # 5
   dropout: 0.95 # pct keep (None if no dropout)
   reg: 0.
