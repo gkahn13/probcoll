@@ -1,98 +1,17 @@
 import abc
-
 import os, pickle
 import random, time
 import itertools
 import shutil
 from collections import defaultdict
 import hashlib
-
 import numpy as np
-import matplotlib.pyplot as plt
-
 import tensorflow as tf
 
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
-
+from general.algorithm.mlplotter import MLPlotter
 from config import params
-
-class MLPlotter:
-    """
-    Plot/save machine learning data
-    """
-    def __init__(self, title, subplot_dicts, shape=None, figsize=None):
-        """
-        :param title: title of plot
-        :param subplot_dicts: dictionary with dictionaries of form
-                              name: {subplot, title, color, ylabel}
-        """
-        ### setup plot figure
-        num_subplots = max(d['subplot'] for d in subplot_dicts.values()) + 1
-        if shape is None:
-            shape = (1, num_subplots)
-        if figsize is None:
-            figsize = (30, 7)
-        self.f, self.axes = plt.subplots(shape[0], shape[1], figsize=figsize)
-        mng = plt.get_current_fig_manager()
-        mng.window.showMinimized()
-        plt.suptitle(title)
-        plt.show(block=False)
-        plt.pause(0.5)
-
-        self.train_lines = {}
-        self.val_lines = {}
-
-        axes = self.axes.ravel().tolist()
-        for name, d in subplot_dicts.items():
-            ax = axes[d['subplot']]
-            ax.set_xlabel('Training samples')
-            if 'title' in d: ax.set_title(d['title'])
-            if 'ylabel' in d: ax.set_ylabel(d['ylabel'])
-
-            self.train_lines[name] = ax.plot([], [], color=d['color'], linestyle='-', label=name)[0]
-            self.val_lines[name] = ax.plot([], [], color=d['color'], linestyle='--')[0]
-
-            ax.legend()
-
-        self.f.canvas.draw()
-        plt.pause(0.5)
-
-    def _update_line(self, line, new_x, new_y):
-        xdata, ydata = line.get_xdata(), line.get_ydata()
-
-        xdata = np.concatenate((xdata, [new_x]))
-        ydata = np.concatenate((ydata, [new_y]))
-
-        line.set_xdata(xdata)
-        line.set_ydata(ydata)
-
-        ax = line.get_axes()
-        ax.relim()
-        ax.autoscale_view()
-
-    def add_train(self, name, training_samples, value):
-        self._update_line(self.train_lines[name], training_samples, value)
-
-    def add_val(self, name, value):
-        xdata = self.train_lines[name].get_xdata()
-        self._update_line(self.val_lines[name], xdata[-1] if len(xdata) > 0 else 0, value)
-
-    def plot(self):
-        self.f.canvas.draw()
-        plt.pause(0.01)
-
-    def save(self, save_dir, name='training.png'):
-        self.f.savefig(os.path.join(save_dir, name))
-        with open(os.path.join(save_dir, 'plotter.pkl'), 'w') as f:
-            pickle.dump(dict([(k, (v.get_xdata(), v.get_ydata())) for k, v in self.train_lines.items()] +
-                             [(k, (v.get_xdata(), v.get_ydata())) for k, v in self.val_lines.items()]),
-                        f)
-
-
-
-    def close(self):
-        plt.close(self.f)
 
 class ProbcollModel:
     __metaclass__ = abc.ABCMeta
@@ -118,11 +37,20 @@ class ProbcollModel:
         self.dO = len(self.O_idxs())
         self.doutput = len(self.output_idxs())
 
-        self.npz_fnames = []
-        self.tfrecords_train_fnames = []
-        self.tfrecords_val_fnames = []
-        self.preprocess_fnames = []
+        self.tfrecords_train_fnames = [
+                self.tfrecords_no_coll_train_fnames,
+                self.tfrecords_coll_train_fnames
+            ]
 
+        self.tfrecords_val_fnames = [
+                self.tfrecords_no_coll_val_fnames,
+                self.tfrecords_coll_val_fnames
+            ]
+                
+        self.preprocess_fnames = []
+        
+        self._control_width = np.array(self.control_range["upper"]) - \
+            np.array(self.control_range["lower"])
         self.X_mean = np.zeros(self.dX)
         self.U_mean = np.zeros(self.dU)
         self.O_mean = np.zeros(self.dO)
@@ -141,11 +69,40 @@ class ProbcollModel:
     #############
     ### Files ###
     #############
-
+    
     @abc.abstractproperty
     @property
     def _this_file(self):
         raise NotImplementedError('Implement in subclass')
+
+    
+    @property
+    def tfrecords_no_coll_train_fnames(self):
+        return [
+                os.path.join(self._no_coll_train_tfrecords_dir, fn)
+                    for fn in os.listdir(self._no_coll_train_tfrecords_dir)
+            ]
+
+    @property
+    def tfrecords_coll_train_fnames(self):
+        return [
+                os.path.join(self._coll_train_tfrecords_dir, fn)
+                    for fn in os.listdir(self._coll_train_tfrecords_dir)
+            ]
+    
+    @property
+    def tfrecords_no_coll_val_fnames(self):
+        return [
+                os.path.join(self._no_coll_val_tfrecords_dir, fn)
+                    for fn in os.listdir(self._no_coll_val_tfrecords_dir)
+            ]
+
+    @property
+    def tfrecords_coll_val_fnames(self):
+        return [
+                os.path.join(self._coll_val_tfrecords_dir, fn)
+                    for fn in os.listdir(self._coll_val_tfrecords_dir)
+            ]
 
     @property
     def _code_file(self):
@@ -165,6 +122,39 @@ class ProbcollModel:
             d[key] = params[key]
 
         return hashlib.md5(str(d)).hexdigest()
+
+    ############
+    ### DIR ####
+    ############
+
+    @property
+    def _no_coll_train_tfrecords_dir(self):
+        dir = os.path.join(self.save_dir, "no_coll_train_tfrecords") 
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+    
+    @property
+    def _coll_train_tfrecords_dir(self):
+        dir = os.path.join(self.save_dir, "coll_train_tfrecords")
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+    
+    @property
+    def _no_coll_val_tfrecords_dir(self):
+        dir = os.path.join(self.save_dir, "no_coll_val_tfrecords")
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+    
+    @property
+    def _coll_val_tfrecords_dir(self):
+        dir = os.path.join(self.save_dir, "coll_val_tfrecords") 
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+    
 
     ############
     ### Data ###
@@ -207,15 +197,12 @@ class ProbcollModel:
 
     def _load_samples(self, npz_fnames):
         """
-        :param npz_fnames: pkl file names containing Samples
-        :return: start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample
-                 (start_idxs_by_sample only contains start indices)
+        :param npz_fnames: pkl files names containing Samples
+        :return: no_coll_data, coll_data 
         """
-        start_idxs_by_sample = []
-        X_by_sample = []
-        U_by_sample = []
-        O_by_sample = []
-        output_by_sample = []
+
+        no_coll_data = {"X": [], "U": [], "O": [], "output": []}
+        coll_data = {"X": [], "U": [], "O": [], "output": []}
 
         random.shuffle(npz_fnames)
         for npz_fname in npz_fnames:
@@ -223,6 +210,7 @@ class ProbcollModel:
             # self._logger.debug('\tOpening {0}'.format(npz_fname))
 
             samples = Sample.load(npz_fname)
+            # TODO possibly remove shuffle, only keeping for validation split
             random.shuffle(samples)
 
             ### add to data
@@ -232,144 +220,70 @@ class ProbcollModel:
                     X = sample.get_X()[:, self.X_idxs(p=s_params)]
                     U = sample.get_U()[:, self.U_idxs(p=s_params)]
                     O = sample.get_O()[:, self.O_idxs(p=s_params)]
-                    output = sample.get_O()[:, self.output_idxs(p=s_params)]
-
+                    output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.int32)
                     buffer_len = 1
                     if len(X) < 1 + buffer_len: # used to be self.T, but now we are extending
                         continue
-
-                    X_input, U_input, O_input = self._create_input(X, U, O)
-                    output = self._create_output(output)
-
-                    if int(output[-1, 0]) == 1:
-                        # if collision, extend collision by T-1 (and buffer)
-                        X_input = np.vstack((X_input, np.tile([X_input[-1]], (self.T - 1 - buffer_len, 1))))
-                        U_input = np.vstack((U_input, np.tile([U_input[-1]], (self.T - 1 - buffer_len, 1))))
-                        output = np.vstack((output, np.tile([output[-1]], (self.T - 1 - buffer_len, 1))))
-                        O_input = np.vstack((O_input, np.tile([O_input[-1]], (self.T - 1 - buffer_len, 1))))
-
-                    for arr in (X_input, U_input, O_input, output):
+                    
+                    for arr in (X, U, O, output):
                         assert(np.all(np.isfinite(arr)))
+                        assert(not np.any(np.isnan(arr)))
 
-                    X_by_sample.append(X_input)
-                    U_by_sample.append(U_input)
-                    O_by_sample.append(O_input)
-                    output_by_sample.append(output)
+                    if output[-1, 0] == 1:
+                        # For collision data extend collision by T-1 (and buffer)
+                        random_u = np.random.random((self.T - 1 - buffer_len, U.shape[1])) * \
+                            self._control_width + np.array(self.control_range["lower"])
+                        U_coll = np.vstack((U[-self.T:], random_u))
 
-                    ### just the start indices
-                    start_idxs_by_sample.append(range(0, len(X_by_sample[-1]) - self.T + 1))
+                        X_coll = np.vstack((X[-self.T:], np.tile([X[-1]], (self.T - 1 - buffer_len, 1))))
+                        O_coll = np.vstack((O[-self.T:], np.tile([O[-1]], (self.T - 1 - buffer_len, 1))))
+                        output_coll = np.vstack((output[-self.T:], np.tile([output[-1]], (self.T - 1 - buffer_len, 1))))
+                        coll_data["X"].append(X_coll)
+                        coll_data["U"].append(U_coll)
+                        coll_data["O"].append(O_coll)
+                        coll_data["output"].append(output_coll)
+                        # For noncollision data remove the collision
+                        X = X[:-1]
+                        U = U[:-1]
+                        O = O[:-1]
+                        output = output[:-1]
+                    
+                    if len(X) >= self.T:
+                        no_coll_data["X"].append(X)
+                        no_coll_data["U"].append(U)
+                        no_coll_data["O"].append(O)
+                        no_coll_data["output"].append(output)
 
-        return start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample
+        return no_coll_data, coll_data 
 
-    def _balance_data(self, start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-        """
-        Default is no balancing, just split normally
-        """
-        num_val = max(1, int(len(start_idxs_by_sample) * self.val_pct))
-
-        ### split by traj
-        start_idxs_by_val_sample = start_idxs_by_sample[:num_val]
-        start_idxs_by_train_sample = start_idxs_by_sample[num_val:]
-        ### idxs to resample from (sample, start_idx)
-        def resample_idxs(start_idxs_by_sample):
-            return [(i, j) for i in xrange(len(start_idxs_by_sample))
-                    for j in start_idxs_by_sample[i]]
-        train_resample_idxs = resample_idxs(start_idxs_by_train_sample)
-        val_resample_idxs = resample_idxs(start_idxs_by_val_sample)
-        ### do resampling
-        def resample(resample_idxs):
-            num_samples = len(resample_idxs)
-
-            ### [# train/val samples, # bootstrap, start idxs]
-            bootstrap_start_idxs_by_sample = [[[] for _ in xrange(self.num_bootstrap)] for _ in xrange(num_samples)]
-            for b in xrange(self.num_bootstrap):
-                for _ in xrange(num_samples):
-                    sample_idx, start_idx = random.choice(resample_idxs)
-                    bootstrap_start_idxs_by_sample[sample_idx][b].append(start_idx)
-
-            return bootstrap_start_idxs_by_sample
-
-        bootstrap_start_idxs_by_train_sample = resample(train_resample_idxs)
-        bootstrap_start_idxs_by_val_sample = resample(val_resample_idxs)
-
-        return bootstrap_start_idxs_by_train_sample, X_by_sample[num_val:], U_by_sample[num_val:], O_by_sample[num_val:], output_by_sample[num_val:], \
-               bootstrap_start_idxs_by_val_sample, X_by_sample[:num_val], U_by_sample[:num_val], O_by_sample[:num_val], output_by_sample[:num_val]
-
-    def _save_tfrecords(self, tfrecords, bootstrap_start_idxs_by_sample,
-                        X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-        if self.save_type == 'varlen':
-            save_tfrecords = self._save_tfrecords_varlen
-        elif self.save_type == 'fixedlen':
+    def _save_tfrecords(
+            self,
+            tfrecords,
+            X_by_sample,
+            U_by_sample,
+            O_by_sample,
+            output_by_sample):
+        
+        if self.save_type == 'fixedlen':
             save_tfrecords = self._save_tfrecords_fixedlen
         else:
             raise Exception('{0} not valid save type'.format(self.save_type))
 
-        save_tfrecords(tfrecords, bootstrap_start_idxs_by_sample,
-                       X_by_sample, U_by_sample, O_by_sample, output_by_sample)
+        self.save_tfrecords(
+            tfrecords,
+            X_by_sample,
+            U_by_sample,
+            O_by_sample,
+            output_by_sample)
 
-    def _save_tfrecords_varlen(self, tfrecords, bootstrap_start_idxs_by_sample,
-                               X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-        def _floatlist_feature(value):
-            return tf.train.Feature(float_list=tf.train.FloatList(value=value))
-
-        def _int64list_feature(value):
-            return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
-
-        def _bytes_feature(value):
-            return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
-        writer = tf.python_io.TFRecordWriter(tfrecords)
-        written = []
-        for i, (bootstrap_start_idxs, X, U, O, output) in \
-            enumerate(zip(bootstrap_start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)):
-
-            num_start_idxs = sum([len(start_idxs) for start_idxs in bootstrap_start_idxs])
-            if num_start_idxs == 0:
-                continue
-            written.append(i)
-
-            feature = {
-                'fname': _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(i)),
-                'X': _floatlist_feature(X.ravel().tolist()),
-                'U': _floatlist_feature(U.ravel().tolist()),
-                'O': _floatlist_feature(O.ravel().tolist()),
-                'output': _int64list_feature(output.ravel().tolist()),
-                'H': _int64list_feature([len(X)]),
-            }
-            for b, start_idxs in enumerate(bootstrap_start_idxs):
-                feature['bootstrap_start_idxs_{0}'.format(b)] = _int64list_feature(start_idxs)
-                feature['bootstrap_start_idxs_{0}_len'.format(b)] = _int64list_feature([len(start_idxs)])
-
-            example = tf.train.Example(features=tf.train.Features(feature=feature))
-            writer.write(example.SerializeToString())
-
-        writer.close()
-
-    def _save_tfrecords_fixedlen(self, tfrecords, bootstrap_start_idxs_by_sample,
-                        X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-
-        ### create all X / U / O / output for all bootstraps
-        X_bootstrap = [[] for _ in xrange(self.num_bootstrap)]
-        U_bootstrap = [[] for _ in xrange(self.num_bootstrap)]
-        O_bootstrap = [[] for _ in xrange(self.num_bootstrap)]
-        output_bootstrap = [[] for _ in xrange(self.num_bootstrap)]
-        for bootstrap_start_idxs, X, U, O, output in \
-            zip(bootstrap_start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample):
-
-            num_start_idxs = sum([len(start_idxs) for start_idxs in bootstrap_start_idxs])
-            if num_start_idxs == 0:
-                continue
-
-            for b, start_idxs in enumerate(bootstrap_start_idxs):
-                for start_idx in start_idxs:
-                    idxs = slice(start_idx, start_idx + self.T)
-                    X_bootstrap[b].append(X[idxs])
-                    U_bootstrap[b].append(U[idxs])
-                    O_bootstrap[b].append(O[idxs])
-                    output_bootstrap[b].append(output[idxs])
-
-        N = len(X_bootstrap[0])
-        assert(np.all([len(l) == N for l in X_bootstrap + U_bootstrap + O_bootstrap + output_bootstrap]))
+    # TODO Not sure if this works
+    def _save_tfrecords_fixedlen(
+            self,
+            tfrecords,
+            X_by_sample,
+            U_by_sample,
+            O_by_sample,
+            output_by_sample):
 
         def _floatlist_feature(value):
             return tf.train.Feature(float_list=tf.train.FloatList(value=value))
@@ -381,49 +295,24 @@ class ProbcollModel:
             return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
         writer = tf.python_io.TFRecordWriter(tfrecords)
-        for i in xrange(N):
-            feature = {
-                'fname': _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(i)),
-            }
 
-            for b, (X, U, O, output) in enumerate(zip(X_bootstrap, U_bootstrap, O_bootstrap, output_bootstrap)):
-                feature['X_{0}'.format(b)] = _floatlist_feature(np.ravel(X[i]).tolist())
-                feature['U_{0}'.format(b)] = _floatlist_feature(np.ravel(U[i]).tolist())
-                feature['O_{0}'.format(b)] = _floatlist_feature(np.ravel(O[i][0]).tolist())
-                feature['output_{0}'.format(b)] = _int64list_feature([np.ravel(output[i])[-1]])
-
-            example = tf.train.Example(features=tf.train.Features(feature=feature))
-            writer.write(example.SerializeToString())
+        record_num = 0
+        for i, (X, U, O, output) in enumerate(zip(X_by_sample, U_by_sample, O_by_sample, output_by_sample)):
+            assert(len(X) >= self.T)
+            for j in range(len(X) - self.T + 1):
+                feature = {
+                    'fname': _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(record_num)),
+                }
+                feature['X'] = _floatlist_feature(np.ravel(X[j:j+self.T]).tolist())
+                feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
+                feature['O'] = _floatlist_feature(np.ravel(O[j]).tolist())
+                feature['output'] = _int64list_feature(np.ravel(output[j+self.T-1]).tolist())
+                
+                example = tf.train.Example(features=tf.train.Features(feature=feature))
+                writer.write(example.SerializeToString())
+                record_num += 1
 
         writer.close()
-
-    def _save_preprocess(self, fname, X_by_sample, U_by_sample, O_by_sample):
-        def calc_mean_cov(blank_by_sample):
-            timesteps = 0
-            mean_total = 0
-            for blank in blank_by_sample:
-                mean_total += blank.sum(axis=0)
-                timesteps += len(blank)
-            mean = mean_total / float(timesteps)
-
-            cov_total = np.zeros((mean.shape[0], mean.shape[0]), dtype=float)
-            for blank in blank_by_sample:
-                for x in blank:
-                    cov_total += np.outer(x - mean, x - mean)
-            cov = cov_total / float(timesteps)
-            
-            return timesteps, mean, cov
-
-        X_timesteps, X_mean, X_cov = calc_mean_cov(X_by_sample)
-        U_timesteps, U_mean, U_cov = calc_mean_cov(U_by_sample)
-        O_timesteps, O_mean, O_cov = calc_mean_cov(O_by_sample)
-
-        assert(X_timesteps == U_timesteps and U_timesteps == O_timesteps)
-
-        np.savez(fname, timesteps=X_timesteps,
-                 X_mean=X_mean, X_cov=X_cov,
-                 U_mean=U_mean, U_cov=U_cov,
-                 O_mean=O_mean, O_cov=O_cov)
 
     def _compute_mean(self):
         """ Calculates mean and updates variable in graph """
@@ -479,237 +368,151 @@ class ProbcollModel:
                                  self.d_orth['U_placeholder']: U_orth,
                                  self.d_orth['O_placeholder']: O_orth})
 
-    def add_data(self, npz_fnames):
-        if self.aggregate_save_data:
-            assert(self.reset_every_train)
-            self.npz_fnames += sorted([f for f in npz_fnames if 'mean' not in f])
-            tfrecords_train = self.npz_fnames[-1].replace('.npz', '_train_' + self._hash + '.tfrecords')
-            tfrecords_val = self.npz_fnames[-1].replace('.npz', '_val_' + self._hash + '.tfrecords')
-            preprocess_fname = self.npz_fnames[-1].replace('.npz', '_mean_' + self._hash + '.npz')
-
-            self._logger.info('Current npz_fnames: {0}'.format(self.npz_fnames))
-            self._logger.info('Generating and saving to {0}'.format(tfrecords_train))
-            ### load samples
-            random.shuffle(self.npz_fnames)
-            start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample = self._load_samples(self.npz_fnames)
-            ### balance the data
-            bootstrap_start_idxs_by_train_sample, X_by_train_sample, U_by_train_sample, O_by_train_sample, output_by_train_sample, \
-            bootstrap_start_idxs_by_val_sample, X_by_val_sample, U_by_val_sample, O_by_val_sample, output_by_val_sample = \
-                self._balance_data(start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)
-            ### save train/val tfrecords
-            self._logger.info('Saving tfrecords')
-            self._save_tfrecords(tfrecords_train, bootstrap_start_idxs_by_train_sample,
-                                 X_by_train_sample, U_by_train_sample, O_by_train_sample, output_by_train_sample)
-            self._save_tfrecords(tfrecords_val, bootstrap_start_idxs_by_val_sample,
-                                 X_by_val_sample, U_by_val_sample, O_by_val_sample, output_by_val_sample)
-            ### save mean
-            self._save_preprocess(preprocess_fname, X_by_train_sample, U_by_train_sample, O_by_train_sample)
-
-            self.tfrecords_train_fnames = [tfrecords_train]
-            self.tfrecords_val_fnames = [tfrecords_val]
-            self.preprocess_fnames = [preprocess_fname]
-        else:
-            npz_fnames = [f for f in npz_fnames if 'mean' not in f]
-            tfrecords_train_fnames = [f.replace('.npz', '_train_' + self._hash + '.tfrecords') for f in npz_fnames]
-            tfrecords_val_fnames = [f.replace('.npz', '_val_' + self._hash + '.tfrecords') for f in npz_fnames]
-            preprocess_fnames = [f.replace('.npz', '_mean_' + self._hash + '.npz') for f in npz_fnames]
-
-            for npz, tfrecords_train, tfrecords_val, mean in zip(npz_fnames,
-                                                                 tfrecords_train_fnames, tfrecords_val_fnames, preprocess_fnames):
-                if not os.path.exists(tfrecords_train) or not os.path.exists(tfrecords_val):
-                    self._logger.info('Generating and saving to {0}'.format(tfrecords_train))
-                    ### load samples
-                    start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample = \
-                        self._load_samples([npz])
-                    ### balance the data
-                    bootstrap_start_idxs_by_train_sample, X_by_train_sample, U_by_train_sample, O_by_train_sample, output_by_train_sample, \
-                    bootstrap_start_idxs_by_val_sample, X_by_val_sample, U_by_val_sample, O_by_val_sample, output_by_val_sample = \
-                        self._balance_data(start_idxs_by_sample, X_by_sample, U_by_sample, O_by_sample, output_by_sample)
-                    ### save train/val tfrecords
-                    self._save_tfrecords(tfrecords_train, bootstrap_start_idxs_by_train_sample,
-                                         X_by_train_sample, U_by_train_sample, O_by_train_sample, output_by_train_sample)
-                    self._save_tfrecords(tfrecords_val, bootstrap_start_idxs_by_val_sample,
-                                         X_by_val_sample, U_by_val_sample, O_by_val_sample, output_by_val_sample)
-                    ### save mean
-                    self._save_preprocess(mean, X_by_train_sample, U_by_train_sample, O_by_train_sample)
-
+    def _get_tfrecords_fnames(self, fname, create=True):
+        def _file_creator(coll, val):
+            if coll:
+                if val:
+                    tfdir = self._coll_val_tfrecords_dir
                 else:
-                    self._logger.info('{0} already exists'.format(tfrecords_train))
+                    tfdir = self._coll_train_tfrecords_dir
+            else:
+                if val:
+                    tfdir = self._no_coll_val_tfrecords_dir
+                else:
+                    tfdir = self._no_coll_train_tfrecords_dir
+            sample_fname = fname.split("/")[-1]
+            tffname = os.path.join(tfdir, sample_fname.replace(
+                ".npz",
+                "_{0}.tfrecord".format(self._hash)))
+            return tffname
+        coll_train_fname = _file_creator(True, False) 
+        no_coll_train_fname = _file_creator(False, False)
+        coll_val_fname = _file_creator(True, True)
+        no_coll_val_fname = _file_creator(False, True)
+        return [
+                coll_train_fname,
+                no_coll_train_fname,
+                coll_val_fname,
+                no_coll_val_fname
+            ]
 
-            self.npz_fnames += npz_fnames
-            self.tfrecords_train_fnames += tfrecords_train_fnames
-            self.tfrecords_val_fnames += tfrecords_val_fnames
-            self.preprocess_fnames += preprocess_fnames
+    def add_data(self, npz_fnames):
+        tfrecords = self._get_tfrecords_fnames(npz_fnames[-1]) 
+        tfrecords_coll_train, tfrecords_no_coll_train, \
+            tfrecords_coll_val, tfrecords_no_coll_val = tfrecords
+        self._logger.info('Saving tfrecords')
+        no_coll_data, coll_data = self._load_samples(npz_fnames)
+        no_coll_len = len(no_coll_data["X"])
+        coll_len = len(coll_data["X"])
+        tot_coll = sum([len(coll_data["X"][i]) - self.T + 1 for i in range(coll_len)])
+        tot_no = sum([len(no_coll_data["X"][i]) - self.T + 1 for i in range(no_coll_len)])
+        self._logger.info("Size of no collision data: {0}".format(tot_no))
+        self._logger.info("Size of collision data: {0}".format(tot_coll))
+
+        self._save_tfrecords_fixedlen(
+            tfrecords_no_coll_train, 
+            no_coll_data["X"][int(no_coll_len * self.val_pct):],
+            no_coll_data["U"][int(no_coll_len * self.val_pct):],
+            no_coll_data["O"][int(no_coll_len * self.val_pct):],
+            no_coll_data["output"][int(no_coll_len * self.val_pct):])
+
+        self._save_tfrecords_fixedlen(
+            tfrecords_coll_train, 
+            coll_data["X"][int(coll_len * self.val_pct):],
+            coll_data["U"][int(coll_len * self.val_pct):],
+            coll_data["O"][int(coll_len * self.val_pct):],
+            coll_data["output"][int(coll_len * self.val_pct):])
+
+        self._save_tfrecords_fixedlen(
+            tfrecords_no_coll_val, 
+            no_coll_data["X"][:int(no_coll_len * self.val_pct)],
+            no_coll_data["U"][:int(no_coll_len * self.val_pct)],
+            no_coll_data["O"][:int(no_coll_len * self.val_pct)],
+            no_coll_data["output"][:int(no_coll_len * self.val_pct)])
+
+        self._save_tfrecords_fixedlen(
+            tfrecords_coll_val, 
+            coll_data["X"][:int(coll_len * self.val_pct)],
+            coll_data["U"][:int(coll_len * self.val_pct)],
+            coll_data["O"][:int(coll_len * self.val_pct)],
+            coll_data["output"][:int(coll_len * self.val_pct)])
 
     #############
     ### Graph ###
     #############
 
     def _graph_inputs_outputs_from_file(self, name):
-        if self.save_type == 'varlen':
-            graph_inputs_outputs_from_file = self._graph_inputs_outputs_from_file_varlen
-        elif self.save_type == 'fixedlen':
+        if self.save_type == 'fixedlen':
             graph_inputs_outputs_from_file = self._graph_inputs_outputs_from_file_fixedlen
         else:
             raise Exception('{0} is not valid save type'.format(self.save_type))
 
         return graph_inputs_outputs_from_file(name)
 
-    def _graph_inputs_outputs_from_file_varlen(self, name):
-        with tf.name_scope(name + '_file_input'):
-            filename_place = tf.placeholder(tf.string)
-            filename_var = tf.get_variable(name + '_fnames', initializer=filename_place, validate_shape=False, trainable=False)
-
-            ### create file queue
-            filename_queue = tf.train.string_input_producer(filename_var,
-                                                            num_epochs=None,
-                                                            shuffle=True)
-
-            ### read and decode
-            reader = tf.TFRecordReader()
-            _, serialized_example = reader.read(filename_queue)
-
-            features = {
-                'fname': tf.FixedLenFeature([], tf.string),
-                'X': tf.VarLenFeature(tf.float32),
-                'U': tf.VarLenFeature(tf.float32),
-                'O': tf.VarLenFeature(tf.float32),
-                'output': tf.VarLenFeature(tf.int64),
-                'H': tf.FixedLenFeature([], tf.int64)
-            }
-            for b in xrange(self.num_bootstrap):
-                features['bootstrap_start_idxs_{0}'.format(b)] = tf.VarLenFeature(tf.int64)
-                features['bootstrap_start_idxs_{0}_len'.format(b)] = tf.FixedLenFeature([], tf.int64)
-
-            batch = tf.train.batch([serialized_example], self.batch_size, capacity=self.batch_size)
-            parsed_examples = tf.parse_example(batch, features)
-
-            ### densify and reshape
-            fname_batch = parsed_examples['fname']
-            H_batch = tf.cast(parsed_examples['H'], tf.int32)
-            H_max = tf.reduce_max(H_batch)
-            X_batch = tf.sparse_tensor_to_dense(parsed_examples['X'])
-            U_batch = tf.sparse_tensor_to_dense(parsed_examples['U'])
-            O_batch = tf.sparse_tensor_to_dense(parsed_examples['O'])
-            output_batch = tf.sparse_tensor_to_dense(parsed_examples['output'])
-
-            self.tf_debug['H_batch'] = H_batch
-            self.tf_debug['H_max'] = H_max
-            self.tf_debug['X_batch'] = X_batch
-            self.tf_debug['U_batch'] = U_batch
-            self.tf_debug['O_batch'] = O_batch
-            self.tf_debug['output_batch'] = output_batch
-
-            for tensor in (X_batch, U_batch, O_batch, output_batch):
-                tensor.set_shape([self.batch_size, None])
-
-            # [# bootstrap, batch size]
-            bootstrap_start_idxs_len_batch = []
-            bootstrap_start_idxs_batch = []
-            for b in xrange(self.num_bootstrap):
-                start_idxs_len_batch = tf.cast(parsed_examples['bootstrap_start_idxs_{0}_len'.format(b)], tf.int32)
-                start_idxs_batch = tf.sparse_tensor_to_dense(parsed_examples['bootstrap_start_idxs_{0}'.format(b)])
-                start_idxs_batch.set_shape([self.batch_size, None])
-                # start_idxs_batch = [tf.slice(si, [0], [si_len]) for si, si_len in
-                #                     zip(tf.unpack(start_idxs_batch), tf.unpack(start_idxs_len_batch))]
-
-                bootstrap_start_idxs_len_batch.append(tf.unpack(start_idxs_len_batch))
-                bootstrap_start_idxs_batch.append(tf.unpack(start_idxs_batch))
-            # [batch size, # bootstrap]
-            bootstrap_start_idxs_len_batch = np.array(bootstrap_start_idxs_len_batch).T.tolist()
-            bootstrap_start_idxs_batch = np.array(bootstrap_start_idxs_batch).T.tolist()
-
-            ### iterate one example at a time
-            bootstrap_X_inputs = [[] for _ in xrange(self.num_bootstrap)]
-            bootstrap_U_inputs = [[] for _ in xrange(self.num_bootstrap)]
-            bootstrap_O_inputs = [[] for _ in xrange(self.num_bootstrap)]
-            bootstrap_outputs = [[] for _ in xrange(self.num_bootstrap)]
-            for i, (H, X, U, O, output, bootstrap_start_idxs_len, bootstrap_start_idxs) in \
-                    enumerate(zip(tf.unpack(H_batch, name='unpack_H'), tf.unpack(X_batch, name='unpack_X'), tf.unpack(U_batch, name='unpack_U'), tf.unpack(O_batch, name='unpack_O'), tf.unpack(output_batch, name='unpack_output'),
-                        bootstrap_start_idxs_len_batch, bootstrap_start_idxs_batch)):
-
-                # tf.Print(H, [H], 'H = ', summarize=100)
-
-                X = tf.reshape(X, tf.pack([H_max, self.dX]), name='reshape_X_{0}'.format(i))
-                U = tf.reshape(U, tf.pack([H_max, self.dU]), name='reshape_U_{0}'.format(i))
-                O = tf.reshape(O, tf.pack([H_max, self.dO]), name='reshape_O_{0}'.format(i))
-                output = tf.reshape(output, tf.pack([H_max]), name='reshape_output_{0}'.format(i))
-
-                self.tf_debug['X_{0}'.format(i)] = X
-                self.tf_debug['U_{0}'.format(i)] = U
-                self.tf_debug['O_{0}'.format(i)] = O
-                self.tf_debug['output_{0}'.format(i)] = output
-
-                ### iterate through each bootstrap
-                for b, (start_idxs_len, start_idxs) in enumerate(zip(bootstrap_start_idxs_len, bootstrap_start_idxs)):
-                    start_idxs = tf.slice(start_idxs, [0], [start_idxs_len])
-                    self.tf_debug['start_idxs_before_{0}_b{1}'.format(i, b)] = start_idxs
-                    start_idxs = tf.expand_dims(start_idxs, 1)
-                    start_idxs = tf.tile(start_idxs, (1, self.T))
-                    start_idxs += tf.constant(range(self.T), dtype=tf.int64)
-
-                    self.tf_debug['start_idxs_len_{0}_b{1}'.format(i, b)] = start_idxs_len
-                    self.tf_debug['start_idxs_{0}_b{1}'.format(i, b)] = start_idxs
-
-                    bootstrap_X_inputs[b].append(tf.gather(X, start_idxs))
-                    bootstrap_U_inputs[b].append(tf.gather(U, start_idxs))
-                    bootstrap_O_inputs[b].append(tf.gather(O, start_idxs[:, 0])) # only first observation
-                    bootstrap_outputs[b].append(tf.expand_dims(tf.gather(output, start_idxs[:, self.T-1]), 1)) # only last output
-
-                    self.tf_debug['X_{0}_b{1}'.format(i, b)] = bootstrap_X_inputs[b][-1]
-                    self.tf_debug['U_{0}_b{1}'.format(i, b)] = bootstrap_U_inputs[b][-1]
-                    self.tf_debug['O_{0}_b{1}'.format(i, b)] = bootstrap_O_inputs[b][-1]
-                    self.tf_debug['output_{0}_b{1}'.format(i, b)] = bootstrap_outputs[b][-1]
-
-            for b in xrange(self.num_bootstrap):
-                bootstrap_X_inputs[b] = tf.concat(0, bootstrap_X_inputs[b])
-                bootstrap_U_inputs[b] = tf.concat(0, bootstrap_U_inputs[b])
-                bootstrap_O_inputs[b] = tf.concat(0, bootstrap_O_inputs[b])
-                bootstrap_outputs[b] = tf.concat(0, bootstrap_outputs[b])
-
-        return fname_batch, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs, \
-               filename_queue, filename_place, filename_var
-
     def _graph_inputs_outputs_from_file_fixedlen(self, name):
         with tf.name_scope(name + '_file_input'):
-            filename_place = tf.placeholder(tf.string)
-            filename_var = tf.get_variable(name + '_fnames', initializer=filename_place, validate_shape=False, trainable=False)
-
-            ### create file queue
-            filename_queue = tf.train.string_input_producer(filename_var,
-                                                            num_epochs=None,
-                                                            shuffle=True)
+            filename_places = (tf.placeholder(tf.string), tf.placeholder(tf.string))
+            filename_vars = ( 
+                    tf.get_variable(
+                        name + '_no_coll_fnames',
+                        initializer=filename_places[0],
+                        validate_shape=False,
+                        trainable=False),
+                    tf.get_variable(
+                        name + '_coll_fnames',
+                        initializer=filename_places[1],
+                        validate_shape=False,
+                        trainable=False)
+                )
+            ### create file queues
+            filename_queues = (
+                    tf.train.string_input_producer(
+                        filename_vars[0],
+                        num_epochs=None,
+                        shuffle=True),
+                    tf.train.string_input_producer(
+                        filename_vars[1],
+                        num_epochs=None,
+                        shuffle=True)
+                )
 
             ### read and decode
-            reader = tf.TFRecordReader()
-            _, serialized_example = reader.read(filename_queue)
-
+            readers = [tf.TFRecordReader(), tf.TFRecordReader()]
+            
             features = {
                 'fname': tf.FixedLenFeature([], tf.string)
             }
 
-            for b in xrange(self.num_bootstrap):
-                features['X_{0}'.format(b)] = tf.FixedLenFeature([self.dX * self.T], tf.float32)
-                features['U_{0}'.format(b)] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
-                features['O_{0}'.format(b)] = tf.FixedLenFeature([self.dO], tf.float32)
-                features['output_{0}'.format(b)] = tf.FixedLenFeature([1], tf.int64)
+            features['X'] = tf.FixedLenFeature([self.dX * self.T], tf.float32)
+            features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
+            features['O'] = tf.FixedLenFeature([self.dO], tf.float32)
+            features['output'] = tf.FixedLenFeature([1], tf.int64)
+            
+            # TODO make sure this works
+            # Figure out how to do arbitrary split across batchsize
+            inputs = [None, None]
+            for i, fq in enumerate(filename_queues):
+                serialized_examples = [readers[(b+i)%2].read(fq)[1] for b in xrange(self.num_bootstrap)]
+                parsed_example = [
+                        tf.parse_single_example(serialized_examples[b], features=features)
+                        for b in xrange(self.num_bootstrap)
+                    ]
 
-            parsed_example = tf.parse_single_example(serialized_example, features=features)
+                fname = parsed_example[0]['fname']
+                bootstrap_X_input = [tf.reshape(parsed_example[b]['X'], (self.T, self.dX))
+                                     for b in xrange(self.num_bootstrap)]
+                bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
+                                     for b in xrange(self.num_bootstrap)]
+                bootstrap_O_input = [parsed_example[b]['O'] for b in xrange(self.num_bootstrap)]
+                bootstrap_output = [parsed_example[b]['output'] for b in xrange(self.num_bootstrap)]
+                inputs[i] = (fname,) + tuple(bootstrap_X_input + bootstrap_U_input + bootstrap_O_input + bootstrap_output)
 
-            fname = parsed_example['fname']
-            bootstrap_X_input = [tf.reshape(parsed_example['X_{0}'.format(b)], (self.T, self.dX))
-                                 for b in xrange(self.num_bootstrap)]
-            bootstrap_U_input = [tf.reshape(parsed_example['U_{0}'.format(b)], (self.T, self.dU))
-                                 for b in xrange(self.num_bootstrap)]
-            bootstrap_O_input = [parsed_example['O_{0}'.format(b)] for b in xrange(self.num_bootstrap)]
-            bootstrap_output = [parsed_example['output_{0}'.format(b)] for b in xrange(self.num_bootstrap)]
-
-            shuffled = tf.train.shuffle_batch(
-                [fname] + bootstrap_X_input + bootstrap_U_input + bootstrap_O_input + bootstrap_output,
+            shuffled = tf.train.shuffle_batch_join(
+                inputs,
                 batch_size=self.batch_size,
                 capacity=10*self.batch_size + 3 * self.batch_size,
                 min_after_dequeue=10*self.batch_size)
-
+            
             fname_batch = shuffled[0]
             bootstrap_X_inputs = shuffled[1:1+self.num_bootstrap]
             bootstrap_U_inputs = shuffled[1+self.num_bootstrap:1+2*self.num_bootstrap]
@@ -717,7 +520,7 @@ class ProbcollModel:
             bootstrap_outputs = shuffled[1+3*self.num_bootstrap:1+4*self.num_bootstrap]
 
         return fname_batch, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs,\
-               filename_queue, filename_place, filename_var
+               filename_queues, filename_places, filename_vars
 
     def _graph_inputs_outputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
@@ -762,7 +565,7 @@ class ProbcollModel:
                 weight_decay = reg * tf.add_n(tf.get_collection('weight_decays'))
                 cost = cross_entropy + weight_decay
                 err = (1. / tf.cast(num_coll + num_nocoll, tf.float32)) * (num_errs_on_coll + num_errs_on_nocoll)
-                err_on_coll = tf.cond(num_coll > 0,
+                err_on_coll = tf.cond(num_coll >= 0,
                                       lambda: (1. / tf.cast(num_coll, tf.float32)) * num_errs_on_coll,
                                       lambda: tf.constant(np.nan))
                 err_on_nocoll = tf.cond(num_nocoll > 0,
@@ -786,9 +589,14 @@ class ProbcollModel:
         return optimizer, grad, optimizer_vars
 
     def _graph_init_vars(self):
-        self.sess.run(tf.global_variables_initializer(),
-                      feed_dict=dict([(p, []) for p in (self.d_train['queue_placeholder'],
-                                                        self.d_val['queue_placeholder'])]))
+        self.sess.run(
+            tf.global_variables_initializer(),
+            feed_dict=dict([(p, []) for p in (
+                    self.d_train['no_coll_queue_placeholder'],
+                    self.d_train['coll_queue_placeholder'],
+                    self.d_val['no_coll_queue_placeholder'],
+                    self.d_val['coll_queue_placeholder']
+                )]))
         self._compute_mean()
 
     def _graph_setup(self):
@@ -839,7 +647,10 @@ class ProbcollModel:
         ### prepare for training
         for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
             d['fnames'], d['X_inputs'], d['U_inputs'], d['O_inputs'], d['outputs'], \
-            d['queue'], d['queue_placeholder'], d['queue_var'] = self._graph_inputs_outputs_from_file(name)
+            queues, queue_places, queue_vars = self._graph_inputs_outputs_from_file(name)
+            d['no_coll_queue'], d['coll_queue'] = queues
+            d['no_coll_queue_placeholder'], d['coll_queue_placeholder']  = queue_places
+            d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
             _, _, _, _, d['output_mats'], _ = self._graph_inference(name, self.T,
                                                                     d['X_inputs'], d['U_inputs'], d['O_inputs'],
                                                                     self.d_mean['X_var'], self.d_orth['X_var'],
@@ -907,31 +718,32 @@ class ProbcollModel:
     def _create_output(self, output):
         return output
 
-    def _get_epoch(self, fnames_dict, fnames_value):
-        for fname in fnames_value:
-            fnames_dict[fname] += 1
-
-        epoch = max(fnames_dict.values()) - 1
-        return epoch
-
     def _flush_queue(self):
-        for tfrecords_fnames, queue in ((self.tfrecords_train_fnames, self.d_train['queue']),
-                                        (self.tfrecords_val_fnames, self.d_val['queue'])):
+        for tfrecords_fnames, queue in (
+                    (self.tfrecords_no_coll_train_fnames, self.d_train['no_coll_queue']),
+                    (self.tfrecords_coll_train_fnames, self.d_train['coll_queue']),
+                    (self.tfrecords_no_coll_val_fnames, self.d_val['no_coll_queue']),
+                    (self.tfrecords_coll_val_fnames, self.d_val['coll_queue'])
+                ):
             while not np.all([(fname in tfrecords_fnames) for fname in
                               self.sess.run(queue.dequeue_many(10*self.batch_size))]):
                 pass
 
     def train(self, prev_model_file=None, new_model_file=None, **kwargs):
-        epochs = kwargs.get('epochs', self.epochs)
 
         if prev_model_file is not None and not self.reset_every_train:
             self.load(prev_model_file)
         else:
             self._graph_init_vars()
-        self._compute_mean()
+#        self._compute_mean()
 
-        self.sess.run([tf.assign(self.d_train['queue_var'], self.tfrecords_train_fnames, validate_shape=False),
-                       tf.assign(self.d_val['queue_var'], self.tfrecords_val_fnames, validate_shape=False)])
+        self.sess.run(
+            [
+                tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
+                tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
+                tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
+                tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
+            ])
 
         if not hasattr(self, 'coord'):
             assert(not hasattr(self, 'threads'))
@@ -942,37 +754,38 @@ class ProbcollModel:
         self._flush_queue()
 
         ### create plotter
-        plotter = MLPlotter(self.save_dir,
-                            {
-                                'err': {
-                                    'title': 'Error',
-                                    'subplot': 0,
-                                    'color': 'k',
-                                    'ylabel': 'Percentage'
-                                },
-                                'err_coll': {
-                                    'title': 'Error Collision',
-                                    'subplot': 1,
-                                    'color': 'r',
-                                    'ylabel': 'Percentage'
-                                },
-                                'err_nocoll': {
-                                    'title': 'Error no collision',
-                                    'subplot': 2,
-                                    'color': 'g',
-                                    'ylabel': 'Percentage'
-                                },
-                                'cost': {
-                                    'title': 'Cost',
-                                    'subplot': 3,
-                                    'color': 'k',
-                                    'ylabel': 'cost'
-                                },
-                                'cross_entropy': {
-                                    'subplot': 3,
-                                    'color': 'm'
-                                }
-                            })
+        plotter = MLPlotter(
+            self.save_dir,
+            {
+                'err': {
+                    'title': 'Error',
+                    'subplot': 0,
+                    'color': 'k',
+                    'ylabel': 'Percentage'
+                },
+                'err_coll': {
+                    'title': 'Error Collision',
+                    'subplot': 1,
+                    'color': 'r',
+                    'ylabel': 'Percentage'
+                },
+                'err_nocoll': {
+                    'title': 'Error no collision',
+                    'subplot': 2,
+                    'color': 'g',
+                    'ylabel': 'Percentage'
+                },
+                'cost': {
+                    'title': 'Cost',
+                    'subplot': 3,
+                    'color': 'k',
+                    'ylabel': 'cost'
+                },
+                'cross_entropy': {
+                    'subplot': 3,
+                    'color': 'm'
+                }
+            })
 
         ### train
         train_values = defaultdict(list)
@@ -981,23 +794,19 @@ class ProbcollModel:
         train_fnames_dict = defaultdict(int)
         val_fnames_dict = defaultdict(int)
 
-        train_epoch = -1
-        new_train_epoch = 0
-        val_epoch = 0
         step = 0
-        save_start = time.time()
-        epoch_start = time.time()
-        while train_epoch < epochs and step < self.steps:
+        epoch_start = save_start = time.time()
+        while step < self.steps:
             if step == 0:
                 for _ in xrange(10): print('')
 
             ### validation
-            if new_train_epoch != train_epoch:
+            if (step != 0 and (step % self.val_freq) == 0):
                 val_values = defaultdict(list)
                 val_nums = defaultdict(float)
-
+                val_steps = 0
                 self._logger.debug('\tComputing validation...')
-                while True:
+                while val_steps < self.val_steps:
                     val_cost, val_cross_entropy, \
                     val_err, val_err_coll, val_err_nocoll, \
                     val_fnames, val_outputs = \
@@ -1013,10 +822,7 @@ class ProbcollModel:
                     val_nums['coll'] += np.sum(np.concatenate(val_outputs))
                     val_nums['nocoll'] += np.sum(1 - np.concatenate(val_outputs))
 
-                    new_val_epoch = self._get_epoch(val_fnames_dict, val_fnames)
-                    if new_val_epoch != val_epoch:
-                        val_epoch = new_val_epoch
-                        break
+                    val_steps += 1
 
                 plotter.add_val('err', np.mean(val_values['err']))
                 plotter.add_val('err_coll', np.mean(val_values['err_coll']))
@@ -1026,8 +832,7 @@ class ProbcollModel:
                 plotter.plot()
 
                 self._logger.debug(
-                    'Epoch {0:d},  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f} ({7:.2f} s per {8:04d} samples)'.format(
-                        train_epoch + 1,
+                    'error: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
                         100 * np.mean(val_values['err']),
                         100 * np.mean(val_values['err_coll']),
                         100 * np.mean(val_values['err_nocoll']),
@@ -1035,7 +840,8 @@ class ProbcollModel:
                         np.mean(val_values['cost']),
                         np.mean(val_values['cross_entropy']),
                         time.time() - epoch_start,
-                        step * self.batch_size / (train_epoch + 1) if train_epoch >= 0 else 0))
+                        int(self.val_freq * self.batch_size)))
+                
                 fnames_condensed = defaultdict(int)
                 for k, v in train_fnames_dict.items():
                     fnames_condensed[k.split(self._hash)[0]] += v
@@ -1046,8 +852,6 @@ class ProbcollModel:
 
                 ### save model
                 self.save(new_model_file)
-
-            train_epoch = new_train_epoch
 
             ### train
             _, train_cost, train_cross_entropy, \
@@ -1069,8 +873,6 @@ class ProbcollModel:
             train_nums['coll'] += np.sum(np.concatenate(train_outputs))
             train_nums['nocoll'] += np.sum(1 - np.concatenate(train_outputs))
 
-            new_train_epoch = self._get_epoch(train_fnames_dict, train_fnames)
-
             # Print an overview fairly often.
             if step % self.display_batch == 0 and step > 0:
                 plotter.add_train('err', step * self.batch_size, np.mean(train_values['err']))
@@ -1082,8 +884,7 @@ class ProbcollModel:
                 plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
                 plotter.plot()
 
-                self._logger.debug('\tepoch {0:d}/{1:d}, step pct: {2:.1f}%,  error: {3:5.2f}%,  error coll: {4:5.2f}%,  error nocoll: {5:5.2f}%,  pct coll: {6:4.1f}%,  cost: {7:4.2f}, ce: {8:4.2f}'.format(
-                    train_epoch, self.epochs,
+                self._logger.debug('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
                     100 * step / float(self.steps),
                     100 * np.mean(train_values['err']),
                     100 * np.mean(train_values['err_coll']),
@@ -1186,53 +987,6 @@ class ProbcollModel:
         Os = [sample.get_O()[:self.T, self.O_idxs(sample._meta_data)] for sample in samples]
 
         return self.eval_batch(Xs, Us, Os, num_avg=num_avg, pre_activation=pre_activation)
-
-    def eval_jac(self, X, U, O):
-        assert(len(X) >= self.T)
-        assert(len(U) >= self.T)
-        assert(len(O) >= self.T)
-
-        x_input, u_input, o_input = self._create_input(X, U, O)
-        feed = {}
-        for b in xrange(self.num_bootstrap):
-            feed.update({
-                self.x_inputs[b]: [x_input],
-                self.u_inputs[b]: [u_input],
-                self.o_inputs[b]: [o_input]
-            })
-
-        all_grads = self.sess.run(self.x_grads + self.u_grads, feed_dict=feed)
-        jac_x, jac_u = None, None
-        if self.dX > 0:
-            jac_x = np.vstack([all_grads.pop(0) for _ in xrange(self.T)])
-        if self.dU > 0:
-            jac_u = np.vstack([all_grads.pop(0) for _ in xrange(self.T)])
-
-        return jac_x, jac_u
-
-    def eval_jac_sample(self, sample):
-        X = sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
-        U = sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
-        O = sample.get_O()[:self.T, self.O_idxs(sample._meta_data)]
-
-        return self.eval_jac(X, U, O)
-
-    def eval_jac_input(self, x_input, u_input, o_input):
-        feed = {}
-        for b in xrange(self.num_bootstrap):
-            feed.update({
-                self.x_inputs[b]: [x_input],
-                self.u_inputs[b]: [u_input],
-                self.o_inputs[b]: [o_input]
-            })
-        all_grads = self.sess.run(self.x_grads + self.u_grads, feed_dict=feed)
-        jac_x, jac_u = None, None
-        if self.dX > 0:
-            jac_x = np.vstack([all_grads.pop(0) for _ in xrange(self.T)])
-        if self.dU > 0:
-            jac_u = np.vstack([all_grads.pop(0) for _ in xrange(self.T-1)])
-
-        return jac_x, jac_u
 
     #############################
     ### Load/save/reset/close ###

@@ -220,7 +220,7 @@ class ProbcollModelRCcar(ProbcollModel):
             for b in xrange(num_bootstrap):
                 ### inputs
                 x_input_b = bootstrap_X_inputs[b]
-                u_input_b = bootstrap_U_inputs[b]
+                u_input_b = (bootstrap_U_inputs[b] - 49.5)/49.5
                 o_input_b = bootstrap_O_inputs[b]
 
                 dX = x_input_b.get_shape()[2].value

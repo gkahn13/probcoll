@@ -17,13 +17,16 @@ class PrimitivesRCcar(Primitives):
         samples = []
         for steer1 in steers:
             for steer2 in steers:
-                speed1 = 16.
-                sample = Sample(T=self._H)
-                linearvel1 = [steer1, speed1]
-                linearvel2 = [steer2, speed1]
-                sample.set_U(linearvel1, t=slice(0, self._H//2))
-                sample.set_U(linearvel2, t=slice(self._H//2, self._H))
-                samples.append(sample)
+                for steer3 in steers:
+                    speed1 = 16.
+                    sample = Sample(T=self._H)
+                    linearvel1 = [steer1, speed1]
+                    linearvel2 = [steer2, speed1]
+                    linearvel3 = [steer3, speed1]
+                    sample.set_U(linearvel1, t=slice(0, self._H//3))
+                    sample.set_U(linearvel2, t=slice(self._H//3, (self._H*2)//3))
+                    sample.set_U(linearvel3, t=slice((self._H*2)//3, self._H))
+                    samples.append(sample)
 
 #        for steer1 in steers:
 #            sample = Sample(T=self._H)

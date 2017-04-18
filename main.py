@@ -8,12 +8,12 @@ import numpy as np, random
 
 from config import load_params, set_params, params
 
-# try:
-from robots.pointquad.algorithm.probcoll_pointquad import ProbcollPointquad
-from robots.pointquad.algorithm.analyze_pointquad import AnalyzePointquad
+try:
+    from robots.pointquad.algorithm.probcoll_pointquad import ProbcollPointquad
+    from robots.pointquad.algorithm.analyze_pointquad import AnalyzePointquad
 # from robots.pointquad.algorithm.replay_prediction_pointquad import ReplayPredictionPointquad
-# except:
-#     print('main.py: not importing pointquad')
+except:
+    print('main.py: not importing pointquad')
 
 try:
     from robots.bebop2d.algorithm.probcoll_bebop2d import ProbcollBebop2d
@@ -22,11 +22,11 @@ try:
 except:
     print('main.py: not importing Bebop2d')
 
-try:
-    from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-    from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
-except:
-    print('main.py: not importing RC car')
+#try:
+from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
+from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
+#except:
+    #print('main.py: not importing RC car')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -79,10 +79,10 @@ if __name__ == '__main__':
     if run is None:
         run = params['run'].lower()
 
-    if exp_name is None:
-        exp_name = params['exp_name']
-    else:
-        params['exp_name'] = exp_name
+#    if exp_name is None:
+#        exp_name = params['exp_name']
+#    else:
+#        params['exp_name'] = exp_name
     
     if run == 'probcoll':
         if robot == 'pointquad':

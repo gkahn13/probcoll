@@ -81,7 +81,7 @@ class Probcoll:
         if not os.path.exists(dir):
             os.makedirs(dir)
         return dir
-
+    
     def _itr_samples_file(self, itr, create=True):
         return os.path.join(self._itr_dir(itr, create=create),
                             'samples_itr_{0}.npz'.format(itr))
@@ -157,10 +157,10 @@ class Probcoll:
             self._probcoll_model.load(model_file=model_file)
 
         ### load previous data
-        if samples_start_itr > 0:
-            prev_sample_files = [self._itr_samples_file(itr) for itr in xrange(samples_start_itr)]
-            assert (os.path.exists(f) for f in prev_sample_files)
-            self._probcoll_model.add_data(prev_sample_files)
+#        if samples_start_itr > 0:
+#            prev_sample_files = [self._itr_samples_file(itr) for itr in xrange(samples_start_itr)]
+#            assert (os.path.exists(f) for f in prev_sample_files)
+#            self._probcoll_model.add_data(prev_sample_files)
         ### load initial dataset
         init_data_folder = params['probcoll'].get('init_data', None)
         if init_data_folder is not None:
@@ -176,8 +176,7 @@ class Probcoll:
             (samples_start_itr == 0 and model_start_itr == 0 and init_data_folder is not None):
             old_model_file = None if samples_start_itr <= 0 else self._itr_model_file(model_start_itr)
             self._probcoll_model.train(old_model_file=old_model_file,
-                                 new_model_file=self._itr_model_file(model_start_itr),
-                                 epochs=self._probcoll_model.epochs)
+                                 new_model_file=self._itr_model_file(model_start_itr))
         start_itr = samples_start_itr
 
         ### training loop
@@ -193,8 +192,7 @@ class Probcoll:
             self._probcoll_model.add_data([self._itr_samples_file(itr)])
             self._logger.info('Itr {0} training probability of collision'.format(itr))
             self._probcoll_model.train(old_model_file=self._itr_model_file(itr-1),
-                                 new_model_file=self._itr_model_file(itr),
-                                 epochs=self._probcoll_model.epochs)
+                                 new_model_file=self._itr_model_file(itr))
 
     def _run_itr(self, itr):
         T = params['probcoll']['T']

@@ -44,6 +44,7 @@ class AgentRCcar(Agent):
         ### publishers
         self.cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
         self.cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
+        self.pred_image_pub = rospy.Publisher(rccar_topics['pred_image'], sensor_msgs.msg.Image, queue_size=1)
 
         self.cv_bridge = cv_bridge.CvBridge()
 
@@ -112,6 +113,8 @@ class AgentRCcar(Agent):
                 image_msgs = image_msgs_filt
             image_msg = image_msgs[-1]
         im = AgentRCcar.process_image(image_msg, self.cv_bridge)
+	ros_image = self.cv_bridge.cv2_to_imgmsg((im*255).astype(np.uint8), "mono8")
+        self.pred_image_pub.publish(ros_image)
         # im = np.zeros((params['O']['camera']['height'], params['O']['camera']['width']), dtype=np.float32)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
         obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
@@ -127,7 +130,7 @@ class AgentRCcar(Agent):
         im = (1./255.) * cv2.resize(image,
                                     (params['O']['camera']['height'], params['O']['camera']['width']),
                                     interpolation=cv2.INTER_AREA) # TODO how does this deal with aspect ratio
-
+        
         return im
 
     def execute_control(self, u):

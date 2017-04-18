@@ -12,7 +12,7 @@ exp_name: test
 
 probcoll:
   T: 28 # timesteps per trajectory
-  max_iter: 23
+  max_iter: 21
   planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
 
   control_noise:
@@ -22,8 +22,8 @@ probcoll:
     gaussian:
       std: [3.0, 0.3]
     uniform:
-      lower: [-5., 0.]
-      upper: [5., 2.]
+      lower: [-10., 0.]
+      upper: [10., 0.]
 
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   obs_noise: True
@@ -46,7 +46,7 @@ probcoll:
     randomize_reps: True
 
     default:
-      cmd_steer: [50.]
+      cmd_steer: [49.5]
       cmd_vel: [0.]
 
     range:
@@ -63,10 +63,15 @@ probcoll:
 ######################
     
 model:
-  T: 8 # how many timesteps to predict
+  T: 6 # how many timesteps to predict
 
+  control_range:
+    lower: [0., 0.]
+    upper: [99.0, 99.0]
+
+  
   graph_type: 'fc' # fc / cnn / rnn
-  num_bootstrap: 10 # 5
+  num_bootstrap: 1 # 5
   dropout: 0.95 # pct keep (None if no dropout)
   reg: 0.
 
@@ -82,11 +87,11 @@ model:
   reset_every_train: True # every time train is called, reinitialize weights?
   early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
   learning_rate: 0.001
-  batch_size: 16
-  display_batch: 5
-  #epochs: 100
-  epochs: 20
-  steps: 1500
+  batch_size: 32
+  display_batch: 100
+  val_freq: 250 # How often you compute validation
+  val_steps: 200  # How many steps you do on validation 
+  steps: 5000
   val_pct: 0.2
 
   # preprocessing
@@ -94,7 +99,7 @@ model:
 
   # how to resample data
   aggregate_save_data: True # put all data into one file?
-  save_type: 'fixedlen' # varlen / fixedlen
+  save_type: 'fixedlen' # fixedlen
   balance:
     type: collision # none, collision, uncertainty
 
@@ -168,6 +173,7 @@ rccar:
     depth: '/bair_car/depth'
     cmd_steer: '/bair_car/cmd/steer' # std_msgs/Float32
     cmd_vel: '/bair_car/cmd/vel' # std_msgs/Float32
+    pred_image: '/bair_car/prediction/image'
     collision: '/bair_car/crash' # std_msgs/Empty
     good_rollout: '/bair_car/good_rollout' # std_msgs/Empty
     bad_rollout: '/bair_car/bad_rollout' # std_msgs/Empty
