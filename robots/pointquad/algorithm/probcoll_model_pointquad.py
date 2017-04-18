@@ -816,14 +816,17 @@ class ProbcollModelPointquad(ProbcollModel):
             # output_pred_std = tf.sqrt(std_normalize * tf.add_n(
             #     [tf.square(tf.sigmoid(tf.sub(output_mat_b, output_mat_mean))) for output_mat_b in output_mats])) # TODO chug through nn or not?
 
-            cost = (1 / float(num_bootstrap)) * tf.add_n(costs, name='cost')
+            # cost = (1 / float(num_bootstrap)) * tf.add_n(costs, name='cost')
             accuracy = (1 / float(num_bootstrap)) * tf.add_n(accuracies, name='accuracy')
             x_grad, u_grad = [0] * n_output, [0] * n_output
             # for i in xrange(n_output):
             #     x_grad[i] = (1 / float(num_bootstrap)) * tf.add_n(np.array(x_grads)[:, i].tolist())
             #     u_grad[i] = (1 / float(num_bootstrap)) * tf.add_n(np.array(u_grads)[:, i].tolist())
 
-            optimizer = tf.train.AdamOptimizer().minimize(cost)
+            optimizer = []
+            for bootstrap_cost in costs:
+                optimizer.append(tf.train.AdamOptimizer().minimize(cost))
+            # optimizer = tf.train.AdamOptimizer().minimize(cost)
 
             ### initialize graph
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction)
