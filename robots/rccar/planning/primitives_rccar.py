@@ -10,7 +10,7 @@ class PrimitivesRCcar(Primitives):
     def _create_primitives(self):
         des_vel = params['planning']['cost_velocity']['u_des']
         weights = params['planning']['cost_velocity']['u_weights']
-
+        
         steers = [30., 40., 50., 60., 70.]
         speeds = [8., 12., 16.]
 

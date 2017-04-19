@@ -52,9 +52,10 @@ class CostProbcollRCcar(CostProbcoll):
 
         ### evaluate model on all time steps
         num_avg = 10 if self._probcoll_model.dropout is not None else 1  # TODO
-        probs_mean_batch, probs_std_batch = self._probcoll_model.eval_sample_batch(samples,
-                                                                             num_avg=num_avg,
-                                                                             pre_activation=self.pre_activation)
+        probs_mean_batch, probs_std_batch = self._probcoll_model.eval_control_batch(
+            samples,
+            num_avg=num_avg,
+            pre_activation=self.pre_activation)
         probs_mean_batch = np.array(probs_mean_batch).ravel()
         probs_std_batch = np.array(probs_std_batch).ravel()
 

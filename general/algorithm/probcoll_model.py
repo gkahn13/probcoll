@@ -472,9 +472,10 @@ class ProbcollModel:
             bootstrap_X_inputs = [tf.placeholder('float32', [None, self.T, self.dX]) for _ in xrange(self.num_bootstrap)]
             bootstrap_U_inputs = [tf.placeholder('float32', [None, self.T, self.dU]) for _ in xrange(self.num_bootstrap)]
             bootstrap_O_inputs = [tf.placeholder('uint8', [None, self.dO]) for _ in xrange(self.num_bootstrap)]
+            O_single_input = tf.placeholder('uint8', [self.dO])
             bootstrap_outputs = [tf.placeholder('uint8', [None]) for _ in xrange(self.num_bootstrap)]
 
-        return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs
+        return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, O_single_input, bootstrap_outputs
 
     def _graph_cost(self, name, bootstrap_output_mats, bootstrap_outputs, reg=0.):
         with tf.name_scope(name + '_cost_and_err'):
@@ -571,13 +572,13 @@ class ProbcollModel:
             self._graph_optimize(self.d_train['cost'])
 
         ### prepare for eval
-        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'], self.d_eval['outputs'] = \
+        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'], self.d_eval['O_single_input'], self.d_eval['outputs'] = \
             self._graph_inputs_outputs_from_placeholders()
         self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
         self.d_eval['output_mat_std'], _, self.d_eval['dropout_placeholders'] = \
             self._graph_inference('eval', self.T,
                                   self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'],
-                                  self.dropout, params,
+                                  self.dropout, params, O_single_input=self.d_eval['O_single_input'],
                                   reuse=True, random_seed=self.random_seed)
 
         ### initialize
@@ -611,8 +612,10 @@ class ProbcollModel:
     @staticmethod
     def _graph_inference_fc(
             name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-            dropout, meta_data, reuse=False, random_seed=None, finalize=True, tf_debug={}):
+            dropout, meta_data, O_single_input=None, reuse=False,
+            random_seed=None, finalize=True, tf_debug={}):
         assert(name == 'train' or name == 'val' or name == 'eval')
+        one_obs = not O_single_input is None
         num_bootstrap = len(bootstrap_X_inputs)
 
         bootstrap_output_mats = []
@@ -631,7 +634,7 @@ class ProbcollModel:
                 ### inputs
                 x_input_b = bootstrap_X_inputs[b]
                 u_input_b = bootstrap_U_inputs[b]
-                o_input_b = tf.cast(bootstrap_O_inputs[b], tf.float32) / 255.
+                o_input_b = bootstrap_O_inputs[b]
                 
                 dX = x_input_b.get_shape()[2].value
                 dU = u_input_b.get_shape()[2].value
@@ -644,16 +647,24 @@ class ProbcollModel:
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
                     if dO > 0:
-                        concat_list.append(o_input_b - tf.reduce_mean(o_input_b, axis = 0))
+                        if one_obs:
+                            o_input_b = tf.cast(O_single_input, tf.float32) / 255.
+                            o_input_b = o_input_b - tf.reduce_mean(o_input_b)
+                            o_input_b = tf.tile(o_input_b, [batch_size])
+                            o_input_b = tf.reshape(o_input_b, [batch_size, dO])
+                        else:
+                            o_input_b = tf.cast(o_input_b, tf.float32) / 255.
+                            o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis=0)
+                        concat_list.append(o_input_b)
                     if dX > 0:
                         x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
                         concat_list.append(x_input_flat_b)
                     if dU > 0:
-#                        control_mean = (np.array(params['model']['control_range']['lower']) + \
-#                            np.array(params['model']['control_range']['upper']))/2.
-#                        control_width = (np.array(params['model']['control_range']['upper']) - \
-#                            control_mean)
-#                        u_input_b = (u_input_b - control_mean) / control_width 
+                        control_mean = (np.array(params['model']['control_range']['lower']) + \
+                            np.array(params['model']['control_range']['upper']))/2.
+                        control_width = (np.array(params['model']['control_range']['upper']) - \
+                            control_mean)
+                        u_input_b = (u_input_b - control_mean) / control_width 
                         u_input_flat_b = tf.reshape(u_input_b, [-1, T * dU])
                         concat_list.append(u_input_flat_b)
                     input_layer = tf.concat(1, concat_list)
@@ -996,6 +1007,67 @@ class ProbcollModel:
         Os = [sample.get_O()[:self.T, self.O_idxs(sample._meta_data)] for sample in samples]
 
         return self.eval_batch(Xs, Us, Os, num_avg=num_avg, pre_activation=pre_activation)
+
+    def eval_control_batch(self, samples, num_avg=1, pre_activation=False):
+        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
+        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
+        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].astype(np.uint8)
+        assert(not np.isnan(O_input).any())
+        X_inputs, U_inputs = [], []
+        for X, U in zip(Xs, Us):
+            assert(len(X) == self.T)
+            assert(len(U) == self.T)
+
+            # TODO remove create_input
+#            X_input, U_input, O_input = self._create_input(X, U, O)
+            X_input, U_input = X, U
+            assert(not np.isnan(X_input).any())
+            assert(not np.isnan(U_input).any())
+            for _ in xrange(num_avg):
+                X_inputs.append(X_input)
+                U_inputs.append(U_input)
+
+        feed = {}
+        for b in xrange(self.num_bootstrap):
+            feed[self.d_eval['X_inputs'][b]] = X_inputs
+            feed[self.d_eval['U_inputs'][b]] = U_inputs
+        feed[self.d_eval['O_single_input']] = O_input
+        # want dropout for each X/U/O to be the same
+        # want dropout for each num_avg to be different
+        # -->
+        # create num_avg different dropout for each dropout mask
+        # use same dropout mask for each X/U/O
+        #
+        # if num_avg = 3
+        # 0 1 2 0 1 2 0 1 2
+        for dropout_placeholder in self.d_eval['dropout_placeholders']:
+            length = dropout_placeholder.get_shape()[1].value
+            feed[dropout_placeholder] = [(1/self.dropout) * (np.random.random(length) < self.dropout).astype(float)
+                                         for _ in xrange(num_avg)] * len(Xs)
+
+        if pre_activation:
+            output_pred_mean, output_pred_std = self.sess.run([self.d_eval['output_mat_mean'],
+                                                               self.d_eval['output_mat_std']],
+                                                              feed_dict=feed)
+        else:
+            output_pred_mean, output_pred_std = self.sess.run([self.d_eval['output_pred_mean'],
+                                                               self.d_eval['output_pred_std']],
+                                                              feed_dict=feed)
+
+        if num_avg > 1:
+            mean, std = [], []
+            for i in xrange(len(Xs)):
+                mean.append(output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
+                std.append(output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
+            output_pred_mean = np.array(mean)
+            output_pred_std = np.array(std)
+
+            assert(len(output_pred_mean) == len(Xs))
+            assert(len(output_pred_std) == len(Xs))
+
+        assert((output_pred_std >= 0).all())
+
+        return output_pred_mean, output_pred_std
 
     #############################
     ### Load/save/reset/close ###

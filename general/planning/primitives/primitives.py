@@ -23,9 +23,10 @@ class Primitives(Planner):
         assert(np.isfinite(o).all())
 
         ### rollout each primitive
-        for primitive in self._primitives:
+        for i, primitive in enumerate(self._primitives):
+            if i == 0:
+                primitive.set_O(o, t=0)
             primitive.set_X(x, t=0)
-            primitive.set_O(o, t=0)
             primitive.rollout(self._dynamics)
 
         costs = np.zeros(len(self._primitives), dtype=float)

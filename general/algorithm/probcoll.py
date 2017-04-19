@@ -2,9 +2,7 @@ import abc
 
 import os, pickle, time, shutil
 import numpy as np
-import IPython
 from general.algorithm.probcoll_model import ProbcollModel
-import IPython
 from config import params
 
 from general.policy.noise_models import ZeroNoise, GaussianNoise, UniformNoise, OUNoise, SmoothedGaussianNoise

@@ -12,7 +12,7 @@ exp_name: test
 
 probcoll:
   T: 28 # timesteps per trajectory
-  max_iter: 22
+  max_iter: 20
   planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
 
   control_noise:
@@ -22,8 +22,8 @@ probcoll:
     gaussian:
       std: [3.0, 0.3]
     uniform:
-      lower: [-10., 0.]
-      upper: [10., 0.]
+      lower: [-5., 0.]
+      upper: [5., 0.]
 
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   obs_noise: True
@@ -71,10 +71,10 @@ model:
 
   
   graph_type: 'fc' # fc / cnn / rnn
-  hidden_layer: 40
+  hidden_layer: 1000
   activation: relu
   num_bootstrap: 1 # 5
-  dropout: 0.95 # pct keep (None if no dropout)
+  dropout: 0.7 # pct keep (None if no dropout)
   reg: 0.
 
   # what to use as input to prediction model
