@@ -135,7 +135,6 @@ class Probcoll:
         for model_start_itr in xrange(self._max_iter-1, -1, -1):
             model_file = self._itr_model_file(model_start_itr, create=False)
             if ProbcollModel.checkpoint_exists(model_file):
-                # IPython.embed()
                 model_start_itr += 1
                 break
         else:
@@ -150,17 +149,11 @@ class Probcoll:
         assert (model_start_itr == samples_start_itr or
                 model_start_itr == samples_start_itr - 1 or
                 (model_start_itr == 1 and samples_start_itr == 0))
-        # IPython.embed()
         ### load neural nets
         if model_file is not None:
             self._logger.info('Loading model {0}'.format(model_file))
             self._probcoll_model.load(model_file=model_file)
 
-        ### load previous data
-#        if samples_start_itr > 0:
-#            prev_sample_files = [self._itr_samples_file(itr) for itr in xrange(samples_start_itr)]
-#            assert (os.path.exists(f) for f in prev_sample_files)
-#            self._probcoll_model.add_data(prev_sample_files)
         ### load initial dataset
         init_data_folder = params['probcoll'].get('init_data', None)
         if init_data_folder is not None:
@@ -206,10 +199,8 @@ class Probcoll:
         for cond in xrange(self._conditions.length):
             rep = 0
             while rep < self._conditions.repeats:
-                # self._setup() # recreate everything so openrave doesn't get bogged down # TODO
                 self._logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
                 if (cond == 0 and rep == 0) or self._world.randomize:
-                    # IPython.embed()
                     self._reset_world(itr, cond, rep)
 
                 x0 = self._conditions.get_cond(cond, rep=rep)
@@ -221,7 +212,6 @@ class Probcoll:
 
                 start = time.time()
                 for t in xrange(T):
-                    # self._logger.info('\t\t\tt: {0}'.format(t))
                     self._update_world(sample_T, t)
 
                     x0 = sample_T.get_X(t=t)
@@ -249,7 +239,6 @@ class Probcoll:
 
                     if hasattr(mpc_policy, '_curr_traj'):
                         self._world.update_visualization(sample_T, mpc_policy._curr_traj, t)
-                    # self._world.get_image(rollout)
 
                 else:
                     self._logger.info('\t\t\tLasted for t={0}'.format(t))

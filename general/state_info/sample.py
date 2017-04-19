@@ -38,7 +38,6 @@ class Sample(object):
 
     def set_U(self, u, t, sub_control=None):
         idxs = self.get_U_idxs(sub_control)
-        # IPython.embed()
         assert(np.array(u).shape[-1] == idxs.stop - idxs.start)
         self._U[t,idxs] = np.copy(u)
 
@@ -124,10 +123,7 @@ class Sample(object):
 
         poses = posquats_to_poses(positions, orientations)
         rave_env.robot.SetTransform(poses[0])
-        # rave_env.plot_transform(poses[0], s=2*scale)
         for pose in poses:
-            # rave_env.robot.SetTransform(pose)
-            # rave_env.plot_transform(pose, s=scale)
             rave_env.plot_arrow(pose, color=color, s=scale)
 
     def get_X_dim(self, sub_state):
@@ -137,7 +133,6 @@ class Sample(object):
 
     def get_X_idxs(self, sub_state=None):
         if sub_state is None: return slice(0, self._xdim)
-        # IPython.embed()
         assert(sub_state in self._meta_data['X'])
         start = self._meta_data['X'][sub_state]['idx']
         dim = self._meta_data['X'][sub_state]['dim']

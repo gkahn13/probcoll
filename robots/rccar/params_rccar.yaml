@@ -12,7 +12,7 @@ exp_name: test
 
 probcoll:
   T: 28 # timesteps per trajectory
-  max_iter: 21
+  max_iter: 22
   planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
 
   control_noise:
@@ -40,7 +40,7 @@ probcoll:
     pre_activation: True
 
   conditions:
-    repeats: 10 # TODO
+    repeats: 20 # TODO
     num_test: 1
     randomize_conds: False
     randomize_reps: True

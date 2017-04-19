@@ -52,9 +52,8 @@ class ProbcollModel:
         
         self._control_width = np.array(self.control_range["upper"]) - \
             np.array(self.control_range["lower"])
-        self.X_mean = np.zeros(self.dX)
-        self.U_mean = np.zeros(self.dU)
-        self.O_mean = np.zeros(self.dO)
+        self._control_mean = (np.array(self.control_range["upper"]) + \
+            np.array(self.control_range["lower"]))/2.
 
         code_file_exists = os.path.exists(self._code_file)
         if code_file_exists:
@@ -278,7 +277,6 @@ class ProbcollModel:
             O_by_sample,
             output_by_sample)
 
-    # TODO Not sure if this works
     def _save_tfrecords_fixedlen(
             self,
             tfrecords,
@@ -315,60 +313,6 @@ class ProbcollModel:
                 record_num += 1
 
         writer.close()
-
-    def _compute_mean(self):
-        """ Calculates mean and updates variable in graph """
-        if len(self.preprocess_fnames) > 0:
-            total_X_mean, total_U_mean, total_O_mean = 0, 0, 0
-            total_X_cov, total_U_cov, total_O_cov = 0, 0, 0
-            total_timesteps = 0
-            for preprocess_fname in self.preprocess_fnames:
-                d = np.load(preprocess_fname)
-                total_timesteps += d['timesteps']
-                total_X_mean += d['X_mean'] * d['timesteps']
-                total_U_mean += d['U_mean'] * d['timesteps']
-                total_O_mean += d['O_mean'] * d['timesteps']
-                total_X_cov += d['X_cov'] * d['timesteps']
-                total_U_cov += d['U_cov'] * d['timesteps']
-                total_O_cov += d['O_cov'] * d['timesteps']
-
-            X_mean = total_X_mean / float(total_timesteps)
-            U_mean = total_U_mean / float(total_timesteps)
-            O_mean = total_O_mean / float(total_timesteps)
-            X_cov = total_X_cov / float(total_timesteps)
-            U_cov = total_U_cov / float(total_timesteps)
-            O_cov = total_O_cov / float(total_timesteps)
-            if self.dX > 0:
-                X_orth, X_eigs, _ = np.linalg.svd(X_cov)
-                X_orth /= np.sqrt(X_eigs + 1e-5)
-            else:
-                X_orth = np.eye(self.dX, dtype=np.float32)
-            if self.dU > 0:
-                U_orth, U_eigs, _ = np.linalg.svd(U_cov)
-                U_orth /= np.sqrt(U_eigs + 1e-5)
-            else:
-                U_orth = np.eye(self.dU, dtype=np.float32)
-            if self.dO > 0 and self.use_O_orth:
-                O_orth, O_eigs, _ = np.linalg.svd(O_cov)
-                O_orth /= np.sqrt(O_eigs + 1e-5)
-            else:
-                O_orth = np.eye(self.dO, dtype=np.float32)
-        else:
-            X_mean = np.zeros(self.dX, dtype=np.float32)
-            U_mean = np.zeros(self.dU, dtype=np.float32)
-            O_mean = np.zeros(self.dO, dtype=np.float32)
-            X_orth = np.eye(self.dX, dtype=np.float32)
-            U_orth = np.eye(self.dU, dtype=np.float32)
-            O_orth = np.eye(self.dO, dtype=np.float32)
-
-        self.sess.run([self.d_mean['X_assign'], self.d_mean['U_assign'], self.d_mean['O_assign'],
-                       self.d_orth['X_assign'], self.d_orth['U_assign'], self.d_orth['O_assign']],
-                      feed_dict={self.d_mean['X_placeholder']: np.expand_dims(X_mean, 0),
-                                 self.d_mean['U_placeholder']: np.expand_dims(U_mean, 0),
-                                 self.d_mean['O_placeholder']: np.expand_dims(O_mean, 0),
-                                 self.d_orth['X_placeholder']: X_orth,
-                                 self.d_orth['U_placeholder']: U_orth,
-                                 self.d_orth['O_placeholder']: O_orth})
 
     def _get_tfrecords_fnames(self, fname, create=True):
         def _file_creator(coll, val):
@@ -598,52 +542,15 @@ class ProbcollModel:
                     self.d_val['no_coll_queue_placeholder'],
                     self.d_val['coll_queue_placeholder']
                 )]))
-        self._compute_mean()
 
     def _graph_setup(self):
         """ Only call once """
 
         tf.reset_default_graph()
 
-        self.d_mean = dict()
-        self.d_orth = dict()
         self.d_train = dict()
         self.d_val = dict()
         self.d_eval = dict()
-
-        ### data stuff
-        with tf.variable_scope('means', reuse=False):
-            # X
-            self.d_mean['X_placeholder'] = tf.placeholder(tf.float32, shape=(1, self.dX))
-            self.d_mean['X_var'] = tf.get_variable('X_mean', shape=[1, self.dX], trainable=False, dtype=tf.float32,
-                                                   initializer=tf.constant_initializer(np.zeros((1, self.dX))))
-            self.d_mean['X_assign'] = tf.assign(self.d_mean['X_var'], self.d_mean['X_placeholder'])
-            # U
-            self.d_mean['U_placeholder'] = tf.placeholder(tf.float32, shape=(1, self.dU))
-            self.d_mean['U_var'] = tf.get_variable('U_mean', shape=[1, self.dU], trainable=False, dtype=tf.float32,
-                                                   initializer=tf.constant_initializer(np.zeros((1, self.dU))))
-            self.d_mean['U_assign'] = tf.assign(self.d_mean['U_var'], self.d_mean['U_placeholder'])
-            # O
-            self.d_mean['O_placeholder'] = tf.placeholder(tf.float32, shape=(1, self.dO))
-            self.d_mean['O_var'] = tf.get_variable('O_mean', shape=[1, self.dO], trainable=False, dtype=tf.float32,
-                                                   initializer=tf.constant_initializer(np.zeros((1, self.dO))))
-            self.d_mean['O_assign'] = tf.assign(self.d_mean['O_var'], self.d_mean['O_placeholder'])
-        with tf.variable_scope('orths', reuse=False):
-            # X
-            self.d_orth['X_placeholder'] = tf.placeholder(tf.float32, shape=(self.dX, self.dX))
-            self.d_orth['X_var'] = tf.get_variable('X_orth', shape=[self.dX, self.dX], trainable=False, dtype=tf.float32,
-                                                   initializer=tf.constant_initializer(np.zeros((self.dX, self.dX))))
-            self.d_orth['X_assign'] = tf.assign(self.d_orth['X_var'], self.d_orth['X_placeholder'])
-            # U
-            self.d_orth['U_placeholder'] = tf.placeholder(tf.float32, shape=(self.dU, self.dU))
-            self.d_orth['U_var'] = tf.get_variable('U_orth', shape=[self.dU, self.dU], trainable=False, dtype=tf.float32,
-                                                   initializer=tf.constant_initializer(np.zeros((self.dU, self.dU))))
-            self.d_orth['U_assign'] = tf.assign(self.d_orth['U_var'], self.d_orth['U_placeholder'])
-            # O
-            self.d_orth['O_placeholder'] = tf.placeholder(tf.float32, shape=(self.dO, self.dO))
-            self.d_orth['O_var'] = tf.get_variable('O_orth', shape=[self.dO, self.dO], trainable=False, dtype=tf.float32,
-                                                   initializer=tf.constant_initializer(np.zeros((self.dO, self.dO))))
-            self.d_orth['O_assign'] = tf.assign(self.d_orth['O_var'], self.d_orth['O_placeholder'])
 
         ### prepare for training
         for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
@@ -654,9 +561,6 @@ class ProbcollModel:
             d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
             _, _, _, _, d['output_mats'], _ = self._graph_inference(name, self.T,
                                                                     d['X_inputs'], d['U_inputs'], d['O_inputs'],
-                                                                    self.d_mean['X_var'], self.d_orth['X_var'],
-                                                                    self.d_mean['U_var'], self.d_orth['U_var'],
-                                                                    self.d_mean['O_var'], self.d_orth['O_var'],
                                                                     self.dropout, params,
                                                                     reuse=i>0, random_seed=self.random_seed,
                                                                     tf_debug=self.tf_debug)
@@ -673,9 +577,6 @@ class ProbcollModel:
         self.d_eval['output_mat_std'], _, self.d_eval['dropout_placeholders'] = \
             self._graph_inference('eval', self.T,
                                   self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'],
-                                  self.d_mean['X_var'], self.d_orth['X_var'],
-                                  self.d_mean['U_var'], self.d_orth['U_var'],
-                                  self.d_mean['O_var'], self.d_orth['O_var'],
                                   self.dropout, params,
                                   reuse=True, random_seed=self.random_seed)
 
@@ -691,9 +592,9 @@ class ProbcollModel:
         self._graph_init_vars()
 
         # Set logs writer into folder /tmp/tensorflow_logs
-        merged = tf.merge_all_summaries()
-        writer = tf.train.SummaryWriter('/tmp', graph_def=self.sess.graph_def)
-
+        merged = tf.summary.merge_all()
+#        writer = tf.train.SummaryWriter('/tmp', graph_def=self.sess.graph_def)
+        writer = tf.summary.FileWriter('/tmp', graph=self.sess.graph)
         self.saver = tf.train.Saver(max_to_keep=None)
 
     def _get_old_graph_inference(self, graph_type='fc'):
@@ -708,9 +609,9 @@ class ProbcollModel:
             raise Exception('graph_type {0} is not valid'.format(graph_type))
 
     @staticmethod
-    def _graph_inference_fc(name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-                            X_mean, X_orth, U_mean, U_orth, O_mean, O_orth, dropout, meta_data,
-                            reuse=False, random_seed=None, finalize=True, tf_debug={}):
+    def _graph_inference_fc(
+            name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
+            dropout, meta_data, reuse=False, random_seed=None, finalize=True, tf_debug={}):
         assert(name == 'train' or name == 'val' or name == 'eval')
         num_bootstrap = len(bootstrap_X_inputs)
 
@@ -732,8 +633,6 @@ class ProbcollModel:
                 u_input_b = bootstrap_U_inputs[b]
                 o_input_b = tf.cast(bootstrap_O_inputs[b], tf.float32) / 255.
                 
-                o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis = 0)
-                
                 dX = x_input_b.get_shape()[2].value
                 dU = u_input_b.get_shape()[2].value
                 dO = o_input_b.get_shape()[1].value
@@ -745,17 +644,16 @@ class ProbcollModel:
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
                     if dO > 0:
-                        concat_list.append(tf.matmul(o_input_b - O_mean, O_orth))
+                        concat_list.append(o_input_b - tf.reduce_mean(o_input_b, axis = 0))
                     if dX > 0:
-                        X_orth_batch = tf.tile(tf.expand_dims(X_orth, 0),
-                                               [batch_size, 1, 1])
-                        x_input_b = tf.batch_matmaul(x_input_b - X_mean, X_orth_batch)
                         x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
                         concat_list.append(x_input_flat_b)
                     if dU > 0:
-                        U_orth_batch= tf.tile(tf.expand_dims(U_orth, 0),
-                                              [batch_size, 1, 1])
-                        u_input_b = tf.batch_matmul(u_input_b - U_mean, U_orth_batch)
+#                        control_mean = (np.array(params['model']['control_range']['lower']) + \
+#                            np.array(params['model']['control_range']['upper']))/2.
+#                        control_width = (np.array(params['model']['control_range']['upper']) - \
+#                            control_mean)
+#                        u_input_b = (u_input_b - control_mean) / control_width 
                         u_input_flat_b = tf.reshape(u_input_b, [-1, T * dU])
                         concat_list.append(u_input_flat_b)
                     input_layer = tf.concat(1, concat_list)
@@ -847,7 +745,6 @@ class ProbcollModel:
             self.load(prev_model_file)
         else:
             self._graph_init_vars()
-#        self._compute_mean()
 
         self.sess.run(
             [
