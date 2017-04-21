@@ -10,22 +10,22 @@ class PrimitivesRCcar(Primitives):
     def _create_primitives(self):
         des_vel = params['planning']['cost_velocity']['u_des']
         weights = params['planning']['cost_velocity']['u_weights']
-        
-        steers = [30., 40., 50., 60., 70.]
-        speeds = [8., 12., 16.]
-
+        steers = params['planning']['primitives']['steers']
+        speeds = params['planning']['primitives']['speeds']
+        num_steers = params['planning']['primitives']['num_steers']        
         samples = []
-        for steer1 in steers:
-            for steer2 in steers:
-                for steer3 in steers:
-                    speed1 = 16.
-                    sample = Sample(T=self._H)
-                    linearvel1 = [steer1, speed1]
-                    linearvel2 = [steer2, speed1]
-                    linearvel3 = [steer3, speed1]
-                    sample.set_U(linearvel1, t=slice(0, self._H//3))
-                    sample.set_U(linearvel2, t=slice(self._H//3, (self._H*2)//3))
-                    sample.set_U(linearvel3, t=slice((self._H*2)//3, self._H))
-                    samples.append(sample)
-        
+        s_len = len(steers)
+        for n in xrange(s_len**num_steers):
+            for speed in speeds:
+                sample = Sample(T=self._H)
+                val = n
+                for i in xrange(num_steers):
+                    index = val % s_len
+                    val = val // s_len
+                    sample.set_U(
+                        [steers[index], speed],
+                        t=slice(
+                            (i * self._H)//num_steers,
+                            (((i + 1) * self._H)//num_steers)))
+                samples.append(sample)
         return samples

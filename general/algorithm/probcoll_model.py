@@ -9,6 +9,8 @@ import numpy as np
 import tensorflow as tf
 import sys
 
+from general.tf.fc_nn import fcnn
+from general.tf.conv_nn import convnn
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 from general.algorithm.mlplotter import MLPlotter
@@ -61,7 +63,7 @@ class ProbcollModel:
         else:
             self._logger.info('Creating NEW graph')
             shutil.copyfile(self._this_file, self._code_file)
-        self._graph_inference = self._get_old_graph_inference(graph_type=self.graph_type)
+        self._graph_inference = self._get_old_graph_inference()
 
         self.tf_debug = {}
         self._graph_setup()
@@ -114,8 +116,7 @@ class ProbcollModel:
         d = {}
 
         pm_params = params['model']
-        for key in ('T', 'num_bootstrap', 'val_pct', 'X_order', 'U_order', 'O_order', 'output_order', 'balance',
-                    'aggregate_save_data', 'save_type'):
+        for key in ('T', 'num_bootstrap', 'val_pct', 'X_order', 'U_order', 'O_order', 'output_order', 'save_type'):
             d[key] = pm_params[key]
 
         for key in ('X', 'U', 'O'):
@@ -508,7 +509,7 @@ class ProbcollModel:
 
             with tf.name_scope('total'):
                 cross_entropy = tf.reduce_mean(tf.concat(0, costs))
-                weight_decay = reg * tf.add_n(tf.get_collection('weight_decays'))
+                weight_decay = reg * tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
                 cost = cross_entropy + weight_decay
                 err = (1. / tf.cast(num_coll + num_nocoll, tf.float32)) * (num_errs_on_coll + num_errs_on_nocoll)
                 err_on_coll = tf.cond(num_coll >= 0,
@@ -594,23 +595,20 @@ class ProbcollModel:
 
         # Set logs writer into folder /tmp/tensorflow_logs
         merged = tf.summary.merge_all()
-#        writer = tf.train.SummaryWriter('/tmp', graph_def=self.sess.graph_def)
         writer = tf.summary.FileWriter('/tmp', graph=self.sess.graph)
         self.saver = tf.train.Saver(max_to_keep=None)
 
-    def _get_old_graph_inference(self, graph_type='fc'):
-        self._logger.info('Graph type: {0}'.format(graph_type))
+    def _get_old_graph_inference(self):
+        # TODO what to call things now
+#        self._logger.info('Graph type: {0}'.format(graph_type))
         sys.path.append(os.path.dirname(self._code_file))
         exec('from {0} import {1} as OldProbcollModel'.format(
             os.path.basename(self._code_file).split('.')[0], 'ProbcollModel'))
 
-        if graph_type == 'fc':
-            return OldProbcollModel._graph_inference_fc
-        else:
-            raise Exception('graph_type {0} is not valid'.format(graph_type))
+        return OldProbcollModel._graph_inference
 
     @staticmethod
-    def _graph_inference_fc(
+    def _graph_inference(
             name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
             dropout, meta_data, O_single_input=None, reuse=False,
             random_seed=None, finalize=True, tf_debug={}):
@@ -620,13 +618,23 @@ class ProbcollModel:
 
         bootstrap_output_mats = []
         bootstrap_output_preds = []
-        dropout_placeholders = [] if name == 'eval' else None
 
+        ag_type = params["model"]["action_graph"]["graph_type"]
+        if ag_type == "fc":
+            action_graph = fcnn
+        else:
+            raise NotImplementedError(
+                "Action graph {0} is not valid".format(ag_type))
 
-        hidden_layer = params['model']['hidden_layer']
-        activation = params['model']['activation']
-        
-        
+        obg_type = params["model"]["observation_graph"]["graph_type"]
+        if obg_type == "fc":
+            observation_graph = fcnn
+        elif obg_type == "cnn":
+            observation_graph = convnn
+        else:
+            raise NotImplementedError(
+                "Observation graph {0} is not valid".format(obg_type))
+
         with tf.name_scope(name + '_inference'):
             tf.set_random_seed(random_seed)
 
@@ -641,7 +649,6 @@ class ProbcollModel:
                 dO = o_input_b.get_shape()[1].value
                 T = x_input_b.get_shape()[1].value
                 batch_size = tf.shape(x_input_b)[0]
-                n_output = 1
 
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
@@ -650,12 +657,28 @@ class ProbcollModel:
                         if one_obs:
                             o_input_b = tf.cast(O_single_input, tf.float32) / 255.
                             o_input_b = o_input_b - tf.reduce_mean(o_input_b)
+                            # TODO any number of channels
+                            o_input_b = tf.reshape(o_input_b, [1, params["O"]["camera"]["height"], params["O"]["camera"]["width"], 1])
+                            cov_output = observation_graph(
+                                o_input_b,
+                                params["model"]["observation_graph"],
+                                scope="observation_graph_b{0}".format(b),
+                                reuse=reuse)
+                            cov_output_flat = tf.contrib.layers.flatten(cov_output)
+                            o_input_b = tf.reshape(cov_output, [-1,])
                             o_input_b = tf.tile(o_input_b, [batch_size])
-                            o_input_b = tf.reshape(o_input_b, [batch_size, dO])
+                            o_input_b = tf.reshape(o_input_b, [batch_size] + [int(cov_output_flat.get_shape()[1])])
                         else:
                             o_input_b = tf.cast(o_input_b, tf.float32) / 255.
                             o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis=0)
-                        concat_list.append(o_input_b)
+                            o_input_b = tf.reshape(o_input_b, [batch_size, params["O"]["camera"]["height"], params["O"]["camera"]["width"], 1])
+                            o_input_b = observation_graph(
+                                o_input_b,
+                                params["model"]["observation_graph"],
+                                scope="observation_graph_b{0}".format(b),
+                                reuse=reuse)
+                        
+                        concat_list.append(tf.contrib.layers.flatten(o_input_b))
                     if dX > 0:
                         x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
                         concat_list.append(x_input_flat_b)
@@ -669,48 +692,21 @@ class ProbcollModel:
                         concat_list.append(u_input_flat_b)
                     input_layer = tf.concat(1, concat_list)
 
-                n_input = input_layer.get_shape()[-1].value
+                    if name == 'eval':
+                        dp = tf.placeholder(
+                            tf.float32,
+                            [None, params["model"]["action_graph"]["hidden_layers"][-1]])
+                    else:
+                        dp = None
+                    use_dp_placeholders = name == 'eval'
+                    # TODO figure out best way to do dropout placeholders
+                    output_mat_b, dropout_placeholders  = action_graph(
+                        input_layer,
+                        params["model"]["action_graph"],
+                        use_dp_placeholders=use_dp_placeholders,
+                        scope="action_graph_b{0}".format(b),
+                        reuse=reuse)
 
-                ### weights
-                with tf.variable_scope('inference_vars_{0}'.format(b), reuse=reuse):
-                    weights_b = [
-                        tf.get_variable('w_hidden_0_b{0}'.format(b), [n_input, hidden_layer], initializer=tf.contrib.layers.xavier_initializer()),
-                        tf.get_variable('w_hidden_1_b{0}'.format(b), [hidden_layer, hidden_layer], initializer=tf.contrib.layers.xavier_initializer()),
-                        tf.get_variable('w_output_b{0}'.format(b), [hidden_layer, n_output], initializer=tf.contrib.layers.xavier_initializer()),
-                    ]
-                    biases_b = [
-                        tf.get_variable('b_hidden_0_b{0}'.format(b), [hidden_layer], initializer=tf.constant_initializer(0.)),
-                        tf.get_variable('b_hidden_1_b{0}'.format(b), [hidden_layer], initializer=tf.constant_initializer(0.)),
-                        tf.get_variable('b_output_b{0}'.format(b), [n_output], initializer=tf.constant_initializer(0.)),
-                    ]
-
-                ### weight decays
-                for v in weights_b + biases_b:
-                    tf.add_to_collection('weight_decays', 0.5 * tf.reduce_mean(v ** 2))
-
-                ### fully connected relus
-                layer = input_layer
-                for i, (weight, bias) in enumerate(zip(weights_b[:-1], biases_b[:-1])):
-                    with tf.name_scope('hidden_{0}_b{1}'.format(i, b)):
-                        if activation == 'relu':
-                            layer = tf.nn.relu(tf.add(tf.matmul(layer, weight), bias))
-                        elif activation == 'tanh':
-                            layer = tf.nn.tanh(tf.add(tf.matmul(layer, weight), bias))
-                        else:
-                            return NotImplementedError("no activation function found")
-                        if dropout is not None:
-                            assert(type(dropout) is float and 0 <= dropout and dropout <= 1.0)
-                            if name == 'eval':
-                                dp = tf.placeholder('float', [None, layer.get_shape()[1].value])
-                                layer = tf.mul(layer, dp)
-                                dropout_placeholders.append(dp)
-                            else:
-                                layer = tf.nn.dropout(layer, dropout)
-
-                with tf.name_scope('scope_output_pred_b{0}'.format(b)):
-                    ### sigmoid
-                    # layer = tf.nn.l2_normalize(layer, 1) # TODO
-                    output_mat_b = tf.add(tf.matmul(layer, weights_b[-1]), biases_b[-1])
                     output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
 
                 bootstrap_output_mats.append(output_mat_b)

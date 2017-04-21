@@ -4,7 +4,7 @@ dt: 0.25
 random_seed: 0
 
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: test
+exp_name: 'test'
 
 ##########################
 ### Probcoll algorithm ###
@@ -26,12 +26,8 @@ probcoll:
       upper: [5., 0.]
 
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-  obs_noise: True
-
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
-  use_ground_truth: False
-  use_init_cost: True # TODO
   epsilon_greedy: 0
 
   cost:
@@ -68,15 +64,7 @@ model:
   control_range:
     lower: [0., 0.]
     upper: [99.0, 99.0]
-
   
-  graph_type: 'fc' # fc / cnn / rnn
-  hidden_layer: 1000
-  activation: relu
-  num_bootstrap: 1 # 5
-  dropout: 0.7 # pct keep (None if no dropout)
-  reg: 0.
-
   # what to use as input to prediction model
   X_order: []
   U_order: ['cmd_steer', 'cmd_vel']
@@ -89,25 +77,38 @@ model:
   reset_every_train: True # every time train is called, reinitialize weights?
   early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
   learning_rate: 0.001
-  batch_size: 32
+  batch_size: 16
   display_batch: 100
   val_freq: 250 # How often you compute validation
   val_steps: 200  # How many steps you do on validation 
   steps: 5000
   val_pct: 0.2
 
-  # preprocessing
-  use_O_orth: False
-
-  # how to resample data
-  aggregate_save_data: True # put all data into one file?
+  # How to save tfrecords
   save_type: 'fixedlen' # fixedlen
-  balance:
-    type: collision # none, collision, uncertainty
+  
+  dropout: 0.7 # pct keep (None if no dropout)
+  reg: 0.
+  num_bootstrap: 1
+  
+  observation_graph:
+    graph_type: "cnn"
+    filters: [4, 4, 4]
+    kernels: [3, 3, 3]
+    strides: [2, 2, 2]
+    padding: "VALID" 
+    conv_activation: "relu" 
+    output_activation: "None"
+       
+  action_graph:
+    graph_type: 'fc' # fc / cnn / rnn
+    hidden_layers: [20, 20]
+    output_dim: 1
+    hidden_activation: "relu"
+    output_activation: "None"
+    # TODO remove redundant dropout
+    dropout: 0.7 # pct keep (None if no dropout)
 
-    collision:
-      pct_coll: 0.5
-    
 #################################################
 ### Planning objective and optimizer settings ###
 #################################################
@@ -117,6 +118,10 @@ planning:
     u_des: [49.5, 16.] # TODO: hard-coded order: steering then speed
     u_weights: [1., 0.2] # [0.0001, 0.2]
 
+  primitives:
+    steers : [30., 40., 50., 60., 70.]
+    speeds : [16.]
+    num_steers : 3
   # TODO: other planning methods here
 
 #############
@@ -124,7 +129,7 @@ planning:
 #############
 
 world:
-  plot: False
+#  plot: False
   randomize: True
 
   back_up:
@@ -172,7 +177,7 @@ rccar:
 
   topics:
     camera: '/bair_car/image' # sensor_msgs/Image
-    depth: '/bair_car/depth'
+    depth: '/bair_car/depth' # sensor_msgs/Image
     cmd_steer: '/bair_car/cmd/steer' # std_msgs/Float32
     cmd_vel: '/bair_car/cmd/vel' # std_msgs/Float32
     pred_image: '/bair_car/prediction/image'
@@ -190,7 +195,6 @@ rccar:
     state: '/bair_car/state'
     steer: '/bair_car/steer'
     vel: '/bair_car/vel'
-    camera_info: '/bair_car/down/camera_info'
     # and for debugging
     debug_cost: '/bair_car/debug_cost' # visualization_msgs/MarkerArray
     debug_cost_probcoll: '/bair_car/debug_cost_probcoll' # visualization_msgs/MarkerArray

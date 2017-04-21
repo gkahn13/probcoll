@@ -1,22 +1,17 @@
 import threading, time
-
 import numpy as np
-
 import rospy, rosbag, rostopic
 import std_msgs
+import general.ros.ros_utils as ros_utils
+from general.world.world import World
+from general.state_info.sample import Sample
+
+from config import params
 
 try:
     import bair_car.srv 
 except:
     pass
-
-import general.ros.ros_utils as ros_utils
-
-from general.world.world import World
-
-from general.state_info.sample import Sample
-
-from config import params
 
 class WorldRCcar(World):
 
@@ -40,7 +35,6 @@ class WorldRCcar(World):
                                                    std_msgs.msg.Empty,
                                                    callback=self._ros_collision_callback)
         self.num_collisions = 0
-        # self._ros_accel = ros_utils.RosCallbackMostRecent(rccar_topics['accel'], gm_msgs.Vector3)
         for topic in rccar_topics.values():
             rostype = rostopic.get_topic_class(topic, blocking=False)[0]
             if rostype:
