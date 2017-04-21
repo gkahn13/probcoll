@@ -3,8 +3,9 @@
 dt: 0.2
 random_seed: 0
 
-exp_dir: '/home/bding/Desktop/probcoll/experiments/pointquad'
-exp_name: test
+
+exp_dir: '/home/adam/probcoll/experiments/pointquad'
+exp_name: 'test'
 
 ##########################
 ### Probcoll algorithm ###
@@ -76,10 +77,9 @@ probcoll:
 model:
   T: 6 # how many timesteps to predict
 
-  graph_type: 'fc' # fc / cnn / rnn
-  num_bootstrap: 2 # TODO
-  dropout: # pct keep (None if no dropout)
-  reg: 0.
+  control_range:
+    lower: [0., 0., 0.]
+    upper: [0.5, 0.5, 0.]
 
   # what to use as input to prediction model
   X_order: []
@@ -95,25 +95,36 @@ model:
   learning_rate: 0.001
   batch_size: 16
   display_batch: 20
-  epochs: 20
   steps: 2500
+  val_freq: 250
+  val_steps: 200
   val_pct: 0.2
 
-  # preprocessing
-  use_O_orth: False
-
-  # how to resample data
-  aggregate_save_data: True # put all data into one file?
+  # How to save tfrecords
   save_type: 'fixedlen' # varlen / fixedlen
-  balance:
-    type: collision # none, collision, uncertainty
 
-    collision:
-      pct_coll: 0.5
+  num_bootstrap: 1 # TODO
+  dropout: 0.7 # pct keep (None if no dropout)
+  reg: 0.
+  num_dropout_passes: 10
 
-  # neural network parameters
-  hidden_layer: 40
-  activation: relu
+  observation_graph:
+    graph_type: "cnn"
+    filters: [4, 4, 4]
+    kernels: [3, 3, 3]
+    strides: [2, 2, 2]
+    padding: "VALID" 
+    conv_activation: "relu" 
+    output_activation: "None"
+       
+  action_graph:
+    graph_type: 'fc' # fc
+    hidden_layers: [20, 20]
+    output_dim: 1
+    hidden_activation: "relu"
+    output_activation: "None"
+    # TODO remove redundant dropout
+    dropout: 0.7 # pct keep (None if no dropout)
 
 #################################################
 ### Planning objective and optimizer settings ###
@@ -124,7 +135,11 @@ planning:
     velocity: [0.5, 0., 0.]
     weights: [1., 0.0, 0.]
 
-  # TODO: other planning methods here
+  primitives:
+    num_thetas: 19
+    num_speeds: 10
+
+# TODO: other planning methods here
 
 #############
 ### World ###

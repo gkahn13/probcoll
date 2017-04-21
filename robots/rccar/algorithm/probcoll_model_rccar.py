@@ -59,7 +59,6 @@ class ProbcollModelRCcar(ProbcollModel):
     ### Graph ###
     #############
 
-
     ################
     ### Training ###
     ################

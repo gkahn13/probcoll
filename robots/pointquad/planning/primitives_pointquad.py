@@ -10,11 +10,12 @@ class PrimitivesPointquad(Primitives):
     def _create_primitives(self):
         des_vel = params['planning']['cost_velocity']['velocity']
         weights = params['planning']['cost_velocity']['weights']
-
+        num_angles = params['planning']['primitives']['num_angles']
+        num_speeds = params['planning']['primitives']['num_speeds']
         assert(weights[1] == 0 and weights[2] == 0)
 
-        thetas = np.linspace(-np.pi/2., np.pi/2., 19)
-        speeds = np.linspace(0.1, 1.0, 10) * des_vel[0]
+        thetas = np.linspace(-np.pi/2., np.pi/2., num_angles)
+        speeds = np.linspace(1.0/num_speeds, 1.0, num_speeds) * des_vel[0]
 
         samples = []
         for theta in thetas:

@@ -51,7 +51,7 @@ class CostProbcollRCcar(CostProbcoll):
         cst_approxs = [CostApprox(T, xdim, udim) for _ in samples]
 
         ### evaluate model on all time steps
-        num_avg = 10 if self._probcoll_model.dropout is not None else 1  # TODO
+        num_avg = params['model']['num_dropout_passes'] if self._probcoll_model.dropout is not None else 1  # TODO
         probs_mean_batch, probs_std_batch = self._probcoll_model.eval_control_batch(
             samples,
             num_avg=num_avg,

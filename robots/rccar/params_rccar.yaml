@@ -90,6 +90,7 @@ model:
   dropout: 0.7 # pct keep (None if no dropout)
   reg: 0.
   num_bootstrap: 1
+  num_dropout_passes: 10
   
   observation_graph:
     graph_type: "cnn"

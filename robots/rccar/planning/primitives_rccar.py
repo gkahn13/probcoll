@@ -8,8 +8,6 @@ from config import params
 class PrimitivesRCcar(Primitives):
 
     def _create_primitives(self):
-        des_vel = params['planning']['cost_velocity']['u_des']
-        weights = params['planning']['cost_velocity']['u_weights']
         steers = params['planning']['primitives']['steers']
         speeds = params['planning']['primitives']['speeds']
         num_steers = params['planning']['primitives']['num_steers']        
