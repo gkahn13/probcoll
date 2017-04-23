@@ -5,7 +5,9 @@ def convnn(inputs, params, scope="convnn", reuse=False):
     if params["conv_activation"] == "relu":
         conv_activation = tf.nn.relu
     else:
-        raise NotImplementedError("No conv activation function found")
+        raise NotImplementedError(
+            "Conv activation {0} is not valid".format(
+                params["conv_activation"]))
 
     if params["output_activation"] == "sigmoid":
         output_activation = tf.nn.sigmoid
@@ -14,7 +16,9 @@ def convnn(inputs, params, scope="convnn", reuse=False):
     elif params["output_activation"] == "None":
         output_activation = None
     else:
-        raise NotImplementedError("No output activation function found")
+        raise NotImplementedError(
+            "Output activation {0} is not valid".format(
+                params["output_activation"]))
     
     kernels = params["kernels"]
     filters = params["filters"]
