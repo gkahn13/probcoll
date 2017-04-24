@@ -122,37 +122,6 @@ class ProbcollRCcar(Probcoll):
                 [cost_velocity, self._cost],
                 use_mpc=True)
             mpc_policy = OpenLoopPolicy(planner)
-#            additional_costs = []
-#            mpc_policy = PrimitivesMPCPolicyRCcar(self._trajopt,
-#                                                  self._cost,
-#                                                  additional_costs=additional_costs,
-#                                                  meta_data=params,
-#                                                  use_threads=False,
-#                                                  plot=True,
-#                                                  epsilon_greedy=params['prediction']['dagger']['epsilon_greedy'])
-#        elif self._planner_type == 'cem':
-#            costs = [self._cost,
-#                     cost_velocity_rccar(params['mpc']['H'],
-#                                         params['trajopt']['cost_velocity']['u_des'],
-#                                         params['trajopt']['cost_velocity']['u_weights'],
-#                                         weight_scale=1.0)]
-#            mpc_policy = CEMMPCPolicy(self._world,
-#                                      self._dynamics,
-#                                      costs,
-#                                      meta_data=params)
-#        elif self._planner_type == 'straight':
-#            mpc_policy = StraightPolicyRCcar(meta_data=params)
-#        elif self._planner_type == 'teleop':
-#            mpc_policy = TeleopMPCPolicyRCcar(meta_data=params)
-#        elif self._planner_type == 'lattice':
-#            additional_costs = []
-#            mpc_policy = LatticeMPCPolicyRCcar(self._trajopt,
-#                                               self._cost,
-#                                               additional_costs=additional_costs,
-#                                               meta_data=params,
-#                                               use_threads=False,
-#                                               plot=True,
-#                                               epsilon_greedy=params['prediction']['dagger']['epsilon_greedy'])
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))
 

@@ -28,7 +28,6 @@ probcoll:
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
-  epsilon_greedy: 0
 
   cost:
     weight: 1e3 # TODO
@@ -78,10 +77,10 @@ model:
   early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
   learning_rate: 0.001
   batch_size: 16
-  display_batch: 100
-  val_freq: 250 # How often you compute validation
+  display_batch: 200
+  val_freq: 500 # How often you compute validation
   val_steps: 200  # How many steps you do on validation 
-  steps: 5000
+  steps: 10000
   val_pct: 0.2
 
   # How to save tfrecords
