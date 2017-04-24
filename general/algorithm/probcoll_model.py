@@ -8,7 +8,7 @@ import hashlib
 import numpy as np
 import tensorflow as tf
 import sys
-
+import IPython
 from general.tf.fc_nn import fcnn
 from general.tf.conv_nn import convnn
 from general.utility.logger import get_logger
@@ -475,8 +475,8 @@ class ProbcollModel:
             bootstrap_O_inputs = [tf.placeholder('uint8', [None, self.dO]) for _ in xrange(self.num_bootstrap)]
             O_single_input = tf.placeholder('uint8', [self.dO])
             bootstrap_outputs = [tf.placeholder('uint8', [None]) for _ in xrange(self.num_bootstrap)]
-
         return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, O_single_input, bootstrap_outputs
+
 
     def _graph_cost(self, name, bootstrap_output_mats, bootstrap_outputs, reg=0.):
         with tf.name_scope(name + '_cost_and_err'):
@@ -845,6 +845,7 @@ class ProbcollModel:
                 plotter.add_val('err_nocoll', np.mean(val_values['err_nocoll']))
                 plotter.add_val('cost', np.mean(val_values['cost']))
                 plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
+                plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
                 plotter.plot()
 
                 self._logger.debug(
@@ -1001,7 +1002,6 @@ class ProbcollModel:
         Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
         Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
         Os = [sample.get_O()[:self.T, self.O_idxs(sample._meta_data)] for sample in samples]
-
         return self.eval_batch(Xs, Us, Os, num_avg=num_avg, pre_activation=pre_activation)
 
     def eval_control_batch(self, samples, num_avg=1, pre_activation=False):
