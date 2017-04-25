@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
-
+import subprocess
 import rospy
 import sensor_msgs
 import std_msgs
 import cv_bridge
+import os
 
 try:
     import bair_car.srv
@@ -13,8 +14,7 @@ except:
 
 from general.agent.agent import Agent
 from config import params
-import general.ros.ros_utils as ros_utils
-
+import robots.rccar.ros.ros_utils as ros_utils
 from general.state_info.sample import Sample
 from general.policy.noise_models import ZeroNoise
 
@@ -24,11 +24,18 @@ class AgentRCcar(Agent):
         Agent.__init__(self, dynamics)
         rccar_topics = params['rccar']['topics']
         self.sim = params['rccar']['sim']
-       
+            
         if self.sim:
+            FNULL = open(os.devnull, 'w') # to supress output
+            command = "roslaunch {0} car_name:={1} config:={2}".format(
+                params["rccar"]["launch_file"],
+                params["exp_name"],
+                params["rccar"]["config_file"])
+
+            subprocess.Popen([command], stdout=FNULL, shell=True)
             service = params['rccar']['srv']
-            rospy.wait_for_service(service)
-            self.srv = rospy.ServiceProxy(service, bair_car.srv.sim_env)
+            ros_utils.wait_for_service(service)
+            self.srv = ros_utils.ServiceProxy(service, bair_car.srv.sim_env)
             # TODO use depth
             data =  self.srv(reset=True)
             self.sim_coll, self.sim_image = data.coll, data.image
@@ -42,9 +49,9 @@ class AgentRCcar(Agent):
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
 
         ### publishers
-        self.cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
-        self.cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
-        self.pred_image_pub = rospy.Publisher(rccar_topics['pred_image'], sensor_msgs.msg.Image, queue_size=1)
+        self.cmd_steer_pub = ros_utils.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
+        self.cmd_vel_pub = ros_utils.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
+        self.pred_image_pub = ros_utils.Publisher(rccar_topics['pred_image'], sensor_msgs.msg.Image, queue_size=1)
 
         self.cv_bridge = cv_bridge.CvBridge()
 

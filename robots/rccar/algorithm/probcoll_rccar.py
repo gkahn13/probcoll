@@ -4,21 +4,16 @@ import rospy
 import std_msgs
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
-#from rll_quadrotor.policy.cem_mpc_policy import CEMMPCPolicy
 from robots.rccar.algorithm.cost_probcoll_rccar import CostProbcollRCcar
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 
-import general.ros.ros_utils as ros_utils
+import robots.rccar.ros.ros_utils as ros_utils
 from config import params
 from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 from robots.rccar.agent.agent_rccar import AgentRCcar
 from robots.rccar.dynamics.dynamics_rccar import DynamicsRCcar
-#from robots.rccar.policy.lattice_mpc_policy_rccar import LatticeMPCPolicyRCcar
 from robots.rccar.planning.primitives_rccar import PrimitivesRCcar
-#from robots.rccar.policy.primitives_mpc_policy_rccar import PrimitivesMPCPolicyRCcar
-#from robots.rccar.policy.straight_policy_rccar import StraightPolicyRCcar
-#from robots.rccar.policy.teleop_mpc_policy_rccar import TeleopMPCPolicyRCcar
 from robots.rccar.planning.cost.cost_velocity_rccar import cost_velocity_rccar
 from robots.rccar.world.world_rccar import WorldRCcar
 

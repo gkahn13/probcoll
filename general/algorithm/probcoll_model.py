@@ -125,6 +125,9 @@ class ProbcollModel:
         for key in ('X', 'U', 'O'):
             d[key] = params[key]
 
+        for key in ('observation_graph', 'action_graph', 'output_graph'):
+            d[key] = pm_params[key]['graph_type']
+
         return hashlib.md5(str(d)).hexdigest()
 
     ############

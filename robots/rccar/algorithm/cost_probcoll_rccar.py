@@ -1,11 +1,10 @@
 import numpy as np
-
 import rospy
 import visualization_msgs.msg as vm
 import geometry_msgs.msg as gm
-
 import matplotlib.cm as cm
 
+import robots.rccar.ros.ros_utils as ros_utils
 from general.algorithm.cost_probcoll import CostProbcoll
 from general.planning.cost.approx import CostApprox
 from config import params
@@ -16,21 +15,10 @@ class CostProbcollRCcar(CostProbcoll):
         CostProbcoll.__init__(self, bootstrap, **kwargs)
 
         rccar_topics = params['rccar']['topics']
-        self.debug_cost_probcoll_pub = rospy.Publisher(rccar_topics['debug_cost_probcoll'],
-                                                         vm.MarkerArray,
-                                                         queue_size=10)
-
-#    def eval_batch(self, samples):
-#        min_vel = params['U']['cmd_vel']['min']
-#        cst_approxes = CostProbcoll.eval_batch(self, samples,
-#                speed_func=lambda s: np.linalg.norm(s.get_U(sub_control='cmd_vel') - min_vel, axis=1).mean())
-#        # costs = [cst_approx.J for cst_approx in cst_approxes]
-#        costs = [1. / (1. + np.exp(-(p + 0.0*s))) for p, s in zip(self.probs_mean_batch, self.probs_std_batch)]
-#        cheapest_samples, cheapest_cst_approxes = zip(*sorted(zip(samples, costs),
-#                                                              key=lambda x: x[1])[:])
-#        self.visualize(cheapest_samples, cheapest_cst_approxes)
-#        # raw_input('eval_batch press enter')
-#        return cst_approxes
+        self.debug_cost_probcoll_pub = ros_utils.Publisher(
+            rccar_topics['debug_cost_probcoll'],
+            vm.MarkerArray,
+            queue_size=10)
 
     def eval_batch(self, samples):
         min_vel = params['U']['cmd_vel']['min']

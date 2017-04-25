@@ -4,7 +4,7 @@ dt: 0.25
 random_seed: 0
 
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'test'
+exp_name: 'bair_car_test'
 
 ##########################
 ### Probcoll algorithm ###
@@ -197,30 +197,32 @@ O:
 ##################
 
 rccar:
+  config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
+  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   sim: True 
-  srv: 'bair_car/sim_env'
+  srv: 'sim_env'
 
   topics:
-    camera: '/bair_car/image' # sensor_msgs/Image
-    depth: '/bair_car/depth' # sensor_msgs/Image
-    cmd_steer: '/bair_car/cmd/steer' # std_msgs/Float32
-    cmd_vel: '/bair_car/cmd/vel' # std_msgs/Float32
-    pred_image: '/bair_car/prediction/image'
-    collision: '/bair_car/crash' # std_msgs/Empty
-    good_rollout: '/bair_car/good_rollout' # std_msgs/Empty
-    bad_rollout: '/bair_car/bad_rollout' # std_msgs/Empty
-    teleop_cmd_steer: '/bair_car/teleop_cmd/steer' # std_msgs/Float32
-    teleop_cmd_vel: '/bair_car/teleop_cmd/motor' # std_msgs/Float32
-    reset: '/bair_car/reset' #std_msgs/Empty
+    camera: 'image' # sensor_msgs/Image
+    depth: 'depth' # sensor_msgs/Image
+    cmd_steer: 'cmd/steer' # std_msgs/Float32
+    cmd_vel: 'cmd/vel' # std_msgs/Float32
+    pred_image: 'prediction/image'
+    collision: 'crash' # std_msgs/Empty
+    good_rollout: 'good_rollout' # std_msgs/Empty
+    bad_rollout: 'bad_rollout' # std_msgs/Empty
+    teleop_cmd_steer: 'teleop_cmd/steer' # std_msgs/Float32
+    teleop_cmd_vel: 'teleop_cmd/motor' # std_msgs/Float32
+    reset: 'reset' #std_msgs/Empty
 
     # below topics that are just recorded
-    cmd_motor: '/bair_car/cmd/motor'
-    encoder: '/bair_car/encoder'
-    motor: '/bair_car/motor'
-    state: '/bair_car/state'
-    steer: '/bair_car/steer'
-    vel: '/bair_car/vel'
+    cmd_motor: 'cmd/motor'
+    encoder: 'encoder'
+    motor: 'motor'
+    state: 'state'
+    steer: 'steer'
+    vel: 'vel'
     # and for debugging
-    debug_cost: '/bair_car/debug_cost' # visualization_msgs/MarkerArray
-    debug_cost_probcoll: '/bair_car/debug_cost_probcoll' # visualization_msgs/MarkerArray
+    debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
+    debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
 

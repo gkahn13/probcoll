@@ -2,7 +2,7 @@ import threading, time
 import numpy as np
 import rospy, rosbag, rostopic
 import std_msgs
-import general.ros.ros_utils as ros_utils
+import robots.rccar.ros.ros_utils as ros_utils
 from general.world.world import World
 from general.state_info.sample import Sample
 
@@ -26,19 +26,19 @@ class WorldRCcar(World):
 
         rccar_topics = params['rccar']['topics']
         ### ROS publishers
-        self._ros_reset_pub = rospy.Publisher(rccar_topics['reset'], std_msgs.msg.Empty, queue_size = 100)
-        self._cmd_steer_pub = rospy.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
-        self._cmd_vel_pub = rospy.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
+        self._ros_reset_pub = ros_utils.Publisher(rccar_topics['reset'], std_msgs.msg.Empty, queue_size = 100)
+        self._cmd_steer_pub = ros_utils.Publisher(rccar_topics['cmd_steer'], std_msgs.msg.Float32, queue_size=10)
+        self._cmd_vel_pub = ros_utils.Publisher(rccar_topics['cmd_vel'], std_msgs.msg.Float32, queue_size=10)
         ### ROS subscribers
         self._ros_collision = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
-        self._ros_collision_sub = rospy.Subscriber(rccar_topics['collision'],
+        self._ros_collision_sub = ros_utils.Subscriber(rccar_topics['collision'],
                                                    std_msgs.msg.Empty,
                                                    callback=self._ros_collision_callback)
         self.num_collisions = 0
         for topic in rccar_topics.values():
             rostype = rostopic.get_topic_class(topic, blocking=False)[0]
             if rostype:
-                rospy.Subscriber(topic, rostype, callback=self._bag_callback, callback_args=(topic,))
+                ros_utils.Subscriber(topic, rostype, callback=self._bag_callback, callback_args=(topic,))
 
     def reset(self, back_up, itr=None, cond=None, rep=None, record=True):
         self._agent.execute_control(None) # stop the car
