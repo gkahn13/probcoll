@@ -115,15 +115,16 @@ model:
     num_cells: 1
     num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
+    dropout: 0.7 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
-  output_graph:
+  output_graph: # Must have dropout 1.0
     graph_type: 'fc' # fc / rnn
     hidden_layers: []
     output_dim: 1 # TODO
     hidden_activation: "None"
     output_activation: "None"
-    dropout: 0.7 # pct keep (None if no dropout)
+    dropout: 1.0 # pct keep
 
 
 #################################################

@@ -633,6 +633,7 @@ class ProbcollModel:
 
         bootstrap_output_mats = []
         bootstrap_output_preds = []
+        dropout_placeholders = []
 
         recurrent = params["model"]["recurrent"]
         ag_type = params["model"]["action_graph"]["graph_type"]
@@ -702,14 +703,9 @@ class ProbcollModel:
                                 params["model"]["observation_graph"],
                                 scope="observation_graph_b{0}".format(b),
                                 reuse=reuse)
-                            conv_output_flat = tf.contrib.layers.flatten(conv_output)
+                            o_input_b = tf.contrib.layers.flatten(conv_output)
                             if recurrent:
-                                o_input_b = tf.stack([conv_output_flat]*T, axis=1)
-
-#                        if recurrent:
-#                            o_input_flat_b = tf.reshape(o_input_b, [batch_size, T, int(conv_output_flat.get_shape()[1])])
-#                        else:
-#                            o_input_flat_b = tf.reshape(o_input_b, [batch_size * T, int(conv_output_flat.get_shape()[1])])
+                                o_input_b = tf.stack([o_input_b]*T, axis=1)
 
                         concat_list.append(o_input_b)
                     if dX > 0:
@@ -740,34 +736,36 @@ class ProbcollModel:
                     else:
                         input_layer = tf.concat(1, concat_list)
 
-                    # TODO figure out best way to do dropout placeholders
-                    # TODO figure out best way to do output dim
-                    ag_output, _  = action_graph(
+                    use_dp_placeholders = name == 'eval'
+                    
+                    ag_output, action_dp_placeholders  = action_graph(
                         input_layer,
                         params["model"]["action_graph"],
+                        use_dp_placeholders=use_dp_placeholders,
                         scope="action_graph_b{0}".format(b),
                         reuse=reuse)
                     
-#                    if recurrent:
-                    ag_output = tf.reshape(
-                        ag_output,
-                        (batch_size * T, int(ag_output.get_shape()[-1]))) 
-                    
-                    if name == 'eval':
-                        dp = tf.placeholder(
-                            tf.float32,
-                            [None, int(ag_output.get_shape()[-1])])
+                    dropout_placeholders += action_dp_placeholders
+
+                    if recurrent:
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * T, int(ag_output.get_shape()[-1]))) 
                     else:
-                        dp = None
-                    use_dp_placeholders = name == 'eval'
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * T, int(ag_output.get_shape()[-1])/T)) 
+
                     
                     params["model"]["output_graph"]["output_dim"] = doutput
-                    output_mat_b, dropout_placeholders  = fcnn(
+                    output_mat_b, output_dp_placeholders  = fcnn(
                         ag_output,
                         params["model"]["output_graph"],
                         use_dp_placeholders=use_dp_placeholders,
                         scope="output_graph_b{0}".format(b),
                         reuse=reuse)
+
+                    dropout_placeholders += output_dp_placeholders
 
                     output_mat_b = tf.reshape(output_mat_b, [batch_size, T, doutput])
                     # TODO not general because it assumes doutput = 1
