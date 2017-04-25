@@ -35,7 +35,7 @@ probcoll:
     pre_activation: True
 
   conditions:
-    repeats: 20 # TODO
+    repeats: 10 # TODO
     num_test: 1
     randomize_conds: False
     randomize_reps: True
@@ -108,13 +108,14 @@ model:
 #    output_dim: 24 # Has to be divisible by T
 #    hidden_activation: "relu"
 #    output_activation: "None"
-#    dropout:
+#    dropout: 0.7
+  
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
     num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
-    cell_args:
+#    cell_args: # If you need to pass variables to cells 
 
   output_graph:
     graph_type: 'fc' # fc / rnn
@@ -152,6 +153,13 @@ world:
     cmd_steer: [40, 60]
     cmd_vel: -12
     duration: 4.
+
+sim:
+  dt: 0.25
+  steeringClamp: 45.0
+  engineClamp: 1000.0
+  mass: 800.0
+  first_person: True
 
 ######################################################
 ########### States, controls, observations ###########

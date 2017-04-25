@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<launch>
+    <arg name="car_name" default="bair_car" />
+    <arg name="config" default="config/sim.yaml" />
+    <group ns="$(arg car_name)">
+        <node name="car_srv_node" pkg="bair_car" type="car_srv_node.py" output="screen">
+            <rosparam file="$(arg config)" command="load" />
+        </node>
+    </group>
+
+</launch>
