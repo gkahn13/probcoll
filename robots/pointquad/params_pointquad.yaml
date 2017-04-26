@@ -107,6 +107,9 @@ model:
   dropout: 0.7 # pct keep (None if no dropout)
   reg: 0.
   num_dropout_passes: 10
+  prob_coll_strictly_increasing: True
+  recurrent: False
+  mask: "last"
 
   observation_graph:
     graph_type: "cnn"
@@ -125,7 +128,13 @@ model:
     output_activation: "None"
     # TODO remove redundant dropout
     dropout: 0.7 # pct keep (None if no dropout)
-
+  output_graph:
+    graph_type: 'fc'
+    hidden_layers: []
+    output_dim: 1
+    hidden_activation: "None"
+    output_activation: "None"
+    dropout: 0.7
 #################################################
 ### Planning objective and optimizer settings ###
 #################################################

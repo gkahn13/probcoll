@@ -28,7 +28,6 @@ probcoll:
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
-  epsilon_greedy: 0
 
   cost:
     weight: 1e3 # TODO
@@ -73,25 +72,27 @@ model:
 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.8
+  gpu_fraction: 0.4 #TODO
   reset_every_train: True # every time train is called, reinitialize weights?
   early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
   learning_rate: 0.001
   batch_size: 16
-  display_batch: 100
-  val_freq: 250 # How often you compute validation
+  display_batch: 200
+  val_freq: 500 # How often you compute validation
   val_steps: 200  # How many steps you do on validation 
-  steps: 5000
+  steps: 10000
   val_pct: 0.2
 
   # How to save tfrecords
   save_type: 'fixedlen' # fixedlen
   
-  dropout: 0.7 # pct keep (None if no dropout)
   reg: 0.
   num_bootstrap: 1
   num_dropout_passes: 10
-  
+  prob_coll_strictly_increasing: True 
+  recurrent: True
+  mask: "all"
+
   observation_graph:
     graph_type: "cnn"
     filters: [4, 4, 4]
@@ -101,14 +102,28 @@ model:
     conv_activation: "relu" 
     output_activation: "None"
        
+#  action_graph:
+#    graph_type: 'fc' # fc / rnn
+#    hidden_layers: [16, 16]
+#    output_dim: 24 # Has to be divisible by T
+#    hidden_activation: "relu"
+#    output_activation: "None"
+#    dropout:
   action_graph:
-    graph_type: 'fc' # fc / cnn / rnn
-    hidden_layers: [20, 20]
-    output_dim: 1
-    hidden_activation: "relu"
+    graph_type: 'rnn' # fc / rnn
+    num_cells: 1
+    num_units: 16 # state_size
+    cell_type: 'mulint_rnn' #rnn / mulint_rnn
+    cell_args:
+
+  output_graph:
+    graph_type: 'fc' # fc / rnn
+    hidden_layers: []
+    output_dim: 1 # TODO
+    hidden_activation: "None"
     output_activation: "None"
-    # TODO remove redundant dropout
     dropout: 0.7 # pct keep (None if no dropout)
+
 
 #################################################
 ### Planning objective and optimizer settings ###

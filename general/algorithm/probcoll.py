@@ -78,7 +78,14 @@ class Probcoll:
         if not os.path.exists(dir):
             os.makedirs(dir)
         return dir
-    
+
+    @property
+    def _model_checkpoints_dir(self):
+        dir = os.path.join(self._save_dir, "model_checkpoints")
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+
     def _itr_samples_file(self, itr, create=True):
         return os.path.join(self._itr_dir(itr, create=create),
                             'samples_itr_{0}.npz'.format(itr))
@@ -88,7 +95,9 @@ class Probcoll:
                             'stats_itr_{0}.pkl'.format(itr))
 
     def _itr_model_file(self, itr, create=True):
-        return os.path.join(self._itr_dir(itr, create=create), 'model_itr_{0}.ckpt'.format(itr))
+        return os.path.join(
+            self._model_checkpoints_dir,
+            'itr_{0}.ckpt'.format(itr))
 
     def _itr_save_worlds(self, itr, world_infos):
         fname = os.path.join(self._itr_dir(itr), 'worlds_itr_{0}.pkl'.format(itr))

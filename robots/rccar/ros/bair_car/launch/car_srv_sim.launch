@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<launch>
+    <arg name="car_name" default="bair_car" />
+
+    <group ns="$(arg car_name)">
+        <node name="car_srv_node" pkg="bair_car" type="car_srv_node.py" output="screen">
+            <rosparam>
+                steeringClamp: 45.0
+            </rosparam>
+            <rosparam>
+                engineClamp: 1000.0
+            </rosparam>
+            <rosparam>
+                mass: 800.0
+            </rosparam>
+            <rosparam>
+                first_person: True
+            </rosparam>
+        </node>
+    </group>
+
+</launch>

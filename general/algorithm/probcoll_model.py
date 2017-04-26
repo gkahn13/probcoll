@@ -9,8 +9,11 @@ import numpy as np
 import tensorflow as tf
 import sys
 import IPython
+
+from general.tf import tf_utils
 from general.tf.fc_nn import fcnn
 from general.tf.conv_nn import convnn
+from general.tf.rnn import rnn
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 from general.algorithm.mlplotter import MLPlotter
@@ -56,6 +59,7 @@ class ProbcollModel:
             np.array(self.control_range["lower"])
         self._control_mean = (np.array(self.control_range["upper"]) + \
             np.array(self.control_range["lower"]))/2.
+        self.dropout = params["model"]["output_graph"]["dropout"]
 
         code_file_exists = os.path.exists(self._code_file)
         if code_file_exists:
@@ -307,8 +311,10 @@ class ProbcollModel:
                 feature['X'] = _floatlist_feature(np.ravel(X[j:j+self.T]).tolist())
                 feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
                 # TODO figure out how to keep types properly
-                feature['O'] = _bytes_feature(np.ravel(O[j]).tostring())
-                feature['output'] = _bytes_feature(np.ravel(output[j+self.T-1]).tostring())
+                feature['O'] = _floatlist_feature(np.ravel(O[j]).tolist())
+#                feature['O'] = _bytes_feature(np.ravel(O[j]).tostring())
+                # TODO possibly change this based on recurrence
+                feature['output'] = _bytes_feature(np.ravel(output[j:j+self.T]).tostring())
                 example = tf.train.Example(features=tf.train.Features(feature=feature))
                 writer.write(example.SerializeToString())
                 record_num += 1
@@ -432,7 +438,8 @@ class ProbcollModel:
 
             features['X'] = tf.FixedLenFeature([self.dX * self.T], tf.float32)
             features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
-            features['O'] = tf.FixedLenFeature([], tf.string)
+            features['O'] = tf.FixedLenFeature([self.dO], tf.float32)
+#            features['O'] = tf.FixedLenFeature([], tf.string)
             features['output'] = tf.FixedLenFeature([], tf.string)
             # TODO make sure this works
             # Figure out how to do arbitrary split across batchsize
@@ -449,8 +456,10 @@ class ProbcollModel:
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
                                      for b in xrange(self.num_bootstrap)]
-                bootstrap_O_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O'], tf.uint8), (self.dO,)) for b in xrange(self.num_bootstrap)]
-                bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.doutput,))  for b in xrange(self.num_bootstrap)]
+                bootstrap_O_input = [tf.reshape(parsed_example[b]['O'], (self.dO,))
+                                     for b in xrange(self.num_bootstrap)]
+#                bootstrap_O_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O'], tf.uint8), (self.dO,)) for b in xrange(self.num_bootstrap)]
+                bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
                 inputs[i] = (fname,) + tuple(bootstrap_X_input + bootstrap_U_input + bootstrap_O_input + bootstrap_output)
 
             shuffled = tf.train.shuffle_batch_join(
@@ -472,9 +481,9 @@ class ProbcollModel:
         with tf.variable_scope('feed_input'):
             bootstrap_X_inputs = [tf.placeholder('float32', [None, self.T, self.dX]) for _ in xrange(self.num_bootstrap)]
             bootstrap_U_inputs = [tf.placeholder('float32', [None, self.T, self.dU]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_O_inputs = [tf.placeholder('uint8', [None, self.dO]) for _ in xrange(self.num_bootstrap)]
-            O_single_input = tf.placeholder('uint8', [self.dO])
-            bootstrap_outputs = [tf.placeholder('uint8', [None]) for _ in xrange(self.num_bootstrap)]
+            bootstrap_O_inputs = [tf.placeholder('float32', [None, self.dO]) for _ in xrange(self.num_bootstrap)]
+            O_single_input = tf.placeholder('float32', [self.dO])
+            bootstrap_outputs = [tf.placeholder('uint8', [None, self.T, self.doutput]) for _ in xrange(self.num_bootstrap)]
         return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, O_single_input, bootstrap_outputs
 
 
@@ -486,6 +495,18 @@ class ProbcollModel:
             num_nocoll = 0
             num_errs_on_nocoll = 0
 
+            if params["model"]["mask"] == "last":
+                mask = tf.concat(0, [
+                        tf.zeros((self.T - 1, self.doutput)),
+                        tf.ones((1, self.doutput)),
+                    ])
+            elif params["model"]["mask"] == "all":
+                mask = tf.ones((self.T, self.doutput))
+            else:
+                raise NotImplementedError(
+                    "Mask {0} is not valid".format(
+                        params["model"]["mask"]))
+
             for b, (output_mat_b, output_b) in enumerate(zip(bootstrap_output_mats, bootstrap_outputs)):
                 output_b = tf.to_float(output_b)
                 output_pred_b = tf.nn.sigmoid(output_mat_b)
@@ -493,7 +514,14 @@ class ProbcollModel:
                 ### cost
                 with tf.name_scope('cost_b{0}'.format(b)):
                     cross_entropy_b = tf.nn.sigmoid_cross_entropy_with_logits(output_mat_b, output_b)
-                    costs.append(cross_entropy_b)
+                    costs.append(cross_entropy_b * mask)
+                    # TODO
+#                    cross_entropy_b = tf.contrib.seq2seq.sequence_loss(
+#                        output_mat_b,
+#                        ouput_b,
+#                        mask,
+#                        softmax_loss_function=tf.nn.sigmoid)
+#                    costs.append(cross_entropy_b)
                 ### accuracy
                 with tf.name_scope('err_b{0}'.format(b)):
                     output_geq_b = tf.cast(tf.greater_equal(output_pred_b, 0.5), tf.float32)
@@ -518,7 +546,6 @@ class ProbcollModel:
                 err_on_nocoll = tf.cond(num_nocoll > 0,
                                         lambda: (1. / tf.cast(num_nocoll, tf.float32)) * num_errs_on_nocoll,
                                         lambda: tf.constant(np.nan))
-
 
         return cost, cross_entropy, err, err_on_coll, err_on_nocoll
 
@@ -619,9 +646,13 @@ class ProbcollModel:
         bootstrap_output_mats = []
         bootstrap_output_preds = []
 
+        recurrent = params["model"]["recurrent"]
         ag_type = params["model"]["action_graph"]["graph_type"]
+        
         if ag_type == "fc":
             action_graph = fcnn
+        elif ag_type == "rnn":
+            action_graph = rnn
         else:
             raise NotImplementedError(
                 "Action graph {0} is not valid".format(ag_type))
@@ -647,6 +678,8 @@ class ProbcollModel:
                 dX = x_input_b.get_shape()[2].value
                 dU = u_input_b.get_shape()[2].value
                 dO = o_input_b.get_shape()[1].value
+                # Should be general
+                doutput = 1 
                 T = x_input_b.get_shape()[1].value
                 batch_size = tf.shape(x_input_b)[0]
 
@@ -659,54 +692,106 @@ class ProbcollModel:
                             o_input_b = o_input_b - tf.reduce_mean(o_input_b)
                             # TODO any number of channels
                             o_input_b = tf.reshape(o_input_b, [1, params["O"]["camera"]["height"], params["O"]["camera"]["width"], 1])
-                            cov_output = observation_graph(
+                            conv_output = observation_graph(
                                 o_input_b,
                                 params["model"]["observation_graph"],
                                 scope="observation_graph_b{0}".format(b),
                                 reuse=reuse)
-                            cov_output_flat = tf.contrib.layers.flatten(cov_output)
-                            o_input_b = tf.reshape(cov_output, [-1,])
-                            o_input_b = tf.tile(o_input_b, [batch_size])
-                            o_input_b = tf.reshape(o_input_b, [batch_size] + [int(cov_output_flat.get_shape()[1])])
+                            conv_output_flat = tf.contrib.layers.flatten(conv_output)
+                            o_input_b = tf.reshape(conv_output, [-1,])
+                            o_input_b = tf.tile(o_input_b, [batch_size * T])
+                            o_input_b = tf.reshape(o_input_b, [batch_size * T, int(conv_output_flat.get_shape()[1])])
                         else:
                             o_input_b = tf.cast(o_input_b, tf.float32) / 255.
                             o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis=0)
                             o_input_b = tf.reshape(o_input_b, [batch_size, params["O"]["camera"]["height"], params["O"]["camera"]["width"], 1])
-                            o_input_b = observation_graph(
+                            conv_output = observation_graph(
                                 o_input_b,
                                 params["model"]["observation_graph"],
                                 scope="observation_graph_b{0}".format(b),
                                 reuse=reuse)
-                        
-                        concat_list.append(tf.contrib.layers.flatten(o_input_b))
+                            conv_output_flat = tf.contrib.layers.flatten(conv_output)
+                            o_input_b = tf.stack([conv_output_flat]*T, axis=1)
+
+                        if recurrent:
+                            o_input_flat_b = tf.reshape(o_input_b, [batch_size, T, int(conv_output_flat.get_shape()[1])])
+                        else:
+                            o_input_flat_b = tf.reshape(o_input_b, [batch_size * T, int(conv_output_flat.get_shape()[1])])
+
+                        concat_list.append(o_input_flat_b)
                     if dX > 0:
-                        x_input_flat_b = tf.reshape(x_input_b, [1, T * dX])
+                        
+                        if recurrent:
+                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, T, dX])
+                        else:
+                            x_input_flat_b = tf.reshape(x_input_b, [batch_size * T, dX])
+                        
                         concat_list.append(x_input_flat_b)
+                    
                     if dU > 0:
                         control_mean = (np.array(params['model']['control_range']['lower']) + \
                             np.array(params['model']['control_range']['upper']))/2.
                         control_width = (np.array(params['model']['control_range']['upper']) - \
                             control_mean)
                         u_input_b = (u_input_b - control_mean) / control_width 
-                        u_input_flat_b = tf.reshape(u_input_b, [-1, T * dU])
+                        
+                        if recurrent:
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, T, dU])
+                        else:
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size * T, dU])
+                        
                         concat_list.append(u_input_flat_b)
-                    input_layer = tf.concat(1, concat_list)
+                    
+#                    import ipdb; ipdb.set_trace()
+                    if recurrent:
+                        input_layer = tf.concat(2, concat_list)
+                    else:
+                        input_layer = tf.concat(1, concat_list)
 
+                    # TODO figure out best way to do dropout placeholders
+                    # TODO figure out best way to do output dim
+                    ag_output, _  = action_graph(
+                        input_layer,
+                        params["model"]["action_graph"],
+                        scope="action_graph_b{0}".format(b),
+                        reuse=reuse)
+                    
+                    if recurrent:
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * T, params["model"]["action_graph"]["num_units"])) 
+                    
                     if name == 'eval':
                         dp = tf.placeholder(
                             tf.float32,
-                            [None, params["model"]["action_graph"]["hidden_layers"][-1]])
+                            [None, int(ag_output.get_shape()[-1])])
                     else:
                         dp = None
                     use_dp_placeholders = name == 'eval'
-                    # TODO figure out best way to do dropout placeholders
-                    output_mat_b, dropout_placeholders  = action_graph(
-                        input_layer,
-                        params["model"]["action_graph"],
+                    
+                    params["model"]["output_graph"]["output_dim"] = doutput
+                    output_mat_b, dropout_placeholders  = fcnn(
+                        ag_output,
+                        params["model"]["output_graph"],
                         use_dp_placeholders=use_dp_placeholders,
-                        scope="action_graph_b{0}".format(b),
+                        scope="output_graph_b{0}".format(b),
                         reuse=reuse)
 
+                    output_mat_b = tf.reshape(output_mat_b, [batch_size, T, doutput])
+                    # TODO not general because it assumes doutput = 1
+                    if params["model"]["prob_coll_strictly_increasing"]:
+                        output_mat_b = tf.reshape(output_mat_b, (batch_size, T))
+                        output_mat_b = tf_utils.cumulative_increasing_sum(output_mat_b)
+                        output_mat_b = tf.reshape(output_mat_b, (batch_size, T, doutput))
+
+                    if name == 'eval':
+                        # Only care about final probability of collision
+                        mask = tf.concat(0, [
+                                tf.zeros((T - 1, doutput)),
+                                tf.ones((1, doutput)),
+                            ])
+                        output_mat_b = tf.reduce_sum(mask * output_mat_b, axis=1) 
+                    
                     output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
 
                 bootstrap_output_mats.append(output_mat_b)
@@ -714,12 +799,12 @@ class ProbcollModel:
 
             ### combination of all the bootstraps
             with tf.name_scope('combine_bootstraps'):
-                output_pred_mean = (1 / float(num_bootstrap)) * tf.add_n(bootstrap_output_preds, name='output_pred_mean')
-                std_normalize = (1 / float(num_bootstrap - 1)) if num_bootstrap > 1 else 1
+                output_pred_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_preds, name='output_pred_mean')
+                std_normalize = (1. / (num_bootstrap - 1)) if num_bootstrap > 1 else 1
                 output_pred_std = tf.sqrt(std_normalize * tf.add_n(
                     [tf.square(tf.sub(output_pred_b, output_pred_mean)) for output_pred_b in bootstrap_output_preds]))
 
-                output_mat_mean = (1 / float(num_bootstrap)) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
+                output_mat_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
                 output_mat_std = tf.sqrt(std_normalize * tf.add_n(
                     [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
 
@@ -940,7 +1025,8 @@ class ProbcollModel:
             X_input, U_input, O_input = self._create_input(X, U, O)
             X_input = X_input[:self.T]
             U_input = U_input[:self.T]
-            O_input = O_input[0].astype(np.uint8)
+#            O_input = O_input[0].astype(np.uint8)
+            O_input = O_input[:self.T]
             assert(not np.isnan(X_input).any())
             assert(not np.isnan(U_input).any())
             assert(not np.isnan(O_input).any())
@@ -1007,7 +1093,8 @@ class ProbcollModel:
     def eval_control_batch(self, samples, num_avg=1, pre_activation=False):
         Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
         Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
-        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].astype(np.uint8)
+        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)]
+#        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].astype(np.uint8)
         assert(not np.isnan(O_input).any())
         X_inputs, U_inputs = [], []
         for X, U in zip(Xs, Us):

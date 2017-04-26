@@ -1,0 +1,10 @@
+#request constants
+float32 steer
+float32 motor
+float32 vel
+bool reset
+---
+#response fields
+bool coll
+sensor_msgs/Image image
+sensor_msgs/Image depth

@@ -17,7 +17,7 @@ class Sample(object):
 
         self._X = kwargs.get('X', np.full((self._T, self._xdim), np.nan, dtype=np.float32))
         self._U = kwargs.get('U', np.full((self._T, self._udim), np.nan, dtype=np.float32))
-        self._O = kwargs.get('O', np.full((self._T, self._odim), np.nan, dtype=np.uint8))
+        self._O = kwargs.get('O', np.full((self._T, self._odim), np.nan, dtype=np.float32))
 
         assert(self._X.shape == (self._T, self._xdim))
         assert(self._U.shape == (self._T, self._udim))
