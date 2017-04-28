@@ -1,14 +1,16 @@
 import os
-
 import rospy
 import std_msgs
+import multiprocessing
+import subprocess
+import os
+import signal
+
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
 from robots.rccar.algorithm.cost_probcoll_rccar import CostProbcollRCcar
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
-
 import robots.rccar.ros.ros_utils as ros_utils
-from config import params
 from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 from robots.rccar.agent.agent_rccar import AgentRCcar
@@ -16,6 +18,7 @@ from robots.rccar.dynamics.dynamics_rccar import DynamicsRCcar
 from robots.rccar.planning.primitives_rccar import PrimitivesRCcar
 from robots.rccar.planning.cost.cost_velocity_rccar import cost_velocity_rccar
 from robots.rccar.world.world_rccar import WorldRCcar
+from config import params
 
 class ProbcollRCcar(Probcoll):
 
@@ -25,11 +28,19 @@ class ProbcollRCcar(Probcoll):
     def _setup(self):
         rospy.init_node('ProbcollRCcar', anonymous=True)
 
+        self._jobs = []
+        
+        if params['rccar']['sim']:
+            p = multiprocessing.Process(target=ProbcollRCcar._run_simulation)
+            p.daemon = True
+            self._jobs.append(p)
+            p.start()
+        
         probcoll_params = params['probcoll']
         world_params = params['world']
         cond_params = probcoll_params['conditions']
         cp_params = probcoll_params['cost']
-
+        self._asynchronous = probcoll_params['asynchronous_training']
         self._max_iter = probcoll_params['max_iter']
         self._dynamics = DynamicsRCcar() # Try to remove dynamics
         self._agent = AgentRCcar(self._dynamics)
@@ -40,15 +51,47 @@ class ProbcollRCcar(Probcoll):
 
         ### load prediction neural net
         self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
+        self._cost = CostProbcollRCcar(self._probcoll_model)
 
-        self._cost = CostProbcollRCcar(
-            self._probcoll_model)
+        self._async_on = False
 
         rccar_topics = params['rccar']['topics']
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
         self.good_rollout_callback = ros_utils.RosCallbackEmpty(rccar_topics['good_rollout'], std_msgs.msg.Empty)
         self.bad_rollout_callback = ros_utils.RosCallbackEmpty(rccar_topics['bad_rollout'], std_msgs.msg.Empty)
+    
+    ##########################
+    ### Threaded Functions ###
+    ##########################
 
+    @staticmethod
+    def _run_simulation():
+        FNULL = open(os.devnull, 'w') # to supress output
+        command = "roslaunch {0} car_name:={1} config:={2}".format(
+            params["rccar"]["launch_file"],
+            params["exp_name"],
+            params["rccar"]["config_file"])
+        subprocess.call(command, stdout=FNULL, shell=True)
+
+    def _close(self):
+        for p in self._jobs:
+            os.kill(p.pid, signal.SIGKILL)
+            p.join()
+        self._probcoll_model.close()
+    
+    ###################
+    ### Run methods ###
+    ###################
+
+    def _run_training(self):
+        if self._asynchronous:
+            self._probcoll_model.recover()
+            if not self._async_on:
+                self._probcoll_model.async_training()
+                self._async_on = True
+        else:
+            self._probcoll_model.train(reset=params['model']['reset_every_train'])
+    
     ####################
     ### Save methods ###
     ####################
@@ -105,7 +148,7 @@ class ProbcollRCcar(Probcoll):
         sample0.set_X(x0, t=0)
         self._update_world(sample0, 0)
 
-        self._logger.info('\t\t\tCreating MPC')
+        self._logger.debug('\t\t\tCreating MPC')
         cost_velocity = cost_velocity_rccar(
             self._probcoll_model.T,
             params['planning']['cost_velocity']['u_des'],

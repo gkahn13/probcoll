@@ -1,10 +1,9 @@
 import os, sys, pickle
-
 import rospy, rosbag
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib
 
 from general.algorithm.analyze import Analyze
 
@@ -14,67 +13,12 @@ class AnalyzeRCcar(Analyze):
 
     def __init__(self, on_replay=False):
         rospy.init_node('analyze_rccar', anonymous=True)
-
         Analyze.__init__(self, on_replay=on_replay, parent_exp_dir=None)
 
     #######################
     ### Data processing ###
     #######################
 
-    def _process_bag_files(self):
-        bag_file_itrs = []
-        itr = 0
-        while True:
-            if not os.path.exists(self._bag_file(itr, 0, 0)):
-                break
-
-            bag_files = []
-            cond = 0
-            while True:
-                if not os.path.exists(self._bag_file(itr, cond, 0)):
-                    break
-
-                rep = 0
-                while True:
-                    if os.path.exists(self._bag_file(itr, cond, rep)):
-                        bag_files.append(self._bag_file(itr, cond, rep))
-                    else:
-                        break
-                    rep += 1
-                cond += 1
-            itr += 1
-
-            bag_file_itrs.append(bag_files)
-
-
-        bagdatas_itrs = []
-        for bag_files in bag_file_itrs:
-            bagdatas = []
-            for bag_file in bag_files:
-                try:
-                    bag = rosbag.Bag(bag_file)
-                except:
-                    bagdatas.append(None)
-                    continue
-
-                bagdata = dict()
-
-                crashes = [m[-1].to_sec() for m in bag.read_messages(topics=['/bair_car/crash'])]
-                if len(crashes) > 0:
-                    _, enc_msgs, enc_stamps = zip(*list(bag.read_messages(topics=['/bair_car/encoder'])))
-                    enc_times = [stamp.to_sec() for stamp in enc_stamps]
-
-                    enc_crash = enc_msgs[np.argmin(abs(np.array(enc_times) - crashes[0]))].data
-                    bagdata['enc_crash_speed'] = enc_crash
-                else:
-                    bagdata['enc_crash_speed'] = 0.
-
-                bagdata['stop_rollout'] = len(list(bag.read_messages(topics=['/bair_car/stop_rollout']))) > 0
-
-                bagdatas.append(bagdata)
-            bagdatas_itrs.append(bagdatas)
-
-        return bagdatas_itrs
 
     #############
     ### Files ###
@@ -89,7 +33,6 @@ class AnalyzeRCcar(Analyze):
 
     def _plot_statistics(self):
         ### get samples
-        bagdatas_itrs = self._process_bag_files()
         samples_itrs = self._load_samples()
         itrs = np.arange(len(samples_itrs))
 
@@ -100,7 +43,21 @@ class AnalyzeRCcar(Analyze):
         f, axes = plt.subplots(4, 1, sharex=True, figsize=(15,15))
 
         ### durations
-        durations_itrs = [[s._T * params['dt'] for s in samples] for samples in samples_itrs]
+        durations_itrs = []
+        time_to_crash = 0
+
+        # TODO deal with iteraitons
+        for samples in samples_itrs:
+            durations_itr = []
+            for i, s in enumerate(samples):
+                time_to_crash += s._T * params['dt']
+                if (int(s.get_O(t=-1, sub_obs='collision')) == 1) or (i == len(samples) - 1):
+                    durations_itr.append(time_to_crash)
+                    time_to_crash = 0
+            durations_itrs.append(durations_itr)
+ 
+
+#        durations_itrs = [[s._T * params['dt'] for s in samples] for samples in samples_itrs]
         dur_means = [np.mean(durations) for durations in durations_itrs]
         dur_stds = [np.std(durations) for durations in durations_itrs]
         if len(itrs) > 1:
@@ -173,33 +130,13 @@ class AnalyzeRCcar(Analyze):
         axes[3].set_ylabel('Pct')
         pkl_dict['U'] = [[s.get_U() for s in samples_itr] for samples_itr in samples_itrs]
 
-        ### ENCODER crash speeds
-        crash_speed_itrs = []
-        crash_speed_means = []
-        crash_speed_stds = []
-        for bagdatas in bagdatas_itrs:
-            speeds = [bagdata['enc_crash_speed'] for bagdata in bagdatas if bagdata is not None]
-            crash_speed_itrs.append(speeds)
-            if len(speeds) > 0:
-                crash_speed_means.append(np.mean(speeds))
-                crash_speed_stds.append(np.std(speeds))
-            else:
-                crash_speed_means.append(0)
-                crash_speed_stds.append(0)
-        if len(itrs) > 1:
-            axes[1].errorbar(itrs, crash_speed_means, crash_speed_stds, color='g')
-        else:
-            axes[1].errorbar([-1]+list(itrs), crash_speed_means*2, crash_speed_stds*2, color='g')
-        pkl_dict['encoder_crash_speeds'] = crash_speed_itrs
 
-        ### stop rollouts
-        stop_rollout_itrs = []
-        for bagdatas in bagdatas_itrs:
-            stop_rollout_itrs.append([bagdata['stop_rollout'] for bagdata in bagdatas])
-        pkl_dict['stop_rollout'] = stop_rollout_itrs
+        # TODO add sim specifics
+        if params["sim"]:
+            pass
 
         plt.show(block=False)
-        plt.pause(0.1)
+        plt.pause(5.0)
         if not os.path.exists(os.path.dirname(self._plot_stats_file)):
             os.makedirs(os.path.dirname(self._plot_stats_file))
         f.savefig(self._plot_stats_file)

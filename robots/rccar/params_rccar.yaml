@@ -14,7 +14,7 @@ probcoll:
   T: 28 # timesteps per trajectory
   max_iter: 20
   planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
-
+  asynchronous_training: True
   control_noise:
     type: 'uniform' # zero / gaussian / uniform
 
@@ -35,7 +35,7 @@ probcoll:
     pre_activation: True
 
   conditions:
-    repeats: 10 # TODO
+    repeats: 20 # TODO
     num_test: 1
     randomize_conds: False
     randomize_reps: True
@@ -72,15 +72,14 @@ model:
 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.4 #TODO
-  reset_every_train: True # every time train is called, reinitialize weights?
-  early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
+  gpu_fraction: 0.8 #TODO
+  reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 0.001
   batch_size: 16
-  display_batch: 200
-  val_freq: 500 # How often you compute validation
-  val_steps: 200  # How many steps you do on validation 
-  steps: 10000
+  display_batch: 100
+  val_freq: 90 # How often you compute validation
+  val_steps: 10  # How many steps you do on validation 
+  steps: 1000
   val_pct: 0.2
 
   # How to save tfrecords
@@ -115,7 +114,7 @@ model:
     num_cells: 1
     num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
-    dropout: 0.7 # pct keep
+    dropout: 0.9 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
   output_graph: # Must have dropout 1.0
@@ -139,7 +138,7 @@ planning:
   primitives:
     steers : [30., 40., 50., 60., 70.]
     speeds : [16.]
-    num_steers : 3
+    num_steers : 2
   # TODO: other planning methods here
 
 #############

@@ -12,9 +12,9 @@ from general.algorithm.analyze_aggregate_prediction import load_pickles, flatten
 
 from general.state_info.sample import Sample
 
-EXP_FOLDER = '/home/gkahn/code/gps_quadrotor/experiments/rccar/'
+EXP_FOLDER = '/home/adam/probcoll/experiments/rccar/'
 # SAVE_FOLDER = '/home/gkahn/Dropbox/Apps/ShareLaTeX/2017_RSS_ProbColl/figures/exps/'
-SAVE_FOLDER = '/home/gkahn/tmp'
+SAVE_FOLDER = '/home/adam/tmp'
 
 ### lambda_std = 0
 std0 = []

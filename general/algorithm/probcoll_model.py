@@ -27,12 +27,11 @@ class ProbcollModel:
 
     def __init__(self, dist_eps, read_only=False, finalize=True):
         self.dist_eps = dist_eps
-
         self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
-        self._logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
-
+        self._logger = get_logger(self.__class__.__name__, 'fatal', os.path.join(self.save_dir, 'debug.txt'))
+        tf.logging.set_verbosity(tf.logging.ERROR)
         self.random_seed = params['random_seed']
         for k, v in params['model'].items():
             setattr(self, k, v)
@@ -53,12 +52,13 @@ class ProbcollModel:
             ]
                 
         self.preprocess_fnames = []
-        
+        self.threads = []
+
         self._control_width = np.array(self.control_range["upper"]) - \
             np.array(self.control_range["lower"])
         self._control_mean = (np.array(self.control_range["upper"]) + \
             np.array(self.control_range["lower"]))/2.
-        self.dropout = params["model"]["output_graph"]["dropout"]
+        self.dropout = params["model"]["action_graph"]["dropout"]
 
         code_file_exists = os.path.exists(self._code_file)
         if code_file_exists:
@@ -130,10 +130,37 @@ class ProbcollModel:
 
         return hashlib.md5(str(d)).hexdigest()
 
+    def _next_model_file(self):
+        latest_file = tf.train.latest_checkpoint(
+            self._checkpoints_dir)
+        if latest_file is None:
+            next_num = 0
+        else:
+            # File should be some number.ckpt
+            num = int(os.path.splitext(os.path.basename(latest_file))[0])
+            next_num = num + 1
+        return os.path.join(
+            self._checkpoints_dir,
+            "{0:d}.ckpt".format(next_num)), next_num
+
     ############
     ### DIR ####
     ############
 
+    @property
+    def _checkpoints_dir(self):
+        dir = os.path.join(self.save_dir, "model_checkpoints") 
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+
+    @property
+    def _plots_dir(self):
+        dir = os.path.join(self.save_dir, "plots") 
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
+    
     @property
     def _no_coll_train_tfrecords_dir(self):
         dir = os.path.join(self.save_dir, "no_coll_train_tfrecords") 
@@ -538,20 +565,24 @@ class ProbcollModel:
                                         lambda: tf.constant(np.nan))
 
 
-        return cost, cross_entropy, err, err_on_coll, err_on_nocoll
+        return costs, weight_decay, cost, cross_entropy, err, err_on_coll, err_on_nocoll
 
-    def _graph_optimize(self, cost):
+    def _graph_optimize(self, bootstrap_costs, reg_cost):
+        # TODO reg_cost is ignored
+        grads = []
+        optimizers = []
         vars_before = tf.global_variables()
-
-        with tf.name_scope('optimizer'):
-            opt = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
-            optimizer = opt.minimize(cost)
-            grad = opt.compute_gradients(cost)
+        for b, bootstrap_cost in enumerate(bootstrap_costs):
+            with tf.name_scope('optimizer_b{0}'.format(b)):
+                opt = tf.train.AdamOptimizer(learning_rate=self.learning_rate) # TODO
+                grad = opt.compute_gradients(bootstrap_cost)
+                optimizers.append(opt.apply_gradients(grad))
+                grads += grad
 
         vars_after = tf.global_variables()
         optimizer_vars = list(set(vars_after).difference(set(vars_before)))
 
-        return optimizer, grad, optimizer_vars
+        return optimizers, grads, optimizer_vars
 
     def _graph_init_vars(self):
         self.sess.run(
@@ -584,11 +615,11 @@ class ProbcollModel:
                                                                     self.dropout, params,
                                                                     reuse=i>0, random_seed=self.random_seed,
                                                                     tf_debug=self.tf_debug)
-            d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'] = \
+            d['bootstraps_cost'], d['reg_cost'], d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'] = \
                 self._graph_cost(name, d['output_mats'], d['outputs'], reg=self.reg)
         ### optimizer
         self.d_train['optimizer'], self.d_train['grads'], self.d_train['optimizer_vars'] = \
-            self._graph_optimize(self.d_train['cost'])
+            self._graph_optimize(self.d_train['bootstraps_cost'], self.d_train['reg_cost'])
 
         ### prepare for eval
         self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'], self.d_eval['O_single_input'], self.d_eval['outputs'] = \
@@ -613,7 +644,9 @@ class ProbcollModel:
 
         # Set logs writer into folder /tmp/tensorflow_logs
         merged = tf.summary.merge_all()
-        writer = tf.summary.FileWriter('/tmp', graph=self.sess.graph)
+        writer = tf.summary.FileWriter(
+            os.path.join('/tmp', params['exp_name']),
+            graph=self.sess.graph)
         self.saver = tf.train.Saver(max_to_keep=None)
 
     def _get_old_graph_inference(self):
@@ -761,14 +794,14 @@ class ProbcollModel:
 
                     
                     params["model"]["output_graph"]["output_dim"] = doutput
-                    output_mat_b, output_dp_placeholders  = fcnn(
+                    params["model"]["output_graph"]["dropout"] = 1.0
+                    # TODO dropout acts only on output of layers
+                    # Therefore, dropout should never be put on outputgraph
+                    output_mat_b, _  = fcnn(
                         ag_output,
                         params["model"]["output_graph"],
-                        use_dp_placeholders=use_dp_placeholders,
                         scope="output_graph_b{0}".format(b),
                         reuse=reuse)
-
-                    dropout_placeholders += output_dp_placeholders
 
                     output_mat_b = tf.reshape(output_mat_b, [batch_size, T, doutput])
                     # TODO not general because it assumes doutput = 1
@@ -824,13 +857,16 @@ class ProbcollModel:
                               self.sess.run(queue.dequeue_many(10*self.batch_size))]):
                 pass
 
-    def train(self, prev_model_file=None, new_model_file=None, **kwargs):
+    def train(self, reset=False, **kwargs):
 
-        if prev_model_file is not None and not self.reset_every_train:
-            self.load(prev_model_file)
-        else:
+        if reset:
             self._graph_init_vars()
-
+        else:
+            self.recover()
+        
+        num_files = len(self.tfrecords_no_coll_train_fnames)
+        
+        new_model_file, model_num  = self._next_model_file()
         self.sess.run(
             [
                 tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
@@ -840,9 +876,10 @@ class ProbcollModel:
             ])
 
         if not hasattr(self, 'coord'):
-            assert(not hasattr(self, 'threads'))
+#            assert(not hasattr(self, 'threads'))
             self.coord = tf.train.Coordinator()
-            self.threads = tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
+            queue_threads = tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
+            self.threads += queue_threads
 
         self._logger.debug('Flushing queue')
         self._flush_queue()
@@ -884,15 +921,27 @@ class ProbcollModel:
         ### train
         train_values = defaultdict(list)
         train_nums = defaultdict(float)
-
         train_fnames_dict = defaultdict(int)
-        val_fnames_dict = defaultdict(int)
 
         step = 0
         epoch_start = save_start = time.time()
         while step < self.steps:
-            if step == 0:
-                for _ in xrange(10): print('')
+            
+            new_num_files = len(self.tfrecords_no_coll_train_fnames)
+
+            if new_num_files > num_files:
+                num_files = new_num_files
+
+                self.sess.run(
+                    [
+                        tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
+                        tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
+                        tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
+                        tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
+                    ])
+
+                self._logger.debug('Flushing queue')
+                self._flush_queue()
 
             ### validation
             if (step != 0 and (step % self.val_freq) == 0):
@@ -936,12 +985,6 @@ class ProbcollModel:
                         time.time() - epoch_start,
                         int(self.val_freq * self.batch_size)))
                 
-                fnames_condensed = defaultdict(int)
-                for k, v in train_fnames_dict.items():
-                    fnames_condensed[k.split(self._hash)[0]] += v
-                for k, v in sorted(fnames_condensed.items(), key=lambda x: x[1]):
-                    self._logger.debug('\t\t\t{0} : {1}'.format(k, v))
-
                 epoch_start = time.time()
 
                 ### save model
@@ -959,6 +1002,10 @@ class ProbcollModel:
                                                          self.d_train['fnames'],
                                                          self.d_train['outputs']])
 
+            # Keeps track of how many times files are read
+            for fname in train_fnames:
+                train_fnames_dict[fname] += 1
+            
             train_values['cost'].append(train_cost)
             train_values['cross_entropy'].append(train_cross_entropy)
             train_values['err'].append(train_err)
@@ -991,13 +1038,20 @@ class ProbcollModel:
                 train_nums = defaultdict(float)
 
             if time.time() - save_start > 60.:
-                plotter.save(os.path.dirname(new_model_file))
+                plotter.save(self._plots_dir, suffix=str(model_num))
                 save_start = time.time()
 
             step += 1
 
+        # Logs the number of times files were accessed
+        fnames_condensed = defaultdict(int)
+        for k, v in train_fnames_dict.items():
+            fnames_condensed[k.split(self._hash)[0]] += v
+        for k, v in sorted(fnames_condensed.items(), key=lambda x: x[1]):
+            self._logger.debug('\t\t\t{0} : {1}'.format(k, v))
+        
         self.save(new_model_file)
-        plotter.save(os.path.dirname(new_model_file))
+        plotter.save(self._plots_dir, suffix=str(model_num))
         plotter.close()
 
     ##################
@@ -1031,7 +1085,7 @@ class ProbcollModel:
             feed[self.d_eval['X_inputs'][b]] = X_inputs
             feed[self.d_eval['U_inputs'][b]] = U_inputs
             feed[self.d_eval['O_inputs'][b]] = O_inputs
-        # want dropout for each X/U/O to be the same
+        # want analysis_dropout for each X/U/O to be the same
         # want dropout for each num_avg to be different
         # -->
         # create num_avg different dropout for each dropout mask
@@ -1086,7 +1140,6 @@ class ProbcollModel:
         Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
         Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
         O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)]
-#        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].astype(np.uint8)
         assert(not np.isnan(O_input).any())
         X_inputs, U_inputs = [], []
         for X, U in zip(Xs, Us):
@@ -1141,12 +1194,20 @@ class ProbcollModel:
             assert(len(output_pred_std) == len(Xs))
 
         assert((output_pred_std >= 0).all())
-
+        
         return output_pred_mean, output_pred_std
 
     #############################
     ### Load/save/reset/close ###
     #############################
+
+    def recover(self):
+        try:
+            latest_file = tf.train.latest_checkpoint(
+                self._checkpoints_dir)
+            self.load(latest_file)
+        except:
+            self._logger.debug("Could not find checkpoint file")
 
     def load(self, model_file):
         self.saver.restore(self.sess, model_file)
@@ -1162,7 +1223,7 @@ class ProbcollModel:
             self.coord.join(self.threads)
         self.sess.close()
         self.sess = None
-
+    
     @staticmethod
     def checkpoint_exists(model_file):
         ckpt = tf.train.get_checkpoint_state(os.path.dirname(model_file))

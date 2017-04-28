@@ -1,8 +1,8 @@
 import os, sys
 import random
-
 import numpy as np
 import tensorflow as tf
+import threading
 
 from general.algorithm.probcoll_model import ProbcollModel
 
@@ -30,31 +30,6 @@ class ProbcollModelRCcar(ProbcollModel):
     ### Data ###
     ############
 
-# TODO figure out if I need this
-#    def _modify_sample(self, sample):
-#        """
-#        In case you want to pre-process the sample before adding it
-#        :return: Sample
-#        """
-#        # return ProbcollModel._modify_sample(self, sample)
-#
-#        ### move collision observation one time step earlier
-#        if sample.get_O(t=-1, sub_obs='collision'):
-#            try:
-#                T_sample = len(sample.get_X())
-#                t_backward = 0
-#                new_sample = sample.match(slice(0, T_sample - t_backward))
-#                new_sample.set_O([1.], t=-1, sub_obs='collision')
-#                # t_forward = 2
-#                # new_sample = sample.match(slice(t_forward, T_sample))
-#                # new_sample.set_U(sample.get_U(t=slice(0, T_sample-t_forward)), t=slice(0, T_sample-t_forward))
-#                # new_sample.set_X(sample.get_X(t=slice(0, T_sample-t_forward)), t=slice(0, T_sample-t_forward))
-#                sample = new_sample
-#            except:
-#                self._logger.debug('Modify sample exception')
-#
-#        return [sample]
-
     #############
     ### Graph ###
     #############
@@ -62,3 +37,19 @@ class ProbcollModelRCcar(ProbcollModel):
     ################
     ### Training ###
     ################
+
+    def async_training(self):
+        t = threading.Thread(
+            target=ProbcollModelRCcar.async_train_func,
+            args=(self,))
+        t.daemon = True
+        self.threads.append(t)
+        t.start()
+
+    def async_train_func(self):
+        self._logger.info("Started asynchronous training!")
+        try:
+            while (True):
+                self.train()
+        finally:
+            self._logger.info("Ending asynchronous training!")

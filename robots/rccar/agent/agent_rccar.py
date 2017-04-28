@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-import subprocess
 import rospy
 import sensor_msgs
 import std_msgs
@@ -12,6 +11,7 @@ try:
 except:
     pass
 
+from general.utility.logger import get_logger
 from general.agent.agent import Agent
 from config import params
 import robots.rccar.ros.ros_utils as ros_utils
@@ -23,16 +23,16 @@ class AgentRCcar(Agent):
     def __init__(self, dynamics):
         Agent.__init__(self, dynamics)
         rccar_topics = params['rccar']['topics']
+        self._logger = get_logger(
+            self.__class__.__name__,
+            'info',
+            os.path.join(
+                os.path.join(params['exp_dir'], params['exp_name']),
+                'debug.txt'))
+        
         self.sim = params['rccar']['sim']
-            
-        if self.sim:
-            FNULL = open(os.devnull, 'w') # to supress output
-            command = "roslaunch {0} car_name:={1} config:={2}".format(
-                params["rccar"]["launch_file"],
-                params["exp_name"],
-                params["rccar"]["config_file"])
 
-            subprocess.Popen([command], stdout=FNULL, shell=True)
+        if self.sim:
             service = params['rccar']['srv']
             ros_utils.wait_for_service(service)
             self.srv = ros_utils.ServiceProxy(service, bair_car.srv.sim_env)
@@ -70,7 +70,7 @@ class AgentRCcar(Agent):
             import time
             start = time.time()
             u_t = policy.act(x_t, o_t, t, noise=noise)
-            print time.time() - start
+            self._logger.debug(time.time() - start)
             # only execute control if no collision
             if int(o_t[policy_sample.get_O_idxs(sub_obs='collision')][0]) == 0:
                 self.execute_control(u_t)

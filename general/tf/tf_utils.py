@@ -49,21 +49,21 @@ def multiplicative_integration(
                 regularizer = None
             else:
                 regularizer = tf.contrib.layers.l2_regularizer(0.5)
-            with tf.variable_scope('Calculate_Wx_mulint'):
-                Wx = tf.contrib.layers.fully_connected(
-                    inputs=list_of_inputs[0],
-                    num_outputs=output_size,
-                    weights_initializer=tf.contrib.layers.xavier_initializer(),
+            Wx = tf.contrib.layers.fully_connected(
+                inputs=list_of_inputs[0],
+                num_outputs=output_size,
+                weights_initializer=tf.contrib.layers.xavier_initializer(),
 #                    weights_regularizer=regularizer,
-                    trainable=True)
+                scope="Calculate_Wx_mulint",
+                trainable=True)
 
-            with tf.variable_scope("Calculate_Uz_mulint"):
-                Uz = tf.contrib.layers.fully_connected(
-                    inputs=list_of_inputs[1],
-                    num_outputs=output_size,
-                    weights_initializer=tf.contrib.layers.xavier_initializer(),
+            Uz = tf.contrib.layers.fully_connected(
+                inputs=list_of_inputs[1],
+                num_outputs=output_size,
+                weights_initializer=tf.contrib.layers.xavier_initializer(),
 #                    weights_regularizer=regularizer,
-                    trainable=True)
+                scope="Calculate_Uz_mulint",
+                trainable=True)
 
         with tf.variable_scope("multiplicative_integration"):
             alpha = tf.get_variable(

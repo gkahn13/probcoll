@@ -37,7 +37,7 @@ class Analyze:
 
     @property
     def _image_folder(self):
-        path = os.path.join(self._save_dir, 'images')
+        path = os.path.join(self._save_dir, 'analysis_images')
         if not os.path.exists(path):
             os.makedirs(path)
         return path

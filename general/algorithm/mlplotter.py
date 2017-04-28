@@ -23,7 +23,7 @@ class MLPlotter:
         mng.window.showMinimized()
         plt.suptitle(title)
         plt.show(block=False)
-        plt.pause(0.5)
+        plt.pause(0.01)
 
         self.train_lines = {}
         self.val_lines = {}
@@ -41,7 +41,7 @@ class MLPlotter:
             ax.legend()
 
         self.f.canvas.draw()
-        plt.pause(0.5)
+        plt.pause(0.01)
 
     def _update_line(self, line, new_x, new_y):
         xdata, ydata = line.get_xdata(), line.get_ydata()
@@ -52,9 +52,10 @@ class MLPlotter:
         line.set_xdata(xdata)
         line.set_ydata(ydata)
 
-        ax = line.get_axes()
+        ax = line.axes
         ax.relim()
         ax.autoscale_view()
+        ax.set_ylim([0, 1])
 
     def add_train(self, name, training_samples, value):
         self._update_line(self.train_lines[name], training_samples, value)
@@ -67,9 +68,11 @@ class MLPlotter:
         self.f.canvas.draw()
         plt.pause(0.01)
 
-    def save(self, save_dir, name='training.png'):
-        self.f.savefig(os.path.join(save_dir, name))
-        with open(os.path.join(save_dir, 'plotter.pkl'), 'w') as f:
+    def save(self, save_dir, suffix=""):
+        fig_name = "training_{0}.png".format(suffix)
+        pkl_name = "plotter_{0}.pkl".format(suffix)
+        self.f.savefig(os.path.join(save_dir, fig_name))
+        with open(os.path.join(save_dir, pkl_name), 'w') as f:
             pickle.dump(dict([(k, (v.get_xdata(), v.get_ydata())) for k, v in self.train_lines.items()] +
                              [(k, (v.get_xdata(), v.get_ydata())) for k, v in self.val_lines.items()]),
                         f)

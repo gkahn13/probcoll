@@ -18,8 +18,10 @@ class Probcoll:
 
         self._setup()
 
-        self._logger = get_logger(self.__class__.__name__, 'info',
-                                  os.path.join(self._probcoll_model.save_dir, 'dagger.txt'))
+        self._logger = get_logger(
+            self.__class__.__name__,
+            'info',
+            os.path.join(self._save_dir, 'dagger.txt'))
         shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
 
 
@@ -27,9 +29,7 @@ class Probcoll:
     def _setup(self):
         ### load prediction neural net
         self._probcoll_model = None
-
         self._cost_probcoll = None
-
         self._max_iter = None
         self._world = None
         self._dynamics = None
@@ -79,13 +79,6 @@ class Probcoll:
             os.makedirs(dir)
         return dir
 
-    @property
-    def _model_checkpoints_dir(self):
-        dir = os.path.join(self._save_dir, "model_checkpoints")
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        return dir
-
     def _itr_samples_file(self, itr, create=True):
         return os.path.join(self._itr_dir(itr, create=create),
                             'samples_itr_{0}.npz'.format(itr))
@@ -93,11 +86,6 @@ class Probcoll:
     def _itr_stats_file(self, itr, create=True):
         return os.path.join(self._itr_dir(itr, create=create),
                             'stats_itr_{0}.pkl'.format(itr))
-
-    def _itr_model_file(self, itr, create=True):
-        return os.path.join(
-            self._model_checkpoints_dir,
-            'itr_{0}.ckpt'.format(itr))
 
     def _itr_save_worlds(self, itr, world_infos):
         fname = os.path.join(self._itr_dir(itr), 'worlds_itr_{0}.pkl'.format(itr))
@@ -139,28 +127,11 @@ class Probcoll:
             train neural network
         """
         ### find last model file
-        for model_start_itr in xrange(self._max_iter-1, -1, -1):
-            model_file = self._itr_model_file(model_start_itr, create=False)
-            if ProbcollModel.checkpoint_exists(model_file):
-                model_start_itr += 1
-                break
-        else:
-            model_file = None
-            ### find last samples
         for samples_start_itr in xrange(self._max_iter-1, -1, -1):
             sample_file = self._itr_samples_file(samples_start_itr, create=False)
             if os.path.exists(sample_file):
                 samples_start_itr += 1
                 break
-        ### should be within one
-        assert (model_start_itr == samples_start_itr or
-                model_start_itr == samples_start_itr - 1 or
-                (model_start_itr == 1 and samples_start_itr == 0))
-        ### load neural nets
-        if model_file is not None:
-            self._logger.info('Loading model {0}'.format(model_file))
-            self._probcoll_model.load(model_file=model_file)
-
         ### load initial dataset
         init_data_folder = params['probcoll'].get('init_data', None)
         if init_data_folder is not None:
@@ -172,29 +143,34 @@ class Probcoll:
             self._probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
 
         ### if any data and haven't trained on it already, train on it
-        if (model_start_itr == samples_start_itr - 1) or \
-            (samples_start_itr == 0 and model_start_itr == 0 and init_data_folder is not None):
-            old_model_file = None if samples_start_itr <= 0 else self._itr_model_file(model_start_itr)
-            self._probcoll_model.train(old_model_file=old_model_file,
-                                 new_model_file=self._itr_model_file(model_start_itr))
+        if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
+            self._run_training()
         start_itr = samples_start_itr
 
         ### training loop
         for itr in xrange(start_itr, self._max_iter):
-            self._logger.info('')
-            self._logger.info('=== Itr {0}'.format(itr))
-            self._logger.info('')
-
-            self._logger.info('Itr {0} flying'.format(itr))
             self._run_itr(itr)
+            self._run_training()
 
-            self._logger.info('Itr {0} adding data'.format(itr))
-            self._probcoll_model.add_data([self._itr_samples_file(itr)])
-            self._logger.info('Itr {0} training probability of collision'.format(itr))
-            self._probcoll_model.train(old_model_file=self._itr_model_file(itr-1),
-                                 new_model_file=self._itr_model_file(itr))
+        self._close()
 
     def _run_itr(self, itr):
+        self._logger.info('')
+        self._logger.info('=== Itr {0}'.format(itr))
+        self._logger.info('')
+        self._logger.info('Itr {0} running'.format(itr))
+        self._run_rollout(itr)
+        self._logger.info('Itr {0} adding data'.format(itr))
+        self._probcoll_model.add_data([self._itr_samples_file(itr)])
+        self._logger.info('Itr {0} training probability of collision'.format(itr))
+
+    def _close(self):
+        self._probcoll_model.close()
+
+    def _run_training(self):
+        self._probcoll_model.train(reset=params['model']['reset_every_train'])
+
+    def _run_rollout(self, itr):
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
 
@@ -206,7 +182,7 @@ class Probcoll:
         for cond in xrange(self._conditions.length):
             rep = 0
             while rep < self._conditions.repeats:
-                self._logger.info('\t\tStarting cond {0} rep {1}'.format(cond, rep))
+                self._logger.info('\t\tStarting cond {0} rep {1} itr {2}'.format(cond, rep, itr))
                 if (cond == 0 and rep == 0) or self._world.randomize:
                     self._reset_world(itr, cond, rep)
 
@@ -228,12 +204,7 @@ class Probcoll:
                     u = rollout.get_U(t=0)
                     o = rollout.get_O(t=0)
 
-                    if label_with_noise or (control_noise is False):
-                        u_label = u
-                    else:
-                        u_label = self._agent.sample_policy(x0, mpc_policy, noise=ZeroNoise(params), T=1).get_U(t=0)
-
-                    sample_T.set_U(u_label, t=t)
+                    sample_T.set_U(u, t=t)
                     sample_T.set_O(o, t=t)
 
                     if self._world.is_collision(sample_T, t=t):

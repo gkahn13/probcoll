@@ -37,7 +37,9 @@ def rnn(
                 else:
                     randoms = tf.random_uniform((num_units,), dtype=dtype)
                     dp = tf.cast(tf.less(randoms, dropout), dtype) / dropout
-            
+            else:
+                dp = None
+
             if "cell_args" in params.keys() and  params["cell_args"] is not None:
                 cell_args = params["cell_args"]
                 cell = cell_type(num_units, dropout_mask=dp, **cell_args)
