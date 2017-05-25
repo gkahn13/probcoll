@@ -27,6 +27,9 @@ class AnalyzeRCcar(Analyze):
     def _bag_file(self, itr, cond, rep):
         return os.path.join(self._itr_dir(itr), 'bagfile_itr{0}_cond{1}_rep{2}.bag'.format(itr, cond, rep))
 
+    def _plot_trajectories_file(self, itr):
+        return os.path.join(self._save_dir, self._image_folder, 'trajectories_{0}.png'.format(itr))
+
     ################
     ### Plotting ###
     ################
@@ -34,8 +37,9 @@ class AnalyzeRCcar(Analyze):
     def _plot_statistics(self):
         ### get samples
         samples_itrs = self._load_samples()
-        itrs = np.arange(len(samples_itrs))
-
+        num_itrs = len(samples_itrs)
+        samples_per_itr = len(samples_itrs[0])
+        itrs = np.arange(num_itrs)
         ### pkl dict to save to
         pkl_dict = {}
 
@@ -43,30 +47,42 @@ class AnalyzeRCcar(Analyze):
         f, axes = plt.subplots(4, 1, sharex=True, figsize=(15,15))
 
         ### durations
-        durations_itrs = []
+        durations = []
+        times = []
         time_to_crash = 0
+        next_time = 0
+        lins = np.linspace(0, num_itrs - 1, num_itrs * samples_per_itr)
 
-        # TODO deal with iteraitons
-        for samples in samples_itrs:
-            durations_itr = []
-            for i, s in enumerate(samples):
+        for i, samples in enumerate(samples_itrs):
+            for j, s in enumerate(samples):
                 time_to_crash += s._T * params['dt']
-                if (int(s.get_O(t=-1, sub_obs='collision')) == 1) or (i == len(samples) - 1):
-                    durations_itr.append(time_to_crash)
+                if (int(s.get_O(t=-1, sub_obs='collision')) == 1) or \
+                        ((i == len(samples) - 1) and \
+                        (j == len(samples_itrs) - 1)):
+                    durations.append(time_to_crash)
+                    times.append(next_time)
                     time_to_crash = 0
-            durations_itrs.append(durations_itr)
- 
+                    next_time = lins[i * samples_per_itr + j]
 
-#        durations_itrs = [[s._T * params['dt'] for s in samples] for samples in samples_itrs]
-        dur_means = [np.mean(durations) for durations in durations_itrs]
-        dur_stds = [np.std(durations) for durations in durations_itrs]
+        dur_means = []
+        dur_stds = []
+        avg_itrs = 10
+        # TODO hard coded
+        for i in xrange(len(durations)):
+            lower_index = max(0, i - avg_itrs)
+            dur_means.append(np.mean(durations[lower_index:i+1]))
+            dur_stds.append(np.std(durations[lower_index:i+1]))
         if len(itrs) > 1:
-            axes[0].errorbar(itrs, dur_means, yerr=dur_stds)
+            axes[0].errorbar(
+                times,
+                dur_means,
+                yerr=dur_stds)
         else:
             axes[0].errorbar([-1]+list(itrs), dur_means*2, yerr=dur_stds*2)
         axes[0].set_title('Time until crash')
         axes[0].set_ylabel('Duration (s)')
-        pkl_dict['durations'] = durations_itrs
+        axes[0].set_xlabel('Steps')
+        pkl_dict['durations'] = durations
 
         ### crash speeds
         crash_speed_itrs = []
@@ -87,6 +103,7 @@ class AnalyzeRCcar(Analyze):
             axes[1].errorbar(itrs, crash_speed_means, crash_speed_stds)
         else:
             axes[1].errorbar([-1]+list(itrs), crash_speed_means*2, crash_speed_stds*2)
+        # TODO size issue
         axes[1].set_title('Speed at crash')
         axes[1].set_ylabel('Speed (m/s)')
         pkl_dict['crash_speeds'] = crash_speed_itrs
@@ -110,12 +127,14 @@ class AnalyzeRCcar(Analyze):
         for samples_itr in samples_itrs:
             x_vels_itr = []
             for s in samples_itr:
+                # TODO think of better way to consolidate
                 x_vels_itr += s.get_U(sub_control='cmd_vel').ravel().tolist()
             x_vels_itrs.append(x_vels_itr)
         x_vel_min = np.hstack(x_vels_itrs).min()
         x_vel_max = np.hstack(x_vels_itrs).max()
-        num_bins = 11
-        bins = np.linspace(x_vel_min, x_vel_max, num_bins)
+#        num_bins = len(params["planning"]["primitives"]["speeds"]) + 1
+#        bins = np.linspace(x_vel_min, x_vel_max, num_bins)
+        bins = np.array(params["planning"]["primitives"]["speeds"] + [np.inf])
         x_vels_hist_itrs = []
         for x_vels_itr in x_vels_itrs:
             x_vels_hist_itr, _ = np.histogram(x_vels_itr, bins, weights=(1./len(x_vels_itr))*np.ones(len(x_vels_itr)))
@@ -131,19 +150,47 @@ class AnalyzeRCcar(Analyze):
         pkl_dict['U'] = [[s.get_U() for s in samples_itr] for samples_itr in samples_itrs]
 
 
-        # TODO add sim specifics
-        if params["sim"]:
-            pass
-
         plt.show(block=False)
-        plt.pause(5.0)
+        plt.pause(0.1)
         if not os.path.exists(os.path.dirname(self._plot_stats_file)):
             os.makedirs(os.path.dirname(self._plot_stats_file))
         f.savefig(self._plot_stats_file)
 
+        # TODO add sim specifics
+        if params["sim"]:
+            positions_itrs = self._plot_position(samples_itrs)
+            pkl_dict['positions'] = positions_itrs
+
         with open(self._plot_stats_file_pkl, 'w') as f:
             pickle.dump(pkl_dict, f)
 
+    def _plot_position(self, samples_itrs):
+        positions_itrs = [] 
+        for itr, samples in enumerate(samples_itrs):
+            positions_x, positions_y, collision = [], [], []
+            plt.figure()
+            plt.title('Trajectories for itr {0}'.format(itr))
+            plt.xlabel('X position')
+            plt.ylabel('Y position')
+            # TODO not make this hard coded
+            plt.ylim([0, 60])
+            plt.xlim([-4.5, 4.5])
+            for s in samples:
+                pos = s.get_X(sub_state='position')
+                is_coll = s.get_O(t=-1, sub_obs='collision')
+                pos_x, pos_y = pos[:, 0], pos[:, 1]
+                if is_coll:
+                    plt.plot(pos_x, pos_y, color='r')
+                    plt.scatter(pos_x[-1], pos_y[-1], marker="x", color='r')
+                else:
+                    plt.plot(pos_x, pos_y, color='b')
+                positions_x.append(pos_x)
+                positions_y.append(pos_y)
+            positions_itrs.append([positions_x, positions_y, collision])
+            plt.savefig(self._plot_trajectories_file(itr)) 
+            plt.close()
+        return positions_itrs
+    
     ###########
     ### Run ###
     ###########

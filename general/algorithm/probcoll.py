@@ -15,7 +15,7 @@ class Probcoll:
         self._use_cp_cost = True
         self._planner_type = params['probcoll']['planner_type']
         self._read_only = read_only
-
+        self._use_dynamics = True
         self._setup()
 
         self._logger = get_logger(
@@ -191,7 +191,14 @@ class Probcoll:
                 sample_T.set_X(x0, t=0)
 
                 mpc_policy = self._create_mpc(itr, x0)
-                control_noise = self._create_control_noise() # create each time b/c may not be memoryless
+                
+                # For validation no noise
+                if (cond >= self._conditions.length * \
+                        params['model']['val_pct']) and \
+                        (params['probcoll']['validation_noise']): 
+                    control_noise = ZeroNoise()
+                else:    
+                    control_noise = self._create_control_noise() # create each time b/c may not be memoryless
 
                 start = time.time()
                 for t in xrange(T):
@@ -206,14 +213,18 @@ class Probcoll:
 
                     sample_T.set_U(u, t=t)
                     sample_T.set_O(o, t=t)
-
+                    
+                    if not self._use_dynamics:
+                        sample_T.set_X(rollout.get_X(t=0), t=t)
+                    
                     if self._world.is_collision(sample_T, t=t):
                         self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
                         break
 
-                    if t < T-1:
-                        x_tp1 = self._dynamics.evolve(x0, u)
-                        sample_T.set_X(x_tp1, t=t+1)
+                    if self._use_dynamics:
+                        if t < T-1:
+                            x_tp1 = self._dynamics.evolve(x0, u)
+                            sample_T.set_X(x_tp1, t=t+1)
 
                     if hasattr(mpc_policy, '_curr_traj'):
                         self._world.update_visualization(sample_T, mpc_policy._curr_traj, t)

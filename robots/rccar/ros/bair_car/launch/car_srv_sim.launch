@@ -1,21 +1,11 @@
 <?xml version="1.0" ?>
 <launch>
     <arg name="car_name" default="bair_car" />
-
+    <arg name="config" default="config/sim.yaml" />
+    <arg name="env" default="hallway" />
     <group ns="$(arg car_name)">
-        <node name="car_srv_node" pkg="bair_car" type="car_srv_node.py" output="screen">
-            <rosparam>
-                steeringClamp: 45.0
-            </rosparam>
-            <rosparam>
-                engineClamp: 1000.0
-            </rosparam>
-            <rosparam>
-                mass: 800.0
-            </rosparam>
-            <rosparam>
-                first_person: True
-            </rosparam>
+        <node name="$(arg env)_srv_node" pkg="bair_car" type="$(arg env)_srv_node.py" output="screen">
+            <rosparam file="$(arg config)" command="load" />
         </node>
     </group>
 

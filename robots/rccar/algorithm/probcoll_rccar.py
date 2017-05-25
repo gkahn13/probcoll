@@ -31,7 +31,7 @@ class ProbcollRCcar(Probcoll):
         self._jobs = []
         
         if params['rccar']['sim']:
-            p = multiprocessing.Process(target=ProbcollRCcar._run_simulation)
+            p = multiprocessing.Process(target=self._run_simulation)
             p.daemon = True
             self._jobs.append(p)
             p.start()
@@ -46,6 +46,7 @@ class ProbcollRCcar(Probcoll):
         self._agent = AgentRCcar(self._dynamics)
         self._world = WorldRCcar(self._agent, self._bag_file, wp=world_params)
         self._conditions = Conditions(cond_params=cond_params)
+        self._use_dynamics = False
 
         assert(self._world.randomize)
 
@@ -64,14 +65,21 @@ class ProbcollRCcar(Probcoll):
     ### Threaded Functions ###
     ##########################
 
-    @staticmethod
-    def _run_simulation():
-        FNULL = open(os.devnull, 'w') # to supress output
-        command = "roslaunch {0} car_name:={1} config:={2}".format(
-            params["rccar"]["launch_file"],
-            params["exp_name"],
-            params["rccar"]["config_file"])
-        subprocess.call(command, stdout=FNULL, shell=True)
+#    @staticmethod
+    def _run_simulation(self):
+        try:
+#            FNULL = open(os.devnull, 'w') # to supress output
+            command = [
+                    "roslaunch",
+                    params["rccar"]["launch_file"],
+                    "car_name:={0}".format(params["exp_name"]),
+                    "config:={0}".format(params["rccar"]["config_file"]),
+                    "env:={0}".format(params["rccar"]["sim_env"])
+                ]
+            subprocess.call(command)
+#            subprocess.call(command, stdout=FNULL)
+        finally:
+            self._logger.info("Ending Simulation!")
 
     def _close(self):
         for p in self._jobs:
@@ -107,12 +115,13 @@ class ProbcollRCcar(Probcoll):
     #####################
 
     def _reset_world(self, itr, cond, rep):
-        if not self._agent.sim:
+        if self._agent.sim:
+            back_up = params["rccar"]["backup"] 
+        else:
             if cond == 0 and rep == 0:
                 self._logger.info('Press A or B to start')
                 self._ros_is_good_rollout()
-        back_up = False
-            #back_up = self.coll_callback.get() is not None # only back up if experienced a crash
+            back_up = self.coll_callback.get() is not None # only back up if experienced a crash
         self._world.reset(back_up, itr=itr, cond=cond, rep=rep)
 
     def _update_world(self, sample, t):

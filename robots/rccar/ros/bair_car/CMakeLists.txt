@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   std_msgs
   sensor_msgs
+  geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -70,7 +71,8 @@ add_service_files(
    DEPENDENCIES
    sensor_msgs
    std_msgs
- )
+   geometry_msgs 
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##

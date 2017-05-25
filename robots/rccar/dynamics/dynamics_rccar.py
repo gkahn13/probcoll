@@ -1,24 +1,23 @@
 import numpy as np
 
 from general.dynamics.dynamics import Dynamics
+from config import params
 
 class DynamicsRCcar(Dynamics):
-
+    # TODO
     def __init__(self):
         Dynamics.__init__(self)
 
-        self.A = np.array([[0., 0.],
-                           [0., 0.]])
-
-        self.B = np.array([[1., 0.],
-                           [0., 1.]])
+        self.A = np.zeros((params['X']['dim'], params['X']['dim']))
+        self.B = np.eye(params['U']['dim']) 
 
     def evolve(self, x, u, fx=None, fu=None, f0=None):
         """
         Evolve the state x given control u, return x_next = x + dt * (dx/dt)
         """
-        x_tp1 = self.A.dot(x) + self.B.dot(u)
-        return x_tp1
+#        x_tp1 = self.A.dot(x) + self.B.dot(u)
+#        return x_tp1
+        return x
 
     def _derivative(self, x, u):
         """

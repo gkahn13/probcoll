@@ -41,34 +41,46 @@ class WorldRCcar(World):
                 ros_utils.Subscriber(topic, rostype, callback=self._bag_callback, callback_args=(topic,))
 
     def reset(self, back_up, itr=None, cond=None, rep=None, record=True):
-        self._agent.execute_control(None) # stop the car
+#        self._agent.execute_control(None) # stop the car
         assert(itr is not None and cond is not None and rep is not None)
 
         # TODO add sim backup
         ### back car up straight and slow
         if back_up:
-            self._logger.info('Backing the car up')
-
             sample = Sample(meta_data=params, T=2)
             sample.set_U([np.random.uniform(*self.wp['back_up']['cmd_steer'])], t=0, sub_control='cmd_steer')
             sample.set_U([self.wp['back_up']['cmd_vel']], t=0, sub_control='cmd_vel')
             u = sample.get_U(t=0)
+            if self._agent.sim:
+                if self._agent.sim_coll and self._agent.sim_last_coll:
+                    self._logger.info('Resetting the car')
+                    self._agent.execute_control(None, reset=True)
+                else:
+                    # TODO add backup logic for not sim
+                    self._logger.info('Backing the car up')
+                    for _ in xrange(int(self.wp['back_up']['duration'] / params['dt'])): 
+                        self._agent.execute_control(u)
+                        if self._agent.sim_coll:
+                            break
+                    for _ in xrange(int(1.0 / params['dt'])):
+                        self._agent.execute_control(None)
+            else:
+                self._logger.info('Backing the car up')
+                start = time.time()
+                while time.time() - start < self.wp['back_up']['duration']:
+                    self._agent.execute_control(u)
 
-            start = time.time()
-            while time.time() - start < self.wp['back_up']['duration']:
-                self._agent.execute_control(u)
-                time.sleep(0.1)
+                self._agent.execute_control(None)
 
-            self._agent.execute_control(None)
-
-            time.sleep(1.0)
+                time.sleep(1.0)
+        else:
+            self._agent.execute_control(None, reset=True)
+            ### TODO add a flag
+            self._ros_reset_pub.publish(std_msgs.msg.Empty())
 
         ### record
         if record:
             self._start_record_bag(itr, cond, rep)
-        
-        ### TODO add a flag
-        self._ros_reset_pub.publish(std_msgs.msg.Empty())
         
         if not self._agent.sim:
             ### reset indicators

@@ -1,6 +1,7 @@
+from general.tf import tf_utils
 import tensorflow as tf
 
-def convnn(inputs, params, scope="convnn", reuse=False):
+def convnn(inputs, params, scope="convnn", dtype=tf.float32, reuse=False):
 
     if params["conv_activation"] == "relu":
         conv_activation = tf.nn.relu
@@ -9,12 +10,12 @@ def convnn(inputs, params, scope="convnn", reuse=False):
             "Conv activation {0} is not valid".format(
                 params["conv_activation"]))
 
-    if params["output_activation"] == "sigmoid":
+    if "output_activation" not in params:
+        output_activation = None
+    elif params["output_activation"] == "sigmoid":
         output_activation = tf.nn.sigmoid
     elif params["output_activation"] == "softmax":
         output_activation = tf.nn.softmax
-    elif params["output_activation"] == "None":
-        output_activation = None
     else:
         raise NotImplementedError(
             "Output activation {0} is not valid".format(
@@ -25,8 +26,6 @@ def convnn(inputs, params, scope="convnn", reuse=False):
     strides = params["strides"]
     # Assuming all paddings will be the same type
     padding = params["padding"]
-    # TODO
-    dtype = tf.float32
     next_layer_input = inputs
     with tf.variable_scope(scope, reuse=reuse):
         for i in xrange(len(kernels)):

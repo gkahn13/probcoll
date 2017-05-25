@@ -1,14 +1,13 @@
 import tensorflow as tf
 
 # TODO just summing might be better
-def cumulative_increasing_sum(x):
+def cumulative_increasing_sum(x, dtype=tf.float32):
     """
     x is tensor of shape (batch_size x T).
     output[i] = sum(x[:i+1])
     return output
     """
     # TODO 
-    dtype = tf.float32
     T = tf.shape(x)[1]
     mask1 = tf.concat(0, [
             tf.ones((1,), dtype=dtype), tf.zeros((T - 1,), dtype=dtype)
@@ -24,12 +23,39 @@ def cumulative_increasing_sum(x):
     output = tf.matmul(masked, upper_triangle)
     return output
 
+def linear(args, output_size, dtype=tf.float32, scope=None):
+    with tf.variable_scope(scope or "linear"):
+        if isinstance(args, list) or isinstance(args, tuple):
+            if len(args) != 1:
+                inputs = tf.concat(1, args)
+            else:
+                inputs = args[0]
+        else:
+            inputs = args
+            args = [args]
+        total_arg_size = 0
+        shapes = [a.get_shape() for a in args]
+        for shape in shapes:
+            if shape.ndims != 2:
+                raise ValueError("linear is expecting 2D arguments: %s" % shapes)
+            else:
+                total_arg_size += shape[1].value
+        dtype = args[0].dtype
+        weights = tf.get_variable(
+            "weights",
+            [total_arg_size, output_size],
+            dtype=dtype,
+            initializer=tf.contrib.layers.xavier_initializer(dtype=dtype))
+        output = tf.matmul(inputs, weights)
+    return output
+
 def multiplicative_integration(
             list_of_inputs,
             output_size,
             initial_bias_value=0.0,
             weights_already_calculated=False,
-            use_l2_loss=False,
+            reg_collection=None,
+            dtype=tf.float32,
             scope=None):
     '''
     expects len(2) for list of inputs and will perform integrative multiplication
@@ -44,45 +70,63 @@ def multiplicative_integration(
             Uz = list_of_inputs[1]
 
         else:
-            # TODO get regularizer to work
-            if use_l2_loss:
-                regularizer = None
-            else:
-                regularizer = tf.contrib.layers.l2_regularizer(0.5)
-            Wx = tf.contrib.layers.fully_connected(
-                inputs=list_of_inputs[0],
-                num_outputs=output_size,
-                weights_initializer=tf.contrib.layers.xavier_initializer(),
-#                    weights_regularizer=regularizer,
-                scope="Calculate_Wx_mulint",
-                trainable=True)
+            Wx = linear(
+                list_of_inputs[0],
+                output_size,
+                dtype=dtype,
+                reg_collection=reg_collection,
+                scope="Calculate_Wx_mulint")
 
-            Uz = tf.contrib.layers.fully_connected(
-                inputs=list_of_inputs[1],
-                num_outputs=output_size,
-                weights_initializer=tf.contrib.layers.xavier_initializer(),
-#                    weights_regularizer=regularizer,
-                scope="Calculate_Uz_mulint",
-                trainable=True)
+            Uz = linear(
+                list_of_inputs[1],
+                output_size,
+                dtype=dtype,
+                reg_collection=reg_collection,
+                scope="Calculate_Uz_mulint")
 
         with tf.variable_scope("multiplicative_integration"):
             alpha = tf.get_variable(
                 'mulint_alpha',
                 [output_size],
-                initializer=tf.truncated_normal_initializer(mean=1.0, stddev=0.1))
+                dtype=dtype,
+                initializer=tf.truncated_normal_initializer(
+                    mean=1.0,
+                    stddev=0.1,
+                    dtype=dtype))
 
             beta1, beta2 = tf.split(0, 2, tf.get_variable(
                 'mulint_params_betas',
                 [output_size * 2],
-                initializer=tf.truncated_normal_initializer(mean=0.5, stddev=0.1)))
+                dtype=dtype,
+                initializer=tf.truncated_normal_initializer(
+                    mean=0.5,
+                    stddev=0.1,
+                    dtype=dtype)))
 
             original_bias = tf.get_variable(
                 'mulint_original_bias',
                 [output_size],
+                dtype=dtype,
                 initializer=tf.truncated_normal_initializer(
                     mean=initial_bias_value,
-                    stddev=0.1))
+                    stddev=0.1,
+                    dtype=dtype))
 
         final_output = alpha * Wx * Uz + beta1 * Uz + beta2 * Wx + original_bias
 
     return final_output
+
+def str_to_dtype(dtype):
+    if dtype == "float32":
+        return tf.float32
+    elif dtype == "float16":
+        return tf.float16
+    elif dtype == "float64":
+        return tf.float64
+    elif dtype == "int32":
+        return tf.int32
+    elif dtype == "uint8":
+        return tf.uint8
+    else:
+        raise NotImplementedError(
+            "dtype {0} is not valid".format(dtype))

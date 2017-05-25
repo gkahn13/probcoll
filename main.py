@@ -19,11 +19,11 @@ try:
 except:
     print('main.py: not importing Bebop2d')
 
-try:
-    from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-    from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
-except:
-    print('main.py: not importing RC car')
+#try:
+from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
+from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
+#except:
+#    print('main.py: not importing RC car')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -60,13 +60,17 @@ if __name__ == '__main__':
     run = args.run
     robot = args.robot
     exp_name = args.exp_name
-    yaml = args.yaml
+    yaml_name = args.yaml
 
+    print(yaml_name)
     # load yaml so all files can access
-    if yaml is None:
+    if yaml_name is None:
         yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}/params_{0}.yaml'.format(robot))
     else:
-        yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}'.format(robot), yaml)
+        if yaml_name[0] == "/":
+            yaml_path = yaml_name
+        else:
+            yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}'.format(robot), yaml_name)
     load_params(yaml_path)
     params['yaml_path'] = yaml_path
 

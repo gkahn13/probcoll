@@ -44,6 +44,7 @@ class ProbcollModelRCcar(ProbcollModel):
             args=(self,))
         t.daemon = True
         self.threads.append(t)
+        self.coord.register_thread(t)
         t.start()
 
     def async_train_func(self):

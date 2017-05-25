@@ -13,7 +13,7 @@ class Analyze:
         self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
 
         yamls = [fname for fname in os.listdir(self._save_dir) if '.yaml' in fname and '~' not in fname]
-        assert(len(yamls) == 1)
+#        assert(len(yamls) == 1)
         yaml_path = os.path.join(self._save_dir, yamls[0])
         load_params(yaml_path)
         params['yaml_path'] = yaml_path

@@ -1,10 +1,10 @@
 # contains all needed parameters for all files
 
-dt: 0.25
-random_seed: 2
+dt: 'sweep'
+random_seed: 'sweep'
 
-exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'bair_car_cory2'
+exp_dir: '/home/adam/probcoll/experiments/rccar/sweep'
+exp_name: 'bair_car'
 
 ##########################
 ### Probcoll algorithm ###
@@ -12,11 +12,11 @@ exp_name: 'bair_car_cory2'
 
 probcoll:
   T: 28 # timesteps per trajectory
-  max_iter: 300
-  planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
+  max_iter: 10
+  planner_type: 'sweep' # primitives / cem / teleop / straight / lattice
   asynchronous_training: True
   control_noise:
-    type: 'uniform' # zero / gaussian / uniform
+    type: 'sweep' # zero / gaussian / uniform
 
     zero: {}
     gaussian:
@@ -31,9 +31,8 @@ probcoll:
 #  init_epochs: 100
 
   cost:
-    weight: 1e3 # TODO
-    eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
-#    eval_cost: 'speed * sigmoid(probs_mean + 1.0 * probs_std)'
+    weight: 'sweep' # TODO
+    eval_cost: 'sweep'
     pre_activation: True
 
   conditions:
@@ -60,7 +59,7 @@ probcoll:
 ######################
     
 model:
-  T: 6 # how many timesteps to predict
+  T: 'sweep' # how many timesteps to predict
 
   control_range:
     lower: [0., 0.]
@@ -74,13 +73,13 @@ model:
 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.6 #TODO
+  gpu_fraction: 0.8 #TODO
   reset_every_train: False # every time train is called, reinitialize weights?
-  learning_rate: 0.001
-  beta1: 0.9 # For Adam
-  beta2: 0.999 # For Adam
+  learning_rate: 'sweep'
+  beta1: 'sweep' # For Adam
+  beta2: 'sweep' # For Adam
   batch_size: 16
-  display_batch: 100 
+  display_batch: 100
   val_freq: 90 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
   steps: 1000
@@ -90,12 +89,12 @@ model:
   save_type: 'fixedlen' # fixedlen
   
   dtype: 'float32'
-  reg: 0.0
-  num_bootstrap: 1
-  num_dropout_passes: 10
+  reg: 'sweep'
+  num_bootstrap: 'sweep'
+  num_dropout_passes: 'sweep'
   prob_coll_strictly_increasing: True 
   recurrent: True
-  mask: "all" # all / last
+  mask: 'sweep' # all / last
 
   observation_graph:
     graph_type: "cnn"
@@ -115,7 +114,7 @@ model:
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
-    num_units: 32 # state_size
+    num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
     dropout: 0.9 # pct keep
 #    cell_args: # If you need to pass variables to cells 
@@ -130,13 +129,12 @@ model:
 planning:
   cost_velocity:
     u_des: [49.5, 16.] # TODO: hard-coded order: steering then speed
-    u_weights: [1., 1.] # [0.0001, 0.2]
+    u_weights: 'sweep' # [0.0001, 0.2]
 
   primitives:
-#    steers : [30., 40., 45., 50., 55., 60., 70.]
-    steers : [20., 30., 40., 45., 50., 55., 60., 70., 80.]
-    speeds : [16.]
-    num_steers : 2
+    steers : 'sweep'
+    speeds : 'sweep'
+    num_steers : 'sweep'
   # TODO: other planning methods here
 
 #############
@@ -148,9 +146,9 @@ world:
   randomize: True
 
   back_up:
-    cmd_steer: [40., 60.]
+    cmd_steer: [40, 60]
     cmd_vel: -12
-    duration: 3.
+    duration: 4.
 
 sim:
   dt: 0.25
@@ -180,7 +178,7 @@ U:
   cmd_vel: {idx: 1, dim: 1, min: 6}
 
 O:
-  use_depth: True
+  use_depth: 'sweep'
   
   dim: 577
   order: ['camera', 'collision']
@@ -203,8 +201,6 @@ rccar:
   launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   sim: True 
   srv: 'sim_env'
-  sim_env: 'cory2'
-  backup: True
 
   topics:
     camera: 'image' # sensor_msgs/Image

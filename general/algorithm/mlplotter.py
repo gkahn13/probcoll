@@ -1,7 +1,8 @@
 import os, pickle
 import numpy as np
 import matplotlib.pyplot as plt
-
+import matplotlib
+#matplotlib.use('Agg')
 class MLPlotter:
     """
     Plot/save machine learning data

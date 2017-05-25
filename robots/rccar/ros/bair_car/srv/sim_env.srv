@@ -8,3 +8,4 @@ bool reset
 bool coll
 sensor_msgs/Image image
 sensor_msgs/Image depth
+geometry_msgs/Pose pose
