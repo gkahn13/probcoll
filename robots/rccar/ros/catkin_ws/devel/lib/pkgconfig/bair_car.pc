@@ -1,0 +1,8 @@
+prefix=/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/devel
+
+Name: bair_car
+Description: Description of bair_car
+Version: 0.0.0
+Cflags: -I/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/devel/include -I/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/include
+Libs: -L/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/devel/lib -lbair_car
+Requires: roscpp rospy std_msgs message_runtime
