@@ -520,9 +520,9 @@ class ProbcollModel:
             bootstrap_X_inputs = [tf.placeholder(self.dtype, [None, self.T, self.dX]) for _ in xrange(self.num_bootstrap)]
             bootstrap_U_inputs = [tf.placeholder(self.dtype, [None, self.T, self.dU]) for _ in xrange(self.num_bootstrap)]
             bootstrap_O_inputs = [tf.placeholder(self.dtype, [None, self.dO]) for _ in xrange(self.num_bootstrap)]
+            bootstrap_outputs = [tf.placeholder(tf.uint8, [None, self.T, self.doutput]) for _ in xrange(self.num_bootstrap)]
             O_single_input = tf.placeholder(self.dtype, [self.dO])
-            bootstrap_outputs = [tf.placeholder('uint8', [None, self.T, self.doutput]) for _ in xrange(self.num_bootstrap)]
-        return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, O_single_input, bootstrap_outputs
+        return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs, O_single_input
 
     def _graph_cost(self, name, bootstrap_output_mats, bootstrap_outputs, bootstrap_lengths, reg=0.):
         with tf.name_scope(name + '_cost_and_err'):
@@ -644,11 +644,18 @@ class ProbcollModel:
             d['no_coll_queue'], d['coll_queue'] = queues
             d['no_coll_queue_placeholder'], d['coll_queue_placeholder']  = queue_places
             d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
-            _, _, _, _, d['output_mats'], _ = self._graph_inference(name, self.T,
-                                                                    d['X_inputs'], d['U_inputs'], d['O_inputs'],
-                                                                    self.dropout, params, dtype=self.dtype,
-                                                                    reuse=i>0, random_seed=self.random_seed,
-                                                                    tf_debug=self.tf_debug)
+            _, _, _, _, d['output_mats'], _ = self._graph_inference(
+                name,
+                self.T,
+                d['X_inputs'],
+                d['U_inputs'],
+                d['O_inputs'],
+                self.dropout, 
+                params,
+                dtype=self.dtype,
+                reuse=i>0,
+                random_seed=self.random_seed,
+                tf_debug=self.tf_debug)
             d['bootstraps_cost'], d['reg_cost'], d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'], d['num_coll'], d['num_nocoll'] = \
                 self._graph_cost(name, d['output_mats'], d['outputs'], d['len'], reg=self.reg)
         ### optimizer
@@ -656,7 +663,7 @@ class ProbcollModel:
             self._graph_optimize(self.d_train['bootstraps_cost'], self.d_train['reg_cost'])
 
         ### prepare for eval
-        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'], self.d_eval['O_single_input'], self.d_eval['outputs'] = \
+        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'], self.d_eval['outputs'], self.d_eval['O_single_input'] = \
             self._graph_inputs_outputs_from_placeholders()
         self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
         self.d_eval['output_mat_std'], _, self.d_eval['dropout_placeholders'] = \
@@ -693,6 +700,42 @@ class ProbcollModel:
         return OldProbcollModel._graph_inference
 
     @staticmethod
+    def _get_embedding(observation, batch_size=1, T=None, dtype=tf.float32, reuse=False, scope=None):
+        
+        obg_type = params["model"]["observation_graph"]["graph_type"]
+        if obg_type == "fc":
+            observation_graph = fcnn
+        elif obg_type == "cnn":
+            observation_graph = convnn
+        else:
+            raise NotImplementedError(
+                "Observation graph {0} is not valid".format(obg_type))
+
+        obs_batch = observation.get_shape()[0].value
+        obs_float = tf.cast(observation, dtype) / 255.
+        obs_norm = obs_float - tf.reduce_mean(obs_float, axis=0)
+        obs_shaped = tf.reshape(
+            obs_norm,
+            [
+                obs_batch,
+                params["O"]["camera"]["height"],
+                params["O"]["camera"]["width"],
+                params["O"]["camera"]["num_channels"]
+            ])
+        conv_output = observation_graph(
+            obs_shaped,
+            params["model"]["observation_graph"],
+            dtype=dtype,
+            scope=scope,
+            reuse=reuse)
+        output = tf.contrib.layers.flatten(conv_output)
+        if obs_batch == 1:
+            output = tf.tile(output, [batch_size, 1])
+        if T is not None:
+            output = tf.stack([output]*T, axis=1)
+        return output
+    
+    @staticmethod
     def _graph_inference(
             name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
             dropout, meta_data, dtype=tf.float32, O_single_input=None, reuse=False,
@@ -716,15 +759,6 @@ class ProbcollModel:
             raise NotImplementedError(
                 "Action graph {0} is not valid".format(ag_type))
 
-        obg_type = params["model"]["observation_graph"]["graph_type"]
-        if obg_type == "fc":
-            observation_graph = fcnn
-        elif obg_type == "cnn":
-            observation_graph = convnn
-        else:
-            raise NotImplementedError(
-                "Observation graph {0} is not valid".format(obg_type))
-
         with tf.name_scope(name + '_inference'):
             tf.set_random_seed(random_seed)
 
@@ -746,51 +780,67 @@ class ProbcollModel:
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
                     if dO > 0:
-                        if one_obs:
-                            o_input_b = tf.cast(O_single_input, dtype) / 255.
-                            o_input_b = o_input_b - tf.reduce_mean(o_input_b)
-                            o_input_b = tf.reshape(
-                                o_input_b,
-                                [
-                                    1,
-                                    params["O"]["camera"]["height"],
-                                    params["O"]["camera"]["width"],
-                                    params["O"]["camera"]["num_channels"]
-                                ])
-                            conv_output = observation_graph(
-                                o_input_b,
-                                params["model"]["observation_graph"],
-                                dtype=dtype,
-                                scope="observation_graph_b{0}".format(b),
-                                reuse=reuse)
-                            conv_output_flat = tf.contrib.layers.flatten(conv_output)
-                            o_input_b = tf.reshape(conv_output, [-1,])
-                            if recurrent:
-                                o_input_b = tf.tile(o_input_b, [batch_size * T])
-                                o_input_b = tf.reshape(o_input_b, [batch_size, T, int(conv_output_flat.get_shape()[1])])
-                            else:
-                                o_input_b = tf.tile(o_input_b, [batch_size])
-                                o_input_b = tf.reshape(o_input_b, [batch_size, int(conv_output_flat.get_shape()[1])])
+#                        if one_obs:
+#                            o_input_b = tf.cast(O_single_input, dtype) / 255.
+#                            o_input_b = o_input_b - tf.reduce_mean(o_input_b)
+#                            o_input_b = tf.reshape(
+#                                o_input_b,
+#                                [
+#                                    1,
+#                                    params["O"]["camera"]["height"],
+#                                    params["O"]["camera"]["width"],
+#                                    params["O"]["camera"]["num_channels"]
+#                                ])
+#                            conv_output = observation_graph(
+#                                o_input_b,
+#                                params["model"]["observation_graph"],
+#                                dtype=dtype,
+#                                scope="observation_graph_b{0}".format(b),
+#                                reuse=reuse)
+#                            conv_output_flat = tf.contrib.layers.flatten(conv_output)
+#                            o_input_b = tf.reshape(conv_output, [-1,])
+#                            if recurrent:
+#                                o_input_b = tf.tile(o_input_b, [batch_size * T])
+#                                o_input_b = tf.reshape(o_input_b, [batch_size, T, int(conv_output_flat.get_shape()[1])])
+#                            else:
+#                                o_input_b = tf.tile(o_input_b, [batch_size])
+#                                o_input_b = tf.reshape(o_input_b, [batch_size, int(conv_output_flat.get_shape()[1])])
+#                        else:
+#                            o_input_b = tf.cast(o_input_b, dtype) / 255.
+#                            o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis=0)
+#                            o_input_b = tf.reshape(
+#                                o_input_b,
+#                                [
+#                                    batch_size,
+#                                    params["O"]["camera"]["height"],
+#                                    params["O"]["camera"]["width"],
+#                                    params["O"]["camera"]["num_channels"]
+#                                ])
+#                            conv_output = observation_graph(
+#                                o_input_b,
+#                                params["model"]["observation_graph"],
+#                                dtype=dtype,
+#                                scope="observation_graph_b{0}".format(b),
+#                                reuse=reuse)
+#                            o_input_b = tf.contrib.layers.flatten(conv_output)
+#                            if recurrent:
+#                                o_input_b = tf.stack([o_input_b]*T, axis=1)
+                        if recurrent:
+                            recurrent_T = T
                         else:
-                            o_input_b = tf.cast(o_input_b, dtype) / 255.
-                            o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis=0)
-                            o_input_b = tf.reshape(
-                                o_input_b,
-                                [
-                                    batch_size,
-                                    params["O"]["camera"]["height"],
-                                    params["O"]["camera"]["width"],
-                                    params["O"]["camera"]["num_channels"]
-                                ])
-                            conv_output = observation_graph(
-                                o_input_b,
-                                params["model"]["observation_graph"],
-                                dtype=dtype,
-                                scope="observation_graph_b{0}".format(b),
-                                reuse=reuse)
-                            o_input_b = tf.contrib.layers.flatten(conv_output)
-                            if recurrent:
-                                o_input_b = tf.stack([o_input_b]*T, axis=1)
+                            recurrent_T = None
+                        if one_obs:
+                            observation = tf.expand_dims(O_single_input, axis=0)
+                        else:
+                            observation = o_input_b
+                            
+                        o_input_b = ProbcollModel._get_embedding(
+                            observation,
+                            batch_size=batch_size,
+                            T=recurrent_T,
+                            dtype=dtype,
+                            reuse=reuse,
+                            scope="observation_graph_b{0}".format(b))
 
                         concat_list.append(o_input_b)
                     if dX > 0:
@@ -1211,8 +1261,7 @@ class ProbcollModel:
             assert(len(U) == self.T)
 
             # TODO remove create_input
-#            X_input, U_input, O_input = self._create_input(X, U, O)
-            X_input, U_input = X, U
+            X_input, U_input, _ = self._create_input(X, U, None)
             assert(not np.isnan(X_input).any())
             assert(not np.isnan(U_input).any())
             for _ in xrange(num_avg):

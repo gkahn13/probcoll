@@ -56,23 +56,14 @@ class Cory2SrvNode(CarSrv):
         # Plane
         shape = BulletPlaneShape(Vec3(0, 0, 1), 0)
 
-#        np = self.ground = self.worldNP.attachNewNode(BulletRigidBodyNode('Ground'))
-#        np.node().addShape(shape)
-#        np.setPos(0, 0, -1)
-#        np.setCollideMask(BitMask32.allOn())
-#
-#        self.world.attachRigidBody(np.node())
-
         # collision
         visNP = loader.loadModel('../models/coryf2.egg')
         visNP.clearModelNodes()
         visNP.reparentTo(render)
-#        visNP.reparentTo(self.ground)
-        pos = (10., 80.0, 3.8)
+        pos = (7., 60.0, 3.8)
         visNP.setPos(pos[0], pos[1], pos[2])
 
         bodyNPs = BulletHelper.fromCollisionSolids(visNP, True);
-#        import ipdb; ipdb.set_trace()
         for bodyNP in bodyNPs:
             bodyNP.reparentTo(render)
             bodyNP.setPos(pos[0], pos[1], pos[2])

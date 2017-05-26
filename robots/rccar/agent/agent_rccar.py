@@ -31,10 +31,10 @@ class AgentRCcar(Agent):
                 os.path.join(params['exp_dir'], params['exp_name']),
                 'debug.txt'))
         
-        self.sim = params['rccar']['sim']
+        self.sim = params['world']['sim']
 
         if self.sim:
-            service = params['rccar']['srv']
+            service = params['sim']['srv']
             self._logger.info("Waiting for service")
             ros_utils.wait_for_service(service)
             self._logger.info("Connected to service")

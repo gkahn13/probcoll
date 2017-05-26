@@ -9,7 +9,7 @@ class CostProbcoll(Cost):
     def __init__(self, probcoll_model):
         self._probcoll_model = probcoll_model
 
-        cost_probcoll_params = params['probcoll']['cost']
+        cost_probcoll_params = params['planning']['cost']
         self.weight = cost_probcoll_params['weight']
         self.eval_cost = cost_probcoll_params['eval_cost']
         self.pre_activation = cost_probcoll_params['pre_activation']

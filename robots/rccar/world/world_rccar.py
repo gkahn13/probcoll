@@ -55,7 +55,7 @@ class WorldRCcar(World):
                 if self._agent.sim_coll and self._agent.sim_last_coll:
                     self._logger.info('Resetting the car')
                     self._agent.execute_control(None, reset=True)
-                else:
+                elif self._agent.sim_coll:
                     # TODO add backup logic for not sim
                     self._logger.info('Backing the car up')
                     for _ in xrange(int(self.wp['back_up']['duration'] / params['dt'])): 

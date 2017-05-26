@@ -30,7 +30,7 @@ class ProbcollRCcar(Probcoll):
 
         self._jobs = []
         
-        if params['rccar']['sim']:
+        if params['world']['sim']:
             p = multiprocessing.Process(target=self._run_simulation)
             p.daemon = True
             self._jobs.append(p)
@@ -39,7 +39,8 @@ class ProbcollRCcar(Probcoll):
         probcoll_params = params['probcoll']
         world_params = params['world']
         cond_params = probcoll_params['conditions']
-        cp_params = probcoll_params['cost']
+#        cp_params = probcoll_params['cost']
+        cp_params = params['planning']['cost']
         self._asynchronous = probcoll_params['asynchronous_training']
         self._max_iter = probcoll_params['max_iter']
         self._dynamics = DynamicsRCcar() # Try to remove dynamics
@@ -65,19 +66,18 @@ class ProbcollRCcar(Probcoll):
     ### Threaded Functions ###
     ##########################
 
-#    @staticmethod
     def _run_simulation(self):
         try:
-#            FNULL = open(os.devnull, 'w') # to supress output
             command = [
                     "roslaunch",
-                    params["rccar"]["launch_file"],
+                    params["sim"]["launch_file"],
                     "car_name:={0}".format(params["exp_name"]),
-                    "config:={0}".format(params["rccar"]["config_file"]),
-                    "env:={0}".format(params["rccar"]["sim_env"])
+                    "config:={0}".format(params["config_file"]),
+                    "env:={0}".format(params["sim"]["sim_env"])
                 ]
             subprocess.call(command)
-#            subprocess.call(command, stdout=FNULL)
+        except Exception as e:
+            print(e)
         finally:
             self._logger.info("Ending Simulation!")
 
@@ -116,7 +116,7 @@ class ProbcollRCcar(Probcoll):
 
     def _reset_world(self, itr, cond, rep):
         if self._agent.sim:
-            back_up = params["rccar"]["backup"] 
+            back_up = params["world"]["do_back_up"] 
         else:
             if cond == 0 and rep == 0:
                 self._logger.info('Press A or B to start')
@@ -160,8 +160,8 @@ class ProbcollRCcar(Probcoll):
         self._logger.debug('\t\t\tCreating MPC')
         cost_velocity = cost_velocity_rccar(
             self._probcoll_model.T,
-            params['planning']['cost_velocity']['u_des'],
-            params['planning']['cost_velocity']['u_weights'])
+            params['planning']['cost']['u_des'],
+            params['planning']['cost']['u_weights'])
         if self._planner_type == 'primitives':
             planner = PrimitivesRCcar(
                 self._probcoll_model.T,
