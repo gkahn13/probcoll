@@ -150,8 +150,8 @@ class AnalyzeRCcar(Analyze):
         pkl_dict['U'] = [[s.get_U() for s in samples_itr] for samples_itr in samples_itrs]
 
 
-        plt.show(block=False)
-        plt.pause(0.1)
+#        plt.show(block=False)
+#        plt.pause(0.1)
         if not os.path.exists(os.path.dirname(self._plot_stats_file)):
             os.makedirs(os.path.dirname(self._plot_stats_file))
         f.savefig(self._plot_stats_file)

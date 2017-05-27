@@ -69,8 +69,6 @@ class ProbcollModel:
         else:
             self._logger.info('Creating NEW graph')
             shutil.copyfile(self._this_file, self._code_file)
-        self._graph_inference = self._get_old_graph_inference()
-
         self.tf_debug = {}
         self._graph_setup()
 
@@ -524,6 +522,192 @@ class ProbcollModel:
             O_single_input = tf.placeholder(self.dtype, [self.dO])
         return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs, O_single_input
 
+    def _get_embedding(self, observation, batch_size=1, T=None, reuse=False, scope=None):
+        
+        obg_type = params["model"]["observation_graph"]["graph_type"]
+        if obg_type == "fc":
+            observation_graph = fcnn
+        elif obg_type == "cnn":
+            observation_graph = convnn
+        else:
+            raise NotImplementedError(
+                "Observation graph {0} is not valid".format(obg_type))
+
+        obs_batch = observation.get_shape()[0].value
+        obs_float = tf.cast(observation, self.dtype) / 255.
+        if not params['O']['use_depth']:
+            obs_float = obs_float - tf.reduce_mean(obs_float, axis=0)
+        obs_shaped = tf.reshape(
+            obs_float,
+            [
+                obs_batch,
+                params["O"]["camera"]["height"],
+                params["O"]["camera"]["width"],
+                params["O"]["camera"]["num_channels"]
+            ])
+        conv_output = observation_graph(
+            obs_shaped,
+            params["model"]["observation_graph"],
+            dtype=self.dtype,
+            scope=scope,
+            reuse=reuse)
+        output = tf.contrib.layers.flatten(conv_output)
+        if obs_batch == 1:
+            output = tf.tile(output, [batch_size, 1])
+        if T is not None:
+            output = tf.stack([output]*T, axis=1)
+        return output
+    
+    def _graph_inference(
+            self, name, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
+            O_single_input=None, reuse=False,
+            finalize=True, tf_debug={}):
+        assert(name == 'train' or name == 'val' or name == 'eval')
+        one_obs = not O_single_input is None
+        num_bootstrap = len(bootstrap_X_inputs)
+
+        bootstrap_output_mats = []
+        bootstrap_output_preds = []
+        dropout_placeholders = []
+
+        ag_type = params["model"]["action_graph"]["graph_type"]
+        
+        if ag_type == "fc":
+            action_graph = fcnn
+            recurrent = False
+        elif ag_type == "rnn":
+            action_graph = rnn
+            recurrent = True
+        else:
+            raise NotImplementedError(
+                "Action graph {0} is not valid".format(ag_type))
+
+        with tf.name_scope(name + '_inference'):
+            tf.set_random_seed(self.random_seed)
+
+            for b in xrange(num_bootstrap):
+                ### inputs
+                x_input_b = bootstrap_X_inputs[b]
+                u_input_b = bootstrap_U_inputs[b]
+                o_input_b = bootstrap_O_inputs[b]
+                batch_size = tf.shape(x_input_b)[0]
+
+                ### concatenate inputs
+                with tf.name_scope('inputs_b{0}'.format(b)):
+                    concat_list = []
+                    if self.dO > 0:
+                        if recurrent:
+                            recurrent_T = self.T
+                        else:
+                            recurrent_T = None
+                        if one_obs:
+                            observation = tf.expand_dims(O_single_input, axis=0)
+                        else:
+                            observation = o_input_b
+                            
+                        o_input_b = self._get_embedding(
+                            observation,
+                            batch_size=batch_size,
+                            T=recurrent_T,
+                            reuse=reuse,
+                            scope="observation_graph_b{0}".format(b))
+
+                        concat_list.append(o_input_b)
+                    if self.dX > 0:
+                        
+                        if recurrent:
+                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T, self.dX])
+                        else:
+                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T * self.dX])
+                        
+                        concat_list.append(x_input_flat_b)
+                    
+                    if self.dU > 0:
+                        control_mean = (np.array(params['model']['control_range']['lower']) + \
+                            np.array(params['model']['control_range']['upper']))/2.
+                        control_width = (np.array(params['model']['control_range']['upper']) - \
+                            control_mean)
+                        u_input_b = tf.cast((u_input_b - control_mean) / control_width, self.dtype) 
+                        
+                        if recurrent:
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T, self.dU])
+                        else:
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T * self.dU])
+                        
+                        concat_list.append(u_input_flat_b)
+                    
+                    if recurrent:
+                        input_layer = tf.concat(2, concat_list)
+                    else:
+                        input_layer = tf.concat(1, concat_list)
+
+                    use_dp_placeholders = name == 'eval'
+                    
+                    ag_output, action_dp_placeholders  = action_graph(
+                        input_layer,
+                        params["model"]["action_graph"],
+                        use_dp_placeholders=use_dp_placeholders,
+                        dtype=self.dtype,
+                        scope="action_graph_b{0}".format(b),
+                        reuse=reuse)
+                   
+                    dropout_placeholders += action_dp_placeholders
+
+                    if recurrent:
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * self.T, int(ag_output.get_shape()[-1]))) 
+                    else:
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * self.T, int(ag_output.get_shape()[-1])/self.T)) 
+
+                    params["model"]["output_graph"]["output_dim"] = self.doutput
+                    params["model"]["output_graph"]["dropout"] = None
+                    # TODO dropout acts only on output of layers
+                    # Therefore, dropout should never be put on outputgraph
+                    output_mat_b, _  = fcnn(
+                        ag_output,
+                        params["model"]["output_graph"],
+                        dtype=self.dtype,
+                        scope="output_graph_b{0}".format(b),
+                        reuse=reuse)
+
+                    output_mat_b = tf.reshape(output_mat_b, [batch_size, self.T, self.doutput])
+                    # TODO not general because it assumes doutput = 1
+                    if params["model"]["prob_coll_strictly_increasing"]:
+                        output_mat_b = tf.reshape(output_mat_b, (batch_size, self.T))
+                        output_mat_b = tf_utils.cumulative_increasing_sum(
+                            output_mat_b,
+                            self.dtype)
+                        output_mat_b = tf.reshape(output_mat_b, (batch_size, self.T, self.doutput))
+
+                    if name == 'eval':
+                        # Only care about final probability of collision
+                        mask = tf.concat(0, [
+                                tf.zeros((self.T - 1, self.doutput), dtype=self.dtype),
+                                tf.ones((1, self.doutput), dtype=self.dtype),
+                            ])
+                        output_mat_b = tf.reduce_sum(mask * output_mat_b, axis=1) 
+                    
+                    output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
+
+                bootstrap_output_mats.append(output_mat_b)
+                bootstrap_output_preds.append(output_pred_b)
+
+            ### combination of all the bootstraps
+            with tf.name_scope('combine_bootstraps'):
+                output_pred_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_preds, name='output_pred_mean')
+                std_normalize = (1. / (num_bootstrap - 1)) if num_bootstrap > 1 else 1
+                output_pred_std = tf.sqrt(std_normalize * tf.add_n(
+                    [tf.square(tf.sub(output_pred_b, output_pred_mean)) for output_pred_b in bootstrap_output_preds]))
+
+                output_mat_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
+                output_mat_std = tf.sqrt(std_normalize * tf.add_n(
+                    [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
+
+        return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std, bootstrap_output_mats, dropout_placeholders
+
     def _graph_cost(self, name, bootstrap_output_mats, bootstrap_outputs, bootstrap_lengths, reg=0.):
         with tf.name_scope(name + '_cost_and_err'):
             costs = []
@@ -646,15 +830,10 @@ class ProbcollModel:
             d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
             _, _, _, _, d['output_mats'], _ = self._graph_inference(
                 name,
-                self.T,
                 d['X_inputs'],
                 d['U_inputs'],
                 d['O_inputs'],
-                self.dropout, 
-                params,
-                dtype=self.dtype,
                 reuse=i>0,
-                random_seed=self.random_seed,
                 tf_debug=self.tf_debug)
             d['bootstraps_cost'], d['reg_cost'], d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'], d['num_coll'], d['num_nocoll'] = \
                 self._graph_cost(name, d['output_mats'], d['outputs'], d['len'], reg=self.reg)
@@ -667,10 +846,13 @@ class ProbcollModel:
             self._graph_inputs_outputs_from_placeholders()
         self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
         self.d_eval['output_mat_std'], _, self.d_eval['dropout_placeholders'] = \
-            self._graph_inference('eval', self.T,
-                                  self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'],
-                                  self.dropout, params, dtype=self.dtype, O_single_input=self.d_eval['O_single_input'],
-                                  reuse=True, random_seed=self.random_seed)
+            self._graph_inference(
+                'eval',
+                self.d_eval['X_inputs'],
+                self.d_eval['U_inputs'],
+                self.d_eval['O_inputs'],
+                O_single_input=self.d_eval['O_single_input'],
+                reuse=True)
 
         ### initialize
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
@@ -692,251 +874,6 @@ class ProbcollModel:
             graph=self.sess.graph)
         self.saver = tf.train.Saver(max_to_keep=None)
 
-    def _get_old_graph_inference(self):
-        sys.path.append(os.path.dirname(self._code_file))
-        exec('from {0} import {1} as OldProbcollModel'.format(
-            os.path.basename(self._code_file).split('.')[0], 'ProbcollModel'))
-
-        return OldProbcollModel._graph_inference
-
-    @staticmethod
-    def _get_embedding(observation, batch_size=1, T=None, dtype=tf.float32, reuse=False, scope=None):
-        
-        obg_type = params["model"]["observation_graph"]["graph_type"]
-        if obg_type == "fc":
-            observation_graph = fcnn
-        elif obg_type == "cnn":
-            observation_graph = convnn
-        else:
-            raise NotImplementedError(
-                "Observation graph {0} is not valid".format(obg_type))
-
-        obs_batch = observation.get_shape()[0].value
-        obs_float = tf.cast(observation, dtype) / 255.
-        obs_norm = obs_float - tf.reduce_mean(obs_float, axis=0)
-        obs_shaped = tf.reshape(
-            obs_norm,
-            [
-                obs_batch,
-                params["O"]["camera"]["height"],
-                params["O"]["camera"]["width"],
-                params["O"]["camera"]["num_channels"]
-            ])
-        conv_output = observation_graph(
-            obs_shaped,
-            params["model"]["observation_graph"],
-            dtype=dtype,
-            scope=scope,
-            reuse=reuse)
-        output = tf.contrib.layers.flatten(conv_output)
-        if obs_batch == 1:
-            output = tf.tile(output, [batch_size, 1])
-        if T is not None:
-            output = tf.stack([output]*T, axis=1)
-        return output
-    
-    @staticmethod
-    def _graph_inference(
-            name, T, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-            dropout, meta_data, dtype=tf.float32, O_single_input=None, reuse=False,
-            random_seed=None, finalize=True, tf_debug={}):
-        assert(name == 'train' or name == 'val' or name == 'eval')
-        one_obs = not O_single_input is None
-        num_bootstrap = len(bootstrap_X_inputs)
-
-        bootstrap_output_mats = []
-        bootstrap_output_preds = []
-        dropout_placeholders = []
-
-        recurrent = params["model"]["recurrent"]
-        ag_type = params["model"]["action_graph"]["graph_type"]
-        
-        if ag_type == "fc":
-            action_graph = fcnn
-        elif ag_type == "rnn":
-            action_graph = rnn
-        else:
-            raise NotImplementedError(
-                "Action graph {0} is not valid".format(ag_type))
-
-        with tf.name_scope(name + '_inference'):
-            tf.set_random_seed(random_seed)
-
-            for b in xrange(num_bootstrap):
-                ### inputs
-                x_input_b = bootstrap_X_inputs[b]
-                u_input_b = bootstrap_U_inputs[b]
-                o_input_b = bootstrap_O_inputs[b]
-                
-                dX = x_input_b.get_shape()[2].value
-                dU = u_input_b.get_shape()[2].value
-                dO = o_input_b.get_shape()[1].value
-                # Should be general
-                doutput = 1 
-                T = x_input_b.get_shape()[1].value
-                batch_size = tf.shape(x_input_b)[0]
-
-                ### concatenate inputs
-                with tf.name_scope('inputs_b{0}'.format(b)):
-                    concat_list = []
-                    if dO > 0:
-#                        if one_obs:
-#                            o_input_b = tf.cast(O_single_input, dtype) / 255.
-#                            o_input_b = o_input_b - tf.reduce_mean(o_input_b)
-#                            o_input_b = tf.reshape(
-#                                o_input_b,
-#                                [
-#                                    1,
-#                                    params["O"]["camera"]["height"],
-#                                    params["O"]["camera"]["width"],
-#                                    params["O"]["camera"]["num_channels"]
-#                                ])
-#                            conv_output = observation_graph(
-#                                o_input_b,
-#                                params["model"]["observation_graph"],
-#                                dtype=dtype,
-#                                scope="observation_graph_b{0}".format(b),
-#                                reuse=reuse)
-#                            conv_output_flat = tf.contrib.layers.flatten(conv_output)
-#                            o_input_b = tf.reshape(conv_output, [-1,])
-#                            if recurrent:
-#                                o_input_b = tf.tile(o_input_b, [batch_size * T])
-#                                o_input_b = tf.reshape(o_input_b, [batch_size, T, int(conv_output_flat.get_shape()[1])])
-#                            else:
-#                                o_input_b = tf.tile(o_input_b, [batch_size])
-#                                o_input_b = tf.reshape(o_input_b, [batch_size, int(conv_output_flat.get_shape()[1])])
-#                        else:
-#                            o_input_b = tf.cast(o_input_b, dtype) / 255.
-#                            o_input_b = o_input_b - tf.reduce_mean(o_input_b, axis=0)
-#                            o_input_b = tf.reshape(
-#                                o_input_b,
-#                                [
-#                                    batch_size,
-#                                    params["O"]["camera"]["height"],
-#                                    params["O"]["camera"]["width"],
-#                                    params["O"]["camera"]["num_channels"]
-#                                ])
-#                            conv_output = observation_graph(
-#                                o_input_b,
-#                                params["model"]["observation_graph"],
-#                                dtype=dtype,
-#                                scope="observation_graph_b{0}".format(b),
-#                                reuse=reuse)
-#                            o_input_b = tf.contrib.layers.flatten(conv_output)
-#                            if recurrent:
-#                                o_input_b = tf.stack([o_input_b]*T, axis=1)
-                        if recurrent:
-                            recurrent_T = T
-                        else:
-                            recurrent_T = None
-                        if one_obs:
-                            observation = tf.expand_dims(O_single_input, axis=0)
-                        else:
-                            observation = o_input_b
-                            
-                        o_input_b = ProbcollModel._get_embedding(
-                            observation,
-                            batch_size=batch_size,
-                            T=recurrent_T,
-                            dtype=dtype,
-                            reuse=reuse,
-                            scope="observation_graph_b{0}".format(b))
-
-                        concat_list.append(o_input_b)
-                    if dX > 0:
-                        
-                        if recurrent:
-                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, T, dX])
-                        else:
-                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, T * dX])
-                        
-                        concat_list.append(x_input_flat_b)
-                    
-                    if dU > 0:
-                        control_mean = (np.array(params['model']['control_range']['lower']) + \
-                            np.array(params['model']['control_range']['upper']))/2.
-                        control_width = (np.array(params['model']['control_range']['upper']) - \
-                            control_mean)
-                        u_input_b = tf.cast((u_input_b - control_mean) / control_width, dtype) 
-                        
-                        if recurrent:
-                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, T, dU])
-                        else:
-                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, T * dU])
-                        
-                        concat_list.append(u_input_flat_b)
-                    
-                    if recurrent:
-                        input_layer = tf.concat(2, concat_list)
-                    else:
-                        input_layer = tf.concat(1, concat_list)
-
-                    use_dp_placeholders = name == 'eval'
-                    
-                    ag_output, action_dp_placeholders  = action_graph(
-                        input_layer,
-                        params["model"]["action_graph"],
-                        use_dp_placeholders=use_dp_placeholders,
-                        dtype=dtype,
-                        scope="action_graph_b{0}".format(b),
-                        reuse=reuse)
-                   
-                    dropout_placeholders += action_dp_placeholders
-
-                    if recurrent:
-                        ag_output = tf.reshape(
-                            ag_output,
-                            (batch_size * T, int(ag_output.get_shape()[-1]))) 
-                    else:
-                        ag_output = tf.reshape(
-                            ag_output,
-                            (batch_size * T, int(ag_output.get_shape()[-1])/T)) 
-
-                    params["model"]["output_graph"]["output_dim"] = doutput
-                    params["model"]["output_graph"]["dropout"] = None
-                    # TODO dropout acts only on output of layers
-                    # Therefore, dropout should never be put on outputgraph
-                    output_mat_b, _  = fcnn(
-                        ag_output,
-                        params["model"]["output_graph"],
-                        dtype=dtype,
-                        scope="output_graph_b{0}".format(b),
-                        reuse=reuse)
-
-                    output_mat_b = tf.reshape(output_mat_b, [batch_size, T, doutput])
-                    # TODO not general because it assumes doutput = 1
-                    if params["model"]["prob_coll_strictly_increasing"]:
-                        output_mat_b = tf.reshape(output_mat_b, (batch_size, T))
-                        output_mat_b = tf_utils.cumulative_increasing_sum(
-                            output_mat_b,
-                            dtype)
-                        output_mat_b = tf.reshape(output_mat_b, (batch_size, T, doutput))
-
-                    if name == 'eval':
-                        # Only care about final probability of collision
-                        mask = tf.concat(0, [
-                                tf.zeros((T - 1, doutput), dtype=dtype),
-                                tf.ones((1, doutput), dtype=dtype),
-                            ])
-                        output_mat_b = tf.reduce_sum(mask * output_mat_b, axis=1) 
-                    
-                    output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
-
-                bootstrap_output_mats.append(output_mat_b)
-                bootstrap_output_preds.append(output_pred_b)
-
-            ### combination of all the bootstraps
-            with tf.name_scope('combine_bootstraps'):
-                output_pred_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_preds, name='output_pred_mean')
-                std_normalize = (1. / (num_bootstrap - 1)) if num_bootstrap > 1 else 1
-                output_pred_std = tf.sqrt(std_normalize * tf.add_n(
-                    [tf.square(tf.sub(output_pred_b, output_pred_mean)) for output_pred_b in bootstrap_output_preds]))
-
-                output_mat_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
-                output_mat_std = tf.sqrt(std_normalize * tf.add_n(
-                    [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
-
-        return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std, bootstrap_output_mats, dropout_placeholders
 
     ################
     ### Training ###
@@ -1073,7 +1010,7 @@ class ProbcollModel:
                 plotter.add_val('err_nocoll', np.mean(val_values['err_nocoll']))
                 plotter.add_val('cost', np.mean(val_values['cost']))
                 plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
-                plotter.plot()
+#                plotter.plot()
 
                 self._logger.debug(
                     'error: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
@@ -1128,7 +1065,7 @@ class ProbcollModel:
                     plotter.add_train('err_nocoll', step * self.batch_size, np.mean(train_values['err_nocoll']))
                 plotter.add_train('cost', step * self.batch_size, np.mean(train_values['cost']))
                 plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
-                plotter.plot()
+#                plotter.plot()
 
                 self._logger.debug('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
                     100 * step / float(self.steps),

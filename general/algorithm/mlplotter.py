@@ -23,8 +23,8 @@ class MLPlotter:
 #        mng = plt.get_current_fig_manager()
 #        mng.window.showMinimized()
         plt.suptitle(title)
-        plt.show(block=False)
-        plt.pause(0.01)
+#        plt.show(block=False)
+#        plt.pause(0.01)
 
         self.train_lines = {}
         self.val_lines = {}
@@ -41,8 +41,8 @@ class MLPlotter:
 
             ax.legend()
 
-        self.f.canvas.draw()
-        plt.pause(0.01)
+#        self.f.canvas.draw()
+#        plt.pause(0.01)
 
     def _update_line(self, line, new_x, new_y):
         xdata, ydata = line.get_xdata(), line.get_ydata()

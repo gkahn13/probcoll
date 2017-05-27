@@ -94,7 +94,6 @@ model:
   num_bootstrap: 1
   num_dropout_passes: 10
   prob_coll_strictly_increasing: True 
-  recurrent: True
   mask: "all" # all / last
 
   observation_graph:
@@ -149,11 +148,11 @@ planning:
     upper: [80., 16.]
 
   random:
-    M: 128
+    M: 128 # number of actions to sample from
 
   cem:
-    M: 128
-    K: 16
+    M: 128 # number of actions to sample from
+    K: 16 # top actions you select
 
   # TODO: other planning methods here
 
