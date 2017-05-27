@@ -20,8 +20,8 @@ class MLPlotter:
         if figsize is None:
             figsize = (30, 7)
         self.f, self.axes = plt.subplots(shape[0], shape[1], figsize=figsize)
-        mng = plt.get_current_fig_manager()
-        mng.window.showMinimized()
+#        mng = plt.get_current_fig_manager()
+#        mng.window.showMinimized()
         plt.suptitle(title)
         plt.show(block=False)
         plt.pause(0.01)
