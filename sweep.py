@@ -136,11 +136,13 @@ if __name__ == '__main__':
         sweep_params.update(yaml.load(f))
 
     d = base_params['exp_dir']
+    if not os.path.exists(d):
+        os.makedirs(d)
     base_path = os.path.join(d, os.path.split(base_yaml_path)[1])
     sweep_path = os.path.join(d, os.path.split(sweep_yaml_path)[1])
-    with open(base_path, "w") as yaml_file:
+    with open(base_path, "wb") as yaml_file:
         yaml.dump(base_params, yaml_file, default_flow_style=False)
-    with open(sweep_path, "w") as yaml_file:
+    with open(sweep_path, "wb") as yaml_file:
         yaml.dump(sweep_params, yaml_file, default_flow_style=False)
 
     params, exp_names = build_experiments(base_params, sweep_params) 

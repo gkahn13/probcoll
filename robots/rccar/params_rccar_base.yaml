@@ -1,7 +1,7 @@
 dt: 0.25
 random_seed: 'sweep'
 config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
-exp_dir: '/home/adam/probcoll/experiments/rccar/sweep/'
+exp_dir: '/home/adam/probcoll/experiments/rccar/sweep'
 exp_name: 'bair_car'
 
 ##########################
