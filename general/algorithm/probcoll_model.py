@@ -522,7 +522,7 @@ class ProbcollModel:
             O_single_input = tf.placeholder(self.dtype, [self.dO])
         return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs, O_single_input
 
-    def _get_embedding(self, observation, batch_size=1, T=None, reuse=False, scope=None):
+    def _get_embedding(self, observation, batch_size=1, reuse=False, scope=None):
         
         obg_type = params["model"]["observation_graph"]["graph_type"]
         if obg_type == "fc":
@@ -554,13 +554,11 @@ class ProbcollModel:
         output = tf.contrib.layers.flatten(conv_output)
         if obs_batch == 1:
             output = tf.tile(output, [batch_size, 1])
-        if T is not None:
-            output = tf.stack([output]*T, axis=1)
         return output
-    
+   
     def _graph_inference(
             self, name, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-            O_single_input=None, reuse=False,
+            O_single_input=None, bootstrap_embeddings=None, reuse=False,
             finalize=True, tf_debug={}):
         assert(name == 'train' or name == 'val' or name == 'eval')
         one_obs = not O_single_input is None
@@ -569,7 +567,7 @@ class ProbcollModel:
         bootstrap_output_mats = []
         bootstrap_output_preds = []
         dropout_placeholders = []
-
+        given_embeddings = bootstrap_embeddings is not None
         ag_type = params["model"]["action_graph"]["graph_type"]
         
         if ag_type == "fc":
@@ -581,6 +579,9 @@ class ProbcollModel:
         else:
             raise NotImplementedError(
                 "Action graph {0} is not valid".format(ag_type))
+
+        if recurrent:
+            assert(self.dO > 0 or use_initial_states)
 
         with tf.name_scope(name + '_inference'):
             tf.set_random_seed(self.random_seed)
@@ -595,24 +596,6 @@ class ProbcollModel:
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
-                    if self.dO > 0:
-                        if recurrent:
-                            recurrent_T = self.T
-                        else:
-                            recurrent_T = None
-                        if one_obs:
-                            observation = tf.expand_dims(O_single_input, axis=0)
-                        else:
-                            observation = o_input_b
-                            
-                        o_input_b = self._get_embedding(
-                            observation,
-                            batch_size=batch_size,
-                            T=recurrent_T,
-                            reuse=reuse,
-                            scope="observation_graph_b{0}".format(b))
-
-                        concat_list.append(o_input_b)
                     if self.dX > 0:
                         
                         if recurrent:
@@ -636,6 +619,26 @@ class ProbcollModel:
                         
                         concat_list.append(u_input_flat_b)
                     
+                    
+                    if given_embeddings:
+                        embedding = bootstrap_embeddings[b] 
+                        if not recurrent:
+                            concat_list.append(embedding)
+                    elif self.dO > 0:
+                        if one_obs:
+                            observation = tf.expand_dims(O_single_input, axis=0)
+                        else:
+                            observation = o_input_b
+                            
+                        embedding = self._get_embedding(
+                            observation,
+                            batch_size=batch_size,
+                            reuse=reuse,
+                            scope="observation_graph_b{0}".format(b))
+
+                        if not recurrent:
+                            concat_list.append(embedding)
+                    
                     if recurrent:
                         input_layer = tf.concat(2, concat_list)
                     else:
@@ -643,14 +646,24 @@ class ProbcollModel:
 
                     use_dp_placeholders = name == 'eval'
                     
-                    ag_output, action_dp_placeholders  = action_graph(
-                        input_layer,
-                        params["model"]["action_graph"],
-                        use_dp_placeholders=use_dp_placeholders,
-                        dtype=self.dtype,
-                        scope="action_graph_b{0}".format(b),
-                        reuse=reuse)
-                   
+                    if recurrent:
+                        ag_output, action_dp_placeholders  = action_graph(
+                            inputs=input_layer,
+                            initial_state=embedding,
+                            params=params["model"]["action_graph"],
+                            use_dp_placeholders=use_dp_placeholders,
+                            dtype=self.dtype,
+                            scope="action_graph_b{0}".format(b),
+                            reuse=reuse)
+                    else:
+                        ag_output, action_dp_placeholders  = action_graph(
+                            inputs=input_layer,
+                            params=params["model"]["action_graph"],
+                            use_dp_placeholders=use_dp_placeholders,
+                            dtype=self.dtype,
+                            scope="action_graph_b{0}".format(b),
+                            reuse=reuse)
+
                     dropout_placeholders += action_dp_placeholders
 
                     if recurrent:

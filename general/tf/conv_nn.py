@@ -16,6 +16,8 @@ def convnn(inputs, params, scope="convnn", dtype=tf.float32, reuse=False):
         output_activation = tf.nn.sigmoid
     elif params["output_activation"] == "softmax":
         output_activation = tf.nn.softmax
+    elif params["output_activation"] == "tanh":
+        output_activation = tf.nn.tanh
     else:
         raise NotImplementedError(
             "Output activation {0} is not valid".format(

@@ -103,6 +103,7 @@ model:
     strides: [2, 2, 2]
     padding: "VALID" 
     conv_activation: "relu" 
+    output_activation: "tanh"
 
 #  action_graph:
 #    graph_type: 'fc' # fc / rnn
@@ -114,7 +115,7 @@ model:
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
-    num_units: 16 # state_size
+#    num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
     dropout: 0.9 # pct keep
 #    cell_args: # If you need to pass variables to cells 
@@ -139,7 +140,8 @@ planning:
     pre_activation: True # wether std is before or after activation (sigmoid)
   
   primitives:
-    steers: [20., 30., 40., 45., 50., 55., 60., 70., 80.]
+    steers: [40., 45., 50., 55., 60.]
+#    steers: [20., 30., 40., 45., 50., 55., 60., 70., 80.]
     speeds: [16.]
     num_steers: 2
 
@@ -164,7 +166,7 @@ world:
 #  plot: False
   randomize: True
   sim: True 
-  do_back_up: True
+  do_back_up: False
 
   back_up:
     cmd_steer: [44.5, 54.5]
@@ -173,7 +175,7 @@ world:
 
 sim:
   srv: 'sim_env'
-  sim_env: 'cory2'
+  sim_env: 'hallway' # hallway / cory2
   launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0

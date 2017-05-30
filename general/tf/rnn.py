@@ -4,6 +4,7 @@ from general.tf import rnn_cell
 
 def rnn(
         inputs,
+        initial_state,
         params,
         use_dp_placeholders=False,
         dtype=tf.float32,
@@ -15,13 +16,16 @@ def rnn(
     """
     if params["cell_type"] == "rnn":
         cell_type = rnn_cell.DpRNNCell
+        inital_state = (initial_state,)
     elif params["cell_type"] == "mulint_rnn":
         cell_type = rnn_cell.DpMulintRNNCell
+        initial_state = (initial_state,)
     else:
         raise NotImplementedError(
             "Cell type {0} is not valid".format(params["cell_type"]))
 
-    num_units = params["num_units"]
+    num_units = initial_state[0].get_shape()[1].value
+    #    num_units = params["num_units"]
     num_cells = params["num_cells"]
     dropout = params.get("dropout", None)
     cell_args = params.get("cell_args", None)
@@ -64,6 +68,7 @@ def rnn(
         outputs, state = tf.nn.dynamic_rnn(
             multi_cell,
             tf.cast(inputs, dtype),
+            initial_state=initial_state,
             dtype=dtype,
             swap_memory=True,
             time_major=False)

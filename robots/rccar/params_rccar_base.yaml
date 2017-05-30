@@ -1,9 +1,7 @@
-# contains all needed parameters for all files
-
-dt: 'sweep'
+dt: 0.25
 random_seed: 'sweep'
-
-exp_dir: '/home/adam/probcoll/experiments/rccar/sweep'
+config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
+exp_dir: '/home/adam/probcoll/experiments/rccar/sweep/'
 exp_name: 'bair_car'
 
 ##########################
@@ -25,15 +23,16 @@ probcoll:
       lower: [-5., 0.]
       upper: [5., 0.]
 
+  epsilon_greedy:
+    epsilon: 'sweep'
+    control_range:
+      lower: [20., 16.]
+      upper: [80., 16.]
+
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   validation_noise: False
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
-
-  cost:
-    weight: 'sweep' # TODO
-    eval_cost: 'sweep'
-    pre_activation: True
 
   conditions:
     repeats: 5 # TODO
@@ -72,7 +71,7 @@ model:
   output_order: ['collision'] # taken from observations O
 
   # NN training parameters
-  device: 0
+  device: 0 #TODO
   gpu_fraction: 0.8 #TODO
   reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 'sweep'
@@ -127,15 +126,32 @@ model:
 #################################################
 
 planning:
-  cost_velocity:
+  cost:
+    coll_cost: square # kinetic
+    eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
+    weight: 1e3
+    coll_weight: 1e3 # TODO
     u_des: [49.5, 16.] # TODO: hard-coded order: steering then speed
-    u_weights: 'sweep' # [0.0001, 0.2]
-
+    u_cost: [square, square]
+    u_weights: [1., 1.] # [0.0001, 0.2]
+    # TODO uncertainty
+    pre_activation: True # wether std is before or after activation (sigmoid)
+  
   primitives:
-    steers : 'sweep'
-    speeds : 'sweep'
-    num_steers : 'sweep'
-  # TODO: other planning methods here
+    steers: 'sweep'
+    speeds: 'sweep'
+    num_steers: 'sweep'
+
+  control_range:
+    lower: [20., 16.]
+    upper: [80., 16.]
+
+  random:
+    M: 128 # number of actions to sample from
+
+  cem:
+    M: 128 # number of actions to sample from
+    K: 16 # top actions you select
 
 #############
 ### World ###
@@ -144,13 +160,18 @@ planning:
 world:
 #  plot: False
   randomize: True
+  sim: True 
+  do_back_up: False
 
   back_up:
-    cmd_steer: [40, 60]
+    cmd_steer: [44.5, 54.5]
     cmd_vel: -12
-    duration: 4.
+    duration: 3.
 
 sim:
+  srv: 'sim_env'
+  sim_env: 'hallway' # hallway / cory2
+  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
   engineClamp: 1000.0
@@ -197,11 +218,6 @@ O:
 ##################
 
 rccar:
-  config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
-  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
-  sim: True 
-  srv: 'sim_env'
-
   topics:
     camera: 'image' # sensor_msgs/Image
     depth: 'depth' # sensor_msgs/Image

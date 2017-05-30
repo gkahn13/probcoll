@@ -1,6 +1,3 @@
-# contains all needed parameters for all files
-
-dt: [0.25]
 random_seed: [0]
 
 ##########################
@@ -12,9 +9,8 @@ probcoll:
   control_noise:
     type: ['uniform'] # zero / gaussian / uniform
 
-  cost:
-    weight: [1e3] # TODO
-    eval_cost: ['speed * speed * sigmoid(probs_mean + 0.0*probs_std)']
+  epsilon_greedy:
+    epsilon: [0.1]
 
 ######################
 ### Probcoll model ###
