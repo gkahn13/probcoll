@@ -33,9 +33,6 @@ model:
 #################################################
 
 planning:
-  cost_velocity:
-    u_weights: [[1., 1.]] # [0.0001, 0.2]
-
   primitives:
     steers : [[40., 45., 50., 55., 60.]]
     speeds : [[16.]]
