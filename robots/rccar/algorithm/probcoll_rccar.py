@@ -17,8 +17,8 @@ from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 from robots.rccar.agent.agent_rccar import AgentRCcar
 from robots.rccar.dynamics.dynamics_rccar import DynamicsRCcar
-from robots.rccar.planning.primitives_rccar import PrimitivesRCcar
-from robots.rccar.planning.cost.cost_velocity_rccar import cost_velocity_rccar
+#from robots.rccar.planning.primitives_rccar import PrimitivesRCcar
+#from robots.rccar.planning.cost.cost_velocity_rccar import cost_velocity_rccar
 from robots.rccar.world.world_rccar import WorldRCcar
 from config import params
 

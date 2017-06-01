@@ -9,13 +9,14 @@ from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 
 from robots.bebop2d.agent.agent_bebop2d import AgentBebop2d
-from robots.bebop2d.algorithm.cost_probcoll_bebop2d import CostProbcollBebop2d
+#from robots.bebop2d.algorithm.cost_probcoll_bebop2d import CostProbcollBebop2d
 from robots.bebop2d.algorithm.probcoll_model_bebop2d import ProbcollModelBebop2d
 from robots.bebop2d.dynamics.dynamics_bebop2d import DynamicsBebop2d
 from robots.bebop2d.world.world_bebop2d import WorldBebop2d
-from robots.bebop2d.planning.cost.cost_velocity_bebop2d import cost_velocity_bebop2d
-from robots.bebop2d.planning.primitives_bebop2d import PrimitivesBebop2d
-
+#from robots.bebop2d.planning.cost.cost_velocity_bebop2d import cost_velocity_bebop2d
+#from robots.bebop2d.planning.primitives_bebop2d import PrimitivesBebop2d
+from robots.bebop2d.tf.planning.planner_primitives_bebop2d import PlannerPrimitivesBebop2d 
+from general.tf.planning.planner_random import PlannerRandom
 import std_msgs.msg as std_msgs
 import general.ros.ros_utils as ros_utils
 import IPython
@@ -54,7 +55,7 @@ class ProbcollBebop2d(Probcoll):
 
         ### load prediction neural net
         self._probcoll_model = ProbcollModelBebop2d(read_only=self._read_only)
-        self._cost_probcoll = CostProbcollBebop2d(self._probcoll_model)
+#        self._cost_probcoll = CostProbcollBebop2d(self._probcoll_model)
 
     def _bag_file(self, itr, cond, rep, create=True):
         return os.path.join(self._itr_dir(itr, create=create), 'bagfile_itr{0}_cond{1}_rep{2}.bag'.format(itr, cond, rep))
@@ -117,23 +118,27 @@ class ProbcollBebop2d(Probcoll):
     ### Create controller ###
     #########################
 
-    def _create_mpc(self, itr, x0):
+    def _create_mpc(self):
         """ Must initialize MPC """
-        sample0 = Sample(meta_data=params, T=1)
-        sample0.set_X(x0, t=0)
-        self._update_world(sample0, 0)
+#        sample0 = Sample(meta_data=params, T=1)
+#        sample0.set_X(x0, t=0)
+#        self._update_world(sample0, 0)
+#
+#        self._logger.info('\t\tCreating MPC')
 
-        self._logger.info('\t\tCreating MPC')
+#        cost_velocity = cost_velocity_bebop2d(self._probcoll_model.T,
+#                                                params['planning']['cost_velocity']['velocity'],
+#                                                params['planning']['cost_velocity']['weights'])
 
-        cost_velocity = cost_velocity_bebop2d(self._probcoll_model.T,
-                                                params['planning']['cost_velocity']['velocity'],
-                                                params['planning']['cost_velocity']['weights'])
-
-        if self._planner_type == 'primitives':
-            planner = PrimitivesBebop2d(self._probcoll_model.T,
-                                          self._dynamics,
-                                          [cost_velocity, self._cost_probcoll],
-                                          use_mpc=True)
+        if self._planner_type == 'random':
+            planner = PlannerRandom(self._probcoll_model, params['planning'])
+            mpc_policy = OpenLoopPolicy(planner)
+        elif self._planner_type == 'primitives':
+            planner = PlannerPrimitivesBebop2d(self._probcoll_model, params['planning'])
+#            planner = PlannerPrimitivesBebop2d(self._probcoll_model.T,
+#                                          self._dynamics,
+#                                          [cost_velocity, self._cost_probcoll],
+#                                          use_mpc=True)
             mpc_policy = OpenLoopPolicy(planner)
         else:
             raise Exception('Invalid planner type: {0}'.format(self._planner_type))

@@ -13,7 +13,7 @@ class Probcoll:
 
     def __init__(self, read_only=False):
         self._use_cp_cost = True
-        self._planner_type = params['probcoll']['planner_type']
+        self._planner_type = params['planning']['planner_type']
         self._read_only = read_only
         self._use_dynamics = True
         self._setup()
