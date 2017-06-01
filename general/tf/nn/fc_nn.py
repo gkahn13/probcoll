@@ -4,7 +4,7 @@ import tensorflow as tf
 def fcnn(
         inputs,
         params,
-        use_dp_placeholders=False,
+        dp_masks=None,
         dtype=tf.float32,
         scope="fcnn",
         reuse=False):
@@ -34,12 +34,17 @@ def fcnn(
     hidden_layers = params.get("hidden_layers", [])
     output_dim = params["output_dim"]
     dropout = params.get("dropout", None)
-    dropout_placeholders = []
+    if dp_masks is not None or dropout is None:
+        dp_return_masks = None
+    else:
+        dp_return_masks = []
+        distribution = tf.contrib.distributions.Uniform()
+    
     dims = hidden_layers + [output_dim]
 
     next_layer_input = inputs
     with tf.variable_scope(scope, reuse=reuse):
-        for dim in dims:
+        for i, dim in enumerate(dims):
             next_layer_input = tf.contrib.layers.fully_connected(
                 inputs=next_layer_input,
                 num_outputs=dim,
@@ -51,13 +56,15 @@ def fcnn(
 
             if dropout is not None:
                 assert(type(dropout) is float and 0 < dropout and dropout < 1.0)
-                if use_dp_placeholders:
-                    dp = tf.placeholder(dtype, [None, dim])
-                    dropout_placeholders.append(dp)
-                    next_layer_input = next_layer_input * dp
+                if dp_masks is not None:
+                    next_layer_input = next_layer_input * dp_masks[i]
                 else:
-                    next_layer_input = tf.nn.dropout(next_layer_input, dropout)
+                    # Shape is not well defined without reshaping
+                    sample = tf.reshape(distribution.sample(tf.shape(next_layer_input)), (-1, dim))
+                    mask = tf.cast(sample < dropout, dtype) / dropout
+                    next_layer_input = next_layer_input * mask
+                    dp_return_masks.append(mask)
 
         output = next_layer_input  
     
-    return output, dropout_placeholders
+    return output, dp_return_masks    

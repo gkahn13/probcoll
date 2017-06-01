@@ -13,7 +13,7 @@ exp_name: 'bair_car_cory2'
 probcoll:
   T: 28 # timesteps per trajectory
   max_iter: 300
-  planner_type: 'primitives' # primitives / cem / teleop / straight / lattice
+  planner_type: 'primitives' # random / primitives / cem
   asynchronous_training: True
   control_noise:
     type: 'uniform' # zero / gaussian / uniform
@@ -25,6 +25,7 @@ probcoll:
       lower: [-5., 0.]
       upper: [5., 0.]
 
+  # TODO not used
   epsilon_greedy:
     epsilon: 0.1
     control_range:
@@ -74,7 +75,7 @@ model:
 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.25 #TODO
+  gpu_fraction: 0.8 #TODO
   reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 0.001
   beta1: 0.9 # For Adam
@@ -92,7 +93,6 @@ model:
   dtype: 'float32'
   reg: 0.0
   num_bootstrap: 1
-  num_dropout_passes: 10
   prob_coll_strictly_increasing: True 
   mask: "all" # all / last
 
@@ -115,6 +115,7 @@ model:
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
+    # TODO num_units isnt used because we use cnn output size as num_units
 #    num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
     dropout: 0.9 # pct keep
@@ -129,28 +130,32 @@ model:
 
 planning:
   cost:
-    coll_cost: square # kinetic
-    eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
-    weight: 1e3
-    coll_weight: 1e3 # TODO
-    u_des: [49.5, 16.] # TODO: hard-coded order: steering then speed
-    u_cost: [square, square]
-    u_weights: [1., 1.] # [0.0001, 0.2]
+    coll_cost:
+      cost: square # square
+      weight: [0., 1000.] # TODO
+    
+    control_cost:
+      des: [49.5, 16.] # TODO: hard-coded order: steering then speed
+      cost: square
+      weight: [1., 1.] # [0.0001, 0.2]
     # TODO uncertainty
-    pre_activation: True # wether std is before or after activation (sigmoid)
+#    pre_activation: True # wether std is before or after activation (sigmoid)
   
+  num_dp: 16 # number of dropout passes to average over
+
+  # specific to your primitives code
   primitives:
     steers: [40., 45., 50., 55., 60.]
-#    steers: [20., 30., 40., 45., 50., 55., 60., 70., 80.]
     speeds: [16.]
     num_steers: 2
 
+  # control range for your planning algorithms
   control_range:
-    lower: [20., 16.]
-    upper: [80., 16.]
+    lower: [40., 16.]
+    upper: [60., 16.]
 
   random:
-    M: 128 # number of actions to sample from
+    K: 512 # number of actions to sample from
 
   cem:
     M: 128 # number of actions to sample from

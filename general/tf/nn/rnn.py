@@ -1,12 +1,12 @@
 import tensorflow as tf
 from  general.tf import tf_utils
-from general.tf import rnn_cell
+from general.tf.nn import rnn_cell
 
 def rnn(
         inputs,
         initial_state,
         params,
-        use_dp_placeholders=False,
+        dp_masks=None,
         dtype=tf.float32,
         scope="rnn",
         reuse=False):
@@ -29,19 +29,25 @@ def rnn(
     num_cells = params["num_cells"]
     dropout = params.get("dropout", None)
     cell_args = params.get("cell_args", None)
-    dropout_placeholders = []
+    if dp_masks is not None or dropout is None:
+        dp_return_masks = None
+    else:
+        dp_return_masks = []
+        distribution = tf.contrib.distributions.Uniform()
     cells = []
 
     with tf.variable_scope(scope, reuse=reuse):
         for i in xrange(num_cells):
             if dropout is not None:
                 assert(type(dropout) is float and 0 < dropout and dropout < 1.0)
-                if use_dp_placeholders:
-                    dp = tf.placeholder(dtype, [None, num_units])
-                    dropout_placeholders.append(dp)
+                if dp_masks is not None:
+                    dp = dp_masks[i]
                 else:
-                    randoms = tf.random_uniform((num_units,), dtype=dtype)
-                    dp = tf.cast(tf.less(randoms, dropout), dtype) / dropout
+                    # Shape is not well defined without reshaping
+                    sample = tf.reshape(distribution.sample((tf.shape(inputs)[0], num_units)), (-1, num_units))
+                    mask = tf.cast(sample < dropout, dtype) / dropout
+                    dp = mask
+                    dp_return_masks.append(mask)
             else:
                 dp = None
 
@@ -72,5 +78,5 @@ def rnn(
             dtype=dtype,
             swap_memory=True,
             time_major=False)
-
-    return outputs, dropout_placeholders
+    
+    return outputs, dp_return_masks

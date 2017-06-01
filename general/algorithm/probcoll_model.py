@@ -9,11 +9,12 @@ import hashlib
 import numpy as np
 import tensorflow as tf
 import sys
+import copy
 
 from general.tf import tf_utils
-from general.tf.fc_nn import fcnn
-from general.tf.conv_nn import convnn
-from general.tf.rnn import rnn
+from general.tf.nn.fc_nn import fcnn
+from general.tf.nn.conv_nn import convnn
+from general.tf.nn.rnn import rnn
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 from general.algorithm.mlplotter import MLPlotter
@@ -513,16 +514,14 @@ class ProbcollModel:
         return fname_batch, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs,\
                bootstrap_lens, filename_queues, filename_places, filename_vars
 
-    def _graph_inputs_outputs_from_placeholders(self):
+    def _graph_inputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
-            bootstrap_X_inputs = [tf.placeholder(self.dtype, [None, self.T, self.dX]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_U_inputs = [tf.placeholder(self.dtype, [None, self.T, self.dU]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_O_inputs = [tf.placeholder(self.dtype, [None, self.dO]) for _ in xrange(self.num_bootstrap)]
-            bootstrap_outputs = [tf.placeholder(tf.uint8, [None, self.T, self.doutput]) for _ in xrange(self.num_bootstrap)]
-            O_single_input = tf.placeholder(self.dtype, [self.dO])
-        return bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs, O_single_input
+            X_inputs = tf.placeholder(self.dtype, [None, self.T, self.dX])
+            U_inputs = tf.placeholder(self.dtype, [None, self.T, self.dU])
+            O_input = tf.placeholder(self.dtype, [1, self.dO])
+        return X_inputs, U_inputs, O_input
 
-    def _get_embedding(self, observation, batch_size=1, reuse=False, scope=None):
+    def get_embedding(self, observation, batch_size=1, reuse=False, scope=None):
         
         obg_type = params["model"]["observation_graph"]["graph_type"]
         if obg_type == "fc":
@@ -558,16 +557,12 @@ class ProbcollModel:
    
     def _graph_inference(
             self, name, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
-            O_single_input=None, bootstrap_embeddings=None, reuse=False,
-            finalize=True, tf_debug={}):
-        assert(name == 'train' or name == 'val' or name == 'eval')
-        one_obs = not O_single_input is None
-        num_bootstrap = len(bootstrap_X_inputs)
+            reuse=False, finalize=True, tf_debug={}):
+        assert(name == 'train' or name == 'val')
+        num_bootstrap = params['model']['num_bootstrap']
 
         bootstrap_output_mats = []
         bootstrap_output_preds = []
-        dropout_placeholders = []
-        given_embeddings = bootstrap_embeddings is not None
         ag_type = params["model"]["action_graph"]["graph_type"]
         
         if ag_type == "fc":
@@ -581,7 +576,7 @@ class ProbcollModel:
                 "Action graph {0} is not valid".format(ag_type))
 
         if recurrent:
-            assert(self.dO > 0 or use_initial_states)
+            assert(self.dO > 0)
 
         with tf.name_scope(name + '_inference'):
             tf.set_random_seed(self.random_seed)
@@ -620,51 +615,36 @@ class ProbcollModel:
                         concat_list.append(u_input_flat_b)
                     
                     
-                    if given_embeddings:
-                        embedding = bootstrap_embeddings[b] 
-                        if not recurrent:
-                            concat_list.append(embedding)
-                    elif self.dO > 0:
-                        if one_obs:
-                            observation = tf.expand_dims(O_single_input, axis=0)
-                        else:
-                            observation = o_input_b
-                            
-                        embedding = self._get_embedding(
-                            observation,
+                    if self.dO > 0:
+                        initial_state = self.get_embedding(
+                            o_input_b,
                             batch_size=batch_size,
                             reuse=reuse,
                             scope="observation_graph_b{0}".format(b))
 
                         if not recurrent:
-                            concat_list.append(embedding)
+                            concat_list.append(initial_state)
                     
                     if recurrent:
                         input_layer = tf.concat(2, concat_list)
                     else:
                         input_layer = tf.concat(1, concat_list)
 
-                    use_dp_placeholders = name == 'eval'
-                    
                     if recurrent:
-                        ag_output, action_dp_placeholders  = action_graph(
+                        ag_output, _  = action_graph(
                             inputs=input_layer,
-                            initial_state=embedding,
+                            initial_state=initial_state,
                             params=params["model"]["action_graph"],
-                            use_dp_placeholders=use_dp_placeholders,
                             dtype=self.dtype,
                             scope="action_graph_b{0}".format(b),
                             reuse=reuse)
                     else:
-                        ag_output, action_dp_placeholders  = action_graph(
+                        ag_output, _  = action_graph(
                             inputs=input_layer,
                             params=params["model"]["action_graph"],
-                            use_dp_placeholders=use_dp_placeholders,
                             dtype=self.dtype,
                             scope="action_graph_b{0}".format(b),
                             reuse=reuse)
-
-                    dropout_placeholders += action_dp_placeholders
 
                     if recurrent:
                         ag_output = tf.reshape(
@@ -695,13 +675,170 @@ class ProbcollModel:
                             self.dtype)
                         output_mat_b = tf.reshape(output_mat_b, (batch_size, self.T, self.doutput))
 
-                    if name == 'eval':
-                        # Only care about final probability of collision
-                        mask = tf.concat(0, [
-                                tf.zeros((self.T - 1, self.doutput), dtype=self.dtype),
-                                tf.ones((1, self.doutput), dtype=self.dtype),
-                            ])
-                        output_mat_b = tf.reduce_sum(mask * output_mat_b, axis=1) 
+                    output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
+
+                bootstrap_output_mats.append(output_mat_b)
+                bootstrap_output_preds.append(output_pred_b)
+
+        return bootstrap_output_mats
+
+    def graph_eval_inference(
+            self, X_input, U_input, O_input=None, bootstrap_initial_states=None,
+            reuse=False, finalize=True, tf_debug={}):
+        
+        bootstrap_output_mats = []
+        bootstrap_output_preds = []
+        dp_masks = []
+        given_initial_states = bootstrap_initial_states is not None
+        num_bootstrap = params['model']['num_bootstrap']
+        ag_type = params["model"]["action_graph"]["graph_type"]
+        
+        if ag_type == "fc":
+            action_graph = fcnn
+            recurrent = False
+        elif ag_type == "rnn":
+            action_graph = rnn
+            recurrent = True
+        else:
+            raise NotImplementedError(
+                "Action graph {0} is not valid".format(ag_type))
+
+        if recurrent:
+            assert(self.dO > 0 or given_initial_states)
+
+        batch_size = tf.shape(U_input)[0]
+
+        with tf.name_scope('eval_inference'):
+            tf.set_random_seed(self.random_seed)
+            x_input_b = X_input
+            u_input_b = U_input
+            o_input_b = O_input
+           
+            base_concat_list = []
+
+            if self.dX > 0:
+                
+                if recurrent:
+                    x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T, self.dX])
+                else:
+                    x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T * self.dX])
+                
+                base_concat_list.append(x_input_flat_b)
+            
+            if self.dU > 0:
+                control_mean = (np.array(params['model']['control_range']['lower']) + \
+                    np.array(params['model']['control_range']['upper']))/2.
+                control_width = (np.array(params['model']['control_range']['upper']) - \
+                    control_mean)
+                u_input_b = tf.cast((u_input_b - control_mean) / control_width, self.dtype) 
+                
+                if recurrent:
+                    u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T, self.dU])
+                else:
+                    u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T * self.dU])
+                
+                base_concat_list.append(u_input_flat_b)
+            
+            for b in xrange(num_bootstrap):
+                concat_list = copy.copy(base_concat_list)
+                ### concatenate inputs
+                with tf.name_scope('inputs_b{0}'.format(b)):
+                    
+                    if given_initial_states:
+                        if isinstance(bootstrap_initial_states, list):
+                            initial_state = bootstrap_initial_states[b] 
+                        else:
+                            initial_state = bootstrap_initial_states
+                        if not recurrent:
+                            concat_list.append(initial_state)
+                    elif self.dO > 0:
+                        initial_state = self.get_embedding(
+                            o_input_b,
+                            batch_size=batch_size,
+                            reuse=reuse,
+                            scope="observation_graph_b{0}".format(b))
+
+                        if not recurrent:
+                            concat_list.append(initial_state)
+                    
+                    if recurrent:
+                        input_layer = tf.concat(2, concat_list)
+                    else:
+                        input_layer = tf.concat(1, concat_list)
+
+                    if b > 0:
+                        if recurrent:
+                            ag_output, action_dp_masks = action_graph(
+                                inputs=input_layer,
+                                initial_state=initial_state,
+                                params=params["model"]["action_graph"],
+                                dp_masks=dp_masks,
+                                dtype=self.dtype,
+                                scope="action_graph_b{0}".format(b),
+                                reuse=reuse)
+                        else:
+                            ag_output, action_dp_masks = action_graph(
+                                inputs=input_layer,
+                                params=params["model"]["action_graph"],
+                                dp_masks=dp_masks,
+                                dtype=self.dtype,
+                                scope="action_graph_b{0}".format(b),
+                                reuse=reuse)
+
+                    else:
+                        if recurrent:
+                            ag_output, action_dp_masks = action_graph(
+                                inputs=input_layer,
+                                initial_state=initial_state,
+                                params=params["model"]["action_graph"],
+                                dtype=self.dtype,
+                                scope="action_graph_b{0}".format(b),
+                                reuse=reuse)
+                        else:
+                            ag_output, action_dp_masks = action_graph(
+                                inputs=input_layer,
+                                params=params["model"]["action_graph"],
+                                dtype=self.dtype,
+                                scope="action_graph_b{0}".format(b),
+                                reuse=reuse)
+
+                        dp_masks += action_dp_masks
+
+                    if recurrent:
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * self.T, int(ag_output.get_shape()[-1]))) 
+                    else:
+                        ag_output = tf.reshape(
+                            ag_output,
+                            (batch_size * self.T, int(ag_output.get_shape()[-1])/self.T)) 
+
+                    params["model"]["output_graph"]["output_dim"] = self.doutput
+                    params["model"]["output_graph"]["dropout"] = None
+                    # TODO dropout acts only on output of layers
+                    # Therefore, dropout should never be put on outputgraph
+                    output_mat_b, _  = fcnn(
+                        ag_output,
+                        params["model"]["output_graph"],
+                        dtype=self.dtype,
+                        scope="output_graph_b{0}".format(b),
+                        reuse=reuse)
+
+                    output_mat_b = tf.reshape(output_mat_b, [batch_size, self.T, self.doutput])
+                    # TODO not general because it assumes doutput = 1
+                    if params["model"]["prob_coll_strictly_increasing"]:
+                        output_mat_b = tf.reshape(output_mat_b, (batch_size, self.T))
+                        output_mat_b = tf_utils.cumulative_increasing_sum(
+                            output_mat_b,
+                            self.dtype)
+                        output_mat_b = tf.reshape(output_mat_b, (batch_size, self.T, self.doutput))
+
+                    # Only care about final probability of collision
+                    mask = tf.concat(0, [
+                            tf.zeros((self.T - 1, self.doutput), dtype=self.dtype),
+                            tf.ones((1, self.doutput), dtype=self.dtype),
+                        ])
+                    output_mat_b = tf.reduce_sum(mask * output_mat_b, axis=1) 
                     
                     output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
 
@@ -719,8 +856,8 @@ class ProbcollModel:
                 output_mat_std = tf.sqrt(std_normalize * tf.add_n(
                     [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
 
-        return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std, bootstrap_output_mats, dropout_placeholders
-
+        return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std
+    
     def _graph_cost(self, name, bootstrap_output_mats, bootstrap_outputs, bootstrap_lengths, reg=0.):
         with tf.name_scope(name + '_cost_and_err'):
             costs = []
@@ -814,6 +951,24 @@ class ProbcollModel:
         optimizer_vars = list(set(vars_after).difference(set(vars_before)))
 
         return optimizers, grads, optimizer_vars
+    
+    def _graph_queue_update(self):
+        self._no_coll_train_fnames_ph = tf.placeholder(tf.string, [None,])
+        self._coll_train_fnames_ph = tf.placeholder(tf.string, [None,]) 
+        self._no_coll_val_fnames_ph = tf.placeholder(tf.string, [None,])
+        self._coll_val_fnames_ph  = tf.placeholder(tf.string, [None,])
+        self._queue_update = [
+                tf.assign(self.d_train['no_coll_queue_var'], self._no_coll_train_fnames_ph, validate_shape=False),
+                tf.assign(self.d_train['coll_queue_var'], self._coll_train_fnames_ph, validate_shape=False),
+                tf.assign(self.d_val['no_coll_queue_var'], self._no_coll_val_fnames_ph, validate_shape=False),
+                tf.assign(self.d_val['coll_queue_var'], self._coll_val_fnames_ph, validate_shape=False)
+            ]
+
+    def _graph_dequeue(self, no_coll_queue, coll_queue):
+        return [
+                no_coll_queue.dequeue_many(10*self.batch_size),
+                coll_queue.dequeue_many(10*self.batch_size)
+            ]
 
     def _graph_init_vars(self):
         self.sess.run(
@@ -839,9 +994,10 @@ class ProbcollModel:
             d['fnames'], d['X_inputs'], d['U_inputs'], d['O_inputs'], d['outputs'], d['len'], \
             queues, queue_places, queue_vars = self._graph_inputs_outputs_from_file(name)
             d['no_coll_queue'], d['coll_queue'] = queues
+            d['no_coll_dequeue'], d['coll_dequeue'] = self._graph_dequeue(*queues)
             d['no_coll_queue_placeholder'], d['coll_queue_placeholder']  = queue_places
             d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
-            _, _, _, _, d['output_mats'], _ = self._graph_inference(
+            d['output_mats'] = self._graph_inference(
                 name,
                 d['X_inputs'],
                 d['U_inputs'],
@@ -855,17 +1011,17 @@ class ProbcollModel:
             self._graph_optimize(self.d_train['bootstraps_cost'], self.d_train['reg_cost'])
 
         ### prepare for eval
-        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_inputs'], self.d_eval['outputs'], self.d_eval['O_single_input'] = \
-            self._graph_inputs_outputs_from_placeholders()
+        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_input'] = self._graph_inputs_from_placeholders()
         self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
-        self.d_eval['output_mat_std'], _, self.d_eval['dropout_placeholders'] = \
-            self._graph_inference(
-                'eval',
+        self.d_eval['output_mat_std'] = \
+            self.graph_eval_inference(
                 self.d_eval['X_inputs'],
                 self.d_eval['U_inputs'],
-                self.d_eval['O_inputs'],
-                O_single_input=self.d_eval['O_single_input'],
+                self.d_eval['O_input'],
                 reuse=True)
+
+        ### queues
+        self._graph_queue_update()
 
         ### initialize
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
@@ -887,7 +1043,6 @@ class ProbcollModel:
             graph=self.sess.graph)
         self.saver = tf.train.Saver(max_to_keep=None)
 
-
     ################
     ### Training ###
     ################
@@ -899,14 +1054,14 @@ class ProbcollModel:
         return output
 
     def _flush_queue(self):
-        for tfrecords_fnames, queue in (
-                    (self.tfrecords_no_coll_train_fnames, self.d_train['no_coll_queue']),
-                    (self.tfrecords_coll_train_fnames, self.d_train['coll_queue']),
-                    (self.tfrecords_no_coll_val_fnames, self.d_val['no_coll_queue']),
-                    (self.tfrecords_coll_val_fnames, self.d_val['coll_queue'])
+        for tfrecords_fnames, dequeue in (
+                    (self.tfrecords_no_coll_train_fnames, self.d_train['no_coll_dequeue']),
+                    (self.tfrecords_coll_train_fnames, self.d_train['coll_dequeue']),
+                    (self.tfrecords_no_coll_val_fnames, self.d_val['no_coll_dequeue']),
+                    (self.tfrecords_coll_val_fnames, self.d_val['coll_dequeue'])
                 ):
             while not np.all([(fname in tfrecords_fnames) for fname in
-                              self.sess.run(queue.dequeue_many(10*self.batch_size))]):
+                              self.sess.run(dequeue)]):
                 pass
 
     def train(self, reset=False, **kwargs):
@@ -920,12 +1075,20 @@ class ProbcollModel:
         
         new_model_file, model_num  = self._next_model_file()
         self.sess.run(
-            [
-                tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
-                tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
-                tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
-                tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
-            ])
+            self._queue_update,
+            {
+                self._no_coll_train_fnames_ph : self.tfrecords_no_coll_train_fnames,
+                self._coll_train_fnames_ph : self.tfrecords_coll_train_fnames,
+                self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
+                self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
+            })
+#        self.sess.run(
+#            [
+#                tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
+#                tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
+#                tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
+#                tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
+#            ])
 
         if not hasattr(self, '_queue_threads'):
             self._logger.debug('Starting queue threads')
@@ -981,14 +1144,22 @@ class ProbcollModel:
 
             if new_num_files > num_files:
                 num_files = new_num_files
-
+        
                 self.sess.run(
-                    [
-                        tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
-                        tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
-                        tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
-                        tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
-                    ])
+                    self._queue_update,
+                    {
+                        self._no_coll_train_fnames_ph : self.tfrecords_no_coll_train_fnames,
+                        self._coll_train_fnames_ph : self.tfrecords_coll_train_fnames,
+                        self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
+                        self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
+                    })
+#                self.sess.run(
+#                    [
+#                        tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
+#                        tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
+#                        tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
+#                        tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
+#                    ])
 
                 self._logger.debug('Flushing queue')
                 self._flush_queue()
@@ -1148,11 +1319,6 @@ class ProbcollModel:
         #
         # if num_avg = 3
         # 0 1 2 0 1 2 0 1 2
-        for dropout_placeholder in self.d_eval['dropout_placeholders']:
-            length = dropout_placeholder.get_shape()[1].value
-            feed[dropout_placeholder] = [(1/self.dropout) * (np.random.random(length) < self.dropout).astype(float)
-                                         for _ in xrange(num_avg)] * len(Xs)
-
         if pre_activation:
             output_pred_mean, output_pred_std = self.sess.run(
                 [self.d_eval['output_mat_mean'],
@@ -1203,7 +1369,7 @@ class ProbcollModel:
             for sample in samples]
         Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
             for sample in samples]
-        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)]
+        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].reshape(1, -1)
         assert(not np.isnan(O_input).any())
         X_inputs, U_inputs = [], []
         for X, U in zip(Xs, Us):
@@ -1218,10 +1384,9 @@ class ProbcollModel:
                 X_inputs.append(X_input)
                 U_inputs.append(U_input)
         feed = {}
-        for b in xrange(self.num_bootstrap):
-            feed[self.d_eval['X_inputs'][b]] = X_inputs
-            feed[self.d_eval['U_inputs'][b]] = U_inputs
-        feed[self.d_eval['O_single_input']] = O_input
+        feed[self.d_eval['X_inputs']] = X_inputs
+        feed[self.d_eval['U_inputs']] = U_inputs
+        feed[self.d_eval['O_input']] = O_input
         # want dropout for each X/U/O to be the same
         # want dropout for each num_avg to be different
         # -->
@@ -1230,14 +1395,6 @@ class ProbcollModel:
         #
         # if num_avg = 3
         # 0 1 2 0 1 2 0 1 2
-        for dropout_placeholder in self.d_eval['dropout_placeholders']:
-            length = dropout_placeholder.get_shape()[1].value
-            feed[dropout_placeholder] = [
-                    (1/self.dropout) * (np.random.random(length)
-                        < self.dropout).astype(float)
-                    for _ in xrange(num_avg)
-                ] * len(Xs)
-
         if pre_activation:
             output_pred_mean, output_pred_std = self.sess.run(
                 [self.d_eval['output_mat_mean'],
@@ -1267,7 +1424,6 @@ class ProbcollModel:
             import ipdb; ipdb.set_trace()
 
         assert((output_pred_std >= 0).all())
-
         return output_pred_mean, output_pred_std
 
     #############################

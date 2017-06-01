@@ -6,9 +6,11 @@ import subprocess
 import os
 import signal
 
+from robots.rccar.tf.planning.planner_primitives_rccar import PlannerPrimitivesRCcar
+from general.tf.planning.planner_random import PlannerRandom
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
-from robots.rccar.algorithm.cost_probcoll_rccar import CostProbcollRCcar
+#from robots.rccar.algorithm.cost_probcoll_rccar import CostProbcollRCcar
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 import robots.rccar.ros.ros_utils as ros_utils
 from general.state_info.conditions import Conditions
@@ -39,8 +41,6 @@ class ProbcollRCcar(Probcoll):
         probcoll_params = params['probcoll']
         world_params = params['world']
         cond_params = probcoll_params['conditions']
-#        cp_params = probcoll_params['cost']
-        cp_params = params['planning']['cost']
         self._asynchronous = probcoll_params['asynchronous_training']
         self._max_iter = probcoll_params['max_iter']
         self._dynamics = DynamicsRCcar() # Try to remove dynamics
@@ -53,7 +53,6 @@ class ProbcollRCcar(Probcoll):
 
         ### load prediction neural net
         self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
-        self._cost = CostProbcollRCcar(self._probcoll_model)
 
         self._async_on = False
 
@@ -151,23 +150,14 @@ class ProbcollRCcar(Probcoll):
     ### Create controller ###
     #########################
 
-    def _create_mpc(self, itr, x0):
+    def _create_mpc(self):
         """ Must initialize MPC """
-        sample0 = Sample(meta_data=params, T=1)
-        sample0.set_X(x0, t=0)
-        self._update_world(sample0, 0)
-
         self._logger.debug('\t\t\tCreating MPC')
-        cost_velocity = cost_velocity_rccar(
-            self._probcoll_model.T,
-            params['planning']['cost']['u_des'],
-            params['planning']['cost']['u_weights'])
-        if self._planner_type == 'primitives':
-            planner = PrimitivesRCcar(
-                self._probcoll_model.T,
-                self._dynamics,
-                [cost_velocity, self._cost],
-                use_mpc=True)
+        if self._planner_type == 'random':
+            planner = PlannerRandom(self._probcoll_model, params['planning'])
+            mpc_policy = OpenLoopPolicy(planner)
+        elif self._planner_type == 'primitives':
+            planner = PlannerPrimitivesRCcar(self._probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))

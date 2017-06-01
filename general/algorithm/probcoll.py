@@ -17,11 +17,11 @@ class Probcoll:
         self._read_only = read_only
         self._use_dynamics = True
         self._setup()
-
         self._logger = get_logger(
             self.__class__.__name__,
             'info',
             os.path.join(self._save_dir, 'dagger.txt'))
+        self._mpc_policy = self._create_mpc()
         shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
 
 
@@ -59,7 +59,7 @@ class Probcoll:
     #########################
 
     @abc.abstractmethod
-    def _create_mpc(self, itr, x0):
+    def _create_mpc(self):
         raise NotImplementedError('Implement in subclass')
 
     ####################
@@ -151,7 +151,8 @@ class Probcoll:
         for itr in xrange(start_itr, self._max_iter):
             self._run_itr(itr)
             self._run_training()
-
+            if not self._probcoll_model.sess.graph.finalized:
+                self._probcoll_model.sess.graph.finalize()
         self._close()
 
     def _run_itr(self, itr):
@@ -189,9 +190,10 @@ class Probcoll:
                 x0 = self._conditions.get_cond(cond, rep=rep)
                 sample_T = Sample(meta_data=params, T=T)
                 sample_T.set_X(x0, t=0)
-
-                mpc_policy = self._create_mpc(itr, x0)
                 
+                # TODO memoryless vs not
+#                mpc_policy = self._create_mpc(itr, x0)
+
                 # For validation no noise
                 if (cond >= self._conditions.length * \
                         params['model']['val_pct']) and \
@@ -206,7 +208,7 @@ class Probcoll:
 
                     x0 = sample_T.get_X(t=t)
 
-                    rollout = self._agent.sample_policy(x0, mpc_policy, noise=control_noise, T=1)
+                    rollout = self._agent.sample_policy(x0, self._mpc_policy, noise=control_noise, T=1)
 
                     u = rollout.get_U(t=0)
                     o = rollout.get_O(t=0)
@@ -226,15 +228,15 @@ class Probcoll:
                             x_tp1 = self._dynamics.evolve(x0, u)
                             sample_T.set_X(x_tp1, t=t+1)
 
-                    if hasattr(mpc_policy, '_curr_traj'):
-                        self._world.update_visualization(sample_T, mpc_policy._curr_traj, t)
+                    if hasattr(self._mpc_policy, '_curr_traj'):
+                        self._world.update_visualization(sample_T, self._mpc_policy._curr_traj, t)
 
                 else:
                     self._logger.info('\t\t\tLasted for t={0}'.format(t))
 
                 sample = sample_T.match(slice(0, t + 1))
                 world_info = self._get_world_info()
-                mpc_info = mpc_policy.get_info()
+                mpc_info = self._mpc_policy.get_info()
 
                 if not self._is_good_rollout(sample, t):
                     self._logger.warning('\t\t\tNot good rollout. Repeating rollout.'.format(t))
