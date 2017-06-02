@@ -7,11 +7,12 @@ from general.policy.open_loop_policy import OpenLoopPolicy
 from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 from robots.pointquad.agent.agent_pointquad import AgentPointquad
-from robots.pointquad.algorithm.cost_probcoll_pointquad import CostProbcollPointquad
+#from robots.pointquad.algorithm.cost_probcoll_pointquad import CostProbcollPointquad
 from robots.pointquad.algorithm.probcoll_model_pointquad import ProbcollModelPointquad
 from robots.pointquad.dynamics.dynamics_pointquad import DynamicsPointquad
-from robots.pointquad.planning.cost.cost_velocity_pointquad import cost_velocity_pointquad
-from robots.pointquad.planning.primitives_pointquad import PrimitivesPointquad
+#from robots.pointquad.planning.cost.cost_velocity_pointquad import cost_velocity_pointquad
+#from robots.pointquad.planning.primitives_pointquad import PrimitivesPointquad
+from general.tf.planning.planner_random import PlannerRandom
 from robots.pointquad.world.world_pointquad import WorldPointquad
 
 
@@ -36,7 +37,7 @@ class ProbcollPointquad(Probcoll):
 
         ### load prediction neural net
         self._probcoll_model = ProbcollModelPointquad(read_only=self._read_only)
-        self._cost_probcoll = CostProbcollPointquad(self._probcoll_model)
+#        self._cost_probcoll = CostProbcollPointquad(self._probcoll_model)
 
     #####################
     ### World methods ###
@@ -95,23 +96,11 @@ class ProbcollPointquad(Probcoll):
     ### Create controller ###
     #########################
 
-    def _create_mpc(self, itr, x0):
+    def _create_mpc(self):
         """ Must initialize MPC """
-        sample0 = Sample(meta_data=params, T=1)
-        sample0.set_X(x0, t=0)
-        self._update_world(sample0, 0)
-
-        self._logger.info('\t\tCreating MPC')
-
-        cost_velocity = cost_velocity_pointquad(self._probcoll_model.T,
-                                                params['planning']['cost_velocity']['velocity'],
-                                                params['planning']['cost_velocity']['weights'])
-
-        if self._planner_type == 'primitives':
-            planner = PrimitivesPointquad(self._probcoll_model.T,
-                                          self._dynamics,
-                                          [cost_velocity, self._cost_probcoll],
-                                          use_mpc=True)
+        self._logger.debug('\t\t\tCreating MPC')
+        if self._planner_type == 'random':
+            planner = PlannerRandom(self._probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         else:
             raise Exception('Invalid planner type: {0}'.format(self._planner_type))
