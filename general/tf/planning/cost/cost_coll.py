@@ -17,4 +17,4 @@ class CostColl(Cost):
     def eval(self, probcoll, data):
         components = tf.reduce_sum(self.cost(data), axis=1)
         weighted_sum = tf.reduce_sum(components * self.weight, axis=1)
-        return weighted_sum * probcoll
+        return weighted_sum * tf.reshape(probcoll, tf.shape(weighted_sum))

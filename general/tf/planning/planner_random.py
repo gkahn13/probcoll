@@ -44,7 +44,7 @@ class PlannerRandom(Planner):
             coll_cost = coll_cost_fn.eval(pred_mean, u_samples)
 
             total_cost = control_cost + coll_cost
-            index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)[0]
+            index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
             self.action = u_samples[index, 0]
 
 

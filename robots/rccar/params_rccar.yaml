@@ -13,7 +13,7 @@ exp_name: 'bair_car_cory2'
 probcoll:
   T: 28 # timesteps per trajectory
   max_iter: 300
-  asynchronous_training: False
+  asynchronous_training: True
   control_noise:
     type: 'uniform' # zero / gaussian / uniform
 
@@ -92,7 +92,7 @@ model:
   dtype: 'float32'
   reg: 0.0
   num_bootstrap: 1
-  prob_coll_strictly_increasing: True 
+  prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
 
   observation_graph:
@@ -131,7 +131,7 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [0., 1e3] # TODO
+      weight: [0., 1000.] # TODO
     
     control_cost:
       des: [49.5, 16.] # TODO: hard-coded order: steering then speed
@@ -141,7 +141,7 @@ planning:
 #    pre_activation: True # wether std is before or after activation (sigmoid)
   
   num_dp: 16 # number of dropout passes to average over
-  planner_type: 'primitives' # random / primitives / cem
+  planner_type: 'cem' # random / primitives / cem
   # specific to your primitives code
   primitives:
     steers: [40., 45., 50., 55., 60.]
@@ -157,8 +157,11 @@ planning:
     K: 512 # number of actions to sample from
 
   cem:
-    M: 128 # number of actions to sample from
+    init_M: 1024 # number of actions to sample from
+    M: 128
     K: 16 # top actions you select
+    num_iters: 3 # does not include first sample    
+    eps: 0.001 # to ensure covariance is PD
 
   # TODO: other planning methods here
 

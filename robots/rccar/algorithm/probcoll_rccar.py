@@ -8,6 +8,7 @@ import signal
 
 from robots.rccar.tf.planning.planner_primitives_rccar import PlannerPrimitivesRCcar
 from general.tf.planning.planner_random import PlannerRandom
+from general.tf.planning.planner_cem import PlannerCem
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
 #from robots.rccar.algorithm.cost_probcoll_rccar import CostProbcollRCcar
@@ -158,6 +159,9 @@ class ProbcollRCcar(Probcoll):
             mpc_policy = OpenLoopPolicy(planner)
         elif self._planner_type == 'primitives':
             planner = PlannerPrimitivesRCcar(self._probcoll_model, params['planning'])
+            mpc_policy = OpenLoopPolicy(planner)
+        elif self._planner_type == 'cem':
+            planner = PlannerCem(self._probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))

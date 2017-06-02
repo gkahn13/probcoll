@@ -47,7 +47,7 @@ class PlannerPrimitives(Planner):
             coll_cost = coll_cost_fn.eval(pred_mean, self.primitives)
 
             total_cost = control_cost + coll_cost
-            index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)[0]
+            index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
             self.action = self.primitives[index, 0]
 
     def plan(self, x, o):
