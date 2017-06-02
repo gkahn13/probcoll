@@ -972,7 +972,7 @@ class ProbcollModel:
 
     def _graph_init_vars(self):
         self.sess.run(
-            tf.global_variables_initializer(),
+            self._global_initializer,
             feed_dict=dict([(p, []) for p in (
                     self.d_train['no_coll_queue_placeholder'],
                     self.d_train['coll_queue_placeholder'],
@@ -1022,8 +1022,8 @@ class ProbcollModel:
 
         ### queues
         self._graph_queue_update()
-
         ### initialize
+        self._global_initializer = tf.global_variables_initializer()
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
         config = tf.ConfigProto(
