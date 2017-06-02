@@ -66,6 +66,7 @@ probcoll:
 ######################
 ### Probcoll model ###
 ######################
+#me/adam' 
 
 model:
   T: 6 # how many timesteps to predict

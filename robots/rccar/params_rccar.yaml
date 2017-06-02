@@ -150,8 +150,8 @@ planning:
 
   # control range for your planning algorithms
   control_range:
-    lower: [40., 16.]
-    upper: [60., 16.]
+    lower: [20., 16.]
+    upper: [80., 16.]
 
   random:
     K: 512 # number of actions to sample from
@@ -160,8 +160,8 @@ planning:
     init_M: 1024 # number of actions to sample from
     M: 128
     K: 16 # top actions you select
-    num_iters: 3 # does not include first sample    
-    eps: 0.001 # to ensure covariance is PD
+    num_iters: 2 # does not include first sample    
+    eps: 0.01 # to ensure covariance is PD
 
   # TODO: other planning methods here
 
@@ -173,7 +173,7 @@ world:
 #  plot: False
   randomize: True
   sim: True 
-  do_back_up: False
+  do_back_up: True
 
   back_up:
     cmd_steer: [44.5, 54.5]
@@ -182,7 +182,7 @@ world:
 
 sim:
   srv: 'sim_env'
-  sim_env: 'hallway' # hallway / cory2
+  sim_env: 'cory2' # hallway / cory2
   launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
