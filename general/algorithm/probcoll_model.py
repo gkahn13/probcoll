@@ -33,7 +33,7 @@ class ProbcollModel:
         self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
-        self._logger = get_logger(self.__class__.__name__, 'fatal', os.path.join(self.save_dir, 'debug.txt'))
+        self._logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
         tf.logging.set_verbosity(tf.logging.ERROR)
         self.random_seed = params['random_seed']
         for k, v in params['model'].items():
@@ -444,12 +444,12 @@ class ProbcollModel:
             filename_vars = ( 
                     tf.get_variable(
                         name + '_no_coll_fnames',
-                        initializer=filename_places[0],
+                        initializer=tf.constant([], dtype=tf.string),
                         validate_shape=False,
                         trainable=False),
                     tf.get_variable(
                         name + '_coll_fnames',
-                        initializer=filename_places[1],
+                        initializer=tf.constant([], dtype=tf.string),
                         validate_shape=False,
                         trainable=False)
                 )
@@ -972,13 +972,13 @@ class ProbcollModel:
 
     def _graph_init_vars(self):
         self.sess.run(
-            self._global_initializer,
-            feed_dict=dict([(p, []) for p in (
-                    self.d_train['no_coll_queue_placeholder'],
-                    self.d_train['coll_queue_placeholder'],
-                    self.d_val['no_coll_queue_placeholder'],
-                    self.d_val['coll_queue_placeholder']
-                )]))
+            self._global_initializer,)
+#            feed_dict=dict([(p, []) for p in (
+#                    self.d_train['no_coll_queue_placeholder'],
+#                    self.d_train['coll_queue_placeholder'],
+#                    self.d_val['no_coll_queue_placeholder'],
+#                    self.d_val['coll_queue_placeholder']
+#                )]))
 
     def _graph_setup(self):
         """ Only call once """
@@ -1082,14 +1082,6 @@ class ProbcollModel:
                 self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
                 self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
             })
-#        self.sess.run(
-#            [
-#                tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
-#                tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
-#                tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
-#                tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
-#            ])
-
         if not hasattr(self, '_queue_threads'):
             self._logger.debug('Starting queue threads')
             self._queue_threads = tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
@@ -1153,14 +1145,6 @@ class ProbcollModel:
                         self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
                         self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
                     })
-#                self.sess.run(
-#                    [
-#                        tf.assign(self.d_train['no_coll_queue_var'], self.tfrecords_no_coll_train_fnames, validate_shape=False),
-#                        tf.assign(self.d_train['coll_queue_var'], self.tfrecords_coll_train_fnames, validate_shape=False),
-#                        tf.assign(self.d_val['no_coll_queue_var'], self.tfrecords_no_coll_val_fnames, validate_shape=False),
-#                        tf.assign(self.d_val['coll_queue_var'], self.tfrecords_coll_val_fnames, validate_shape=False)
-#                    ])
-
                 self._logger.debug('Flushing queue')
                 self._flush_queue()
 
