@@ -6,8 +6,9 @@ class OpenLoopPolicy(Policy):
         self._planner = planner
 
     # TODO
-    def act(self, x, obs, t, noise):
-        u = self._planner.plan(x, obs)
+    def act(self, x, obs, t):
+        u, _ = self._planner.plan(x, obs)
+        return u
 #        sample = self._planner.plan(x, obs)
 #        u = sample.get_U(t=0)
-        return u + noise.sample(u)
+#        return u + noise.sample(u)

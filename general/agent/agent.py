@@ -2,7 +2,6 @@ import abc
 
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
-from general.policy.noise_models import ZeroNoise
 
 from config import params
 
@@ -25,14 +24,12 @@ class Agent(object):
         if T is None:
             T = policy._T
         policy_sample = Sample(meta_data=params, T=T)
-        noise = policy_args.get('noise', ZeroNoise(params))
-
         policy_sample.set_X(x0, t=0)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
-            u_t = policy.act(x_t, o_t, t, noise=noise)
+            u_t = policy.act(x_t, o_t, t)
 
             # record
             policy_sample.set_X(x_t, t=t)

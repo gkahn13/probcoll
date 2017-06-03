@@ -33,7 +33,7 @@ class ProbcollModel:
         self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
-        self._logger = get_logger(self.__class__.__name__, 'debug', os.path.join(self.save_dir, 'debug.txt'))
+        self._logger = get_logger(self.__class__.__name__, 'fatal', os.path.join(self.save_dir, 'debug.txt'))
         tf.logging.set_verbosity(tf.logging.ERROR)
         self.random_seed = params['random_seed']
         for k, v in params['model'].items():

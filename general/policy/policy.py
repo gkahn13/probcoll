@@ -16,7 +16,7 @@ class Policy(UncopyableClass):
         pass
 
     @abc.abstractmethod
-    def act(self, x, obs, t, noise):
+    def act(self, x, obs, t):
         """
         Return the action under this policy given current state or observation
         """

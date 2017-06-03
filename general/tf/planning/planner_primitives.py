@@ -15,6 +15,7 @@ class PlannerPrimitives(Planner):
         self.dtype = self.probcoll_model.dtype
         self._create_primitives()
         self._setup()
+        self._setup_noise()
 
     @abc.abstractmethod
     def _create_primitives(self):
@@ -49,10 +50,3 @@ class PlannerPrimitives(Planner):
             total_cost = control_cost + coll_cost
             index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
             self.action = self.primitives[index, 0]
-
-    def plan(self, x, o):
-        # TODO figure out general way to handle state
-        o_input = o[self.probcoll_model.O_idxs()].reshape(1, -1)
-        feed_dict = {self.X_inputs: [[[]]*self.probcoll_model.T], self.O_input: o_input}
-        action = self.probcoll_model.sess.run(self.action, feed_dict)
-        return action

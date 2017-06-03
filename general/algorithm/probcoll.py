@@ -5,7 +5,6 @@ import numpy as np
 from general.algorithm.probcoll_model import ProbcollModel
 from config import params
 
-from general.policy.noise_models import ZeroNoise, GaussianNoise, UniformNoise, OUNoise, SmoothedGaussianNoise
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 class Probcoll:
@@ -191,24 +190,14 @@ class Probcoll:
                 sample_T = Sample(meta_data=params, T=T)
                 sample_T.set_X(x0, t=0)
                 
-                # TODO memoryless vs not
-#                mpc_policy = self._create_mpc(itr, x0)
-
-                # For validation no noise
-                if (cond >= self._conditions.length * \
-                        params['model']['val_pct']) and \
-                        (params['probcoll']['validation_noise']): 
-                    control_noise = ZeroNoise()
-                else:    
-                    control_noise = self._create_control_noise() # create each time b/c may not be memoryless
-
+                # TODO For validation no noise
                 start = time.time()
                 for t in xrange(T):
                     self._update_world(sample_T, t)
 
                     x0 = sample_T.get_X(t=t)
 
-                    rollout = self._agent.sample_policy(x0, self._mpc_policy, noise=control_noise, T=1)
+                    rollout = self._agent.sample_policy(x0, self._mpc_policy, T=1)
 
                     u = rollout.get_U(t=0)
                     o = rollout.get_O(t=0)
@@ -259,21 +248,3 @@ class Probcoll:
         self._itr_save_mpcs(itr, mpc_infos)
 
         self._reset_world(itr, 0, 0) # leave the world as it was
-
-    def _create_control_noise(self):
-        cn_params = params['probcoll']['control_noise']
-
-        if cn_params['type'] == 'zero':
-            ControlNoiseClass = ZeroNoise
-        elif cn_params['type'] == 'gaussian':
-            ControlNoiseClass = GaussianNoise
-        elif cn_params['type'] == 'uniform':
-            ControlNoiseClass = UniformNoise
-        elif cn_params['type'].lower() == 'ou':
-            ControlNoiseClass = OUNoise
-        elif cn_params['type'].lower() == 'smoothedgaussian':
-            ControlNoiseClass = SmoothedGaussianNoise
-        else:
-            raise Exception('Control noise type {0} not valid'.format(cn_params['type']))
-
-        return ControlNoiseClass(params, **cn_params[cn_params['type']])

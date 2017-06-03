@@ -17,7 +17,6 @@ from general.agent.agent import Agent
 from config import params
 import robots.rccar.ros.ros_utils as ros_utils
 from general.state_info.sample import Sample
-from general.policy.noise_models import ZeroNoise
 
 class AgentRCcar(Agent):
 
@@ -65,7 +64,6 @@ class AgentRCcar(Agent):
         if T is None:
             T = policy._T
         policy_sample = Sample(meta_data=params, T=T)
-        noise = policy_args.get('noise', ZeroNoise(params))
 
         rate = rospy.Rate(1. / params['dt'])
         policy_sample.set_X(x0, t=0)
@@ -76,7 +74,7 @@ class AgentRCcar(Agent):
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
-            u_t = policy.act(x_t, o_t, t, noise=noise)
+            u_t = policy.act(x_t, o_t, t)
             self._logger.debug(time.time() - start)
             # only execute control if no collision
             if int(o_t[policy_sample.get_O_idxs(sub_obs='collision')][0]) == 0:

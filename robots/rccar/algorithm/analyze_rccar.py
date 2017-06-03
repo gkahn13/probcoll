@@ -173,8 +173,8 @@ class AnalyzeRCcar(Analyze):
             plt.xlabel('X position')
             plt.ylabel('Y position')
             # TODO not make this hard coded
-            plt.ylim([0, 60])
-            plt.xlim([-4.5, 4.5])
+            plt.ylim([-50, 75])
+            plt.xlim([-110, 25])
             for s in samples:
                 pos = s.get_X(sub_state='position')
                 is_coll = s.get_O(t=-1, sub_obs='collision')

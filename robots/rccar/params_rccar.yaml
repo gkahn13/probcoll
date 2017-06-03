@@ -14,23 +14,8 @@ probcoll:
   T: 28 # timesteps per trajectory
   max_iter: 300
   asynchronous_training: True
-  control_noise:
-    type: 'uniform' # zero / gaussian / uniform
-
-    zero: {}
-    gaussian:
-      std: [3.0, 0.3]
-    uniform:
-      lower: [-5., 0.]
-      upper: [5., 0.]
-
-  # TODO not used
-  epsilon_greedy:
-    epsilon: 0.1
-    control_range:
-      lower: [20., 16.]
-      upper: [80., 16.]
-
+  
+  #TODO
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   validation_noise: False
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
@@ -75,7 +60,7 @@ model:
   # NN training parameters
   device: 0
   gpu_fraction: 0.8 #TODO
-  reset_every_train: False # every time train is called, reinitialize weights?
+  reset_every_train: True # every time train is called, reinitialize weights?
   learning_rate: 0.001
   beta1: 0.9 # For Adam
   beta2: 0.999 # For Adam
@@ -139,6 +124,21 @@ planning:
       weight: [1., 1.] # [0.0001, 0.2]
     # TODO uncertainty
 #    pre_activation: True # wether std is before or after activation (sigmoid)
+  
+  epsilon_greedy:
+    epsilon: 0.1
+    lower: [20., 16.]
+    upper: [80., 16.]
+
+  control_noise:
+    type: 'gaussian' # zero / gaussian / uniform
+
+    zero: {}
+    gaussian:
+      std: [3.0, 0.3]
+    uniform:
+      lower: [-5., 0.]
+      upper: [5., 0.]
   
   num_dp: 16 # number of dropout passes to average over
   planner_type: 'cem' # random / primitives / cem
