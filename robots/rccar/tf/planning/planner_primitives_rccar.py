@@ -13,10 +13,13 @@ class PlannerPrimitivesRCcar(PlannerPrimitives):
             for speed in speeds:
                 val = n
                 control = []
+                horizon_left = self.probcoll_model.T
                 for i in xrange(num_steers):
                     index = val % s_len
                     val = val // s_len
-                    control += [[steers[index], speed]] * (self.probcoll_model.T//num_steers)
+                    cur_len = horizon_left // (num_steers - i)
+                    control += [[steers[index], speed]] * cur_len
+                    horizon_left -= cur_len
                 controls.append(np.array(control))
         controls = np.array(controls)
         self.primitives = tf.constant(controls, dtype=self.probcoll_model.dtype)
