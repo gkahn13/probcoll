@@ -7,8 +7,5 @@ class OpenLoopPolicy(Policy):
 
     # TODO
     def act(self, x, obs, t):
-        u, _ = self._planner.plan(x, obs)
-        return u
-#        sample = self._planner.plan(x, obs)
-#        u = sample.get_U(t=0)
-#        return u + noise.sample(u)
+        u, u_no_noise = self._planner.plan(x, obs, t)
+        return u, u_no_noise

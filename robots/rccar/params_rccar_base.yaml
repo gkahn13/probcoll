@@ -4,8 +4,8 @@
 
 dt: 0.25
 random_seed: 'sweep'
-config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
-exp_dir: '/home/adam/probcoll/experiments/rccar/sweep'
+config_file: '/home/avillaflor/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
+exp_dir: '/home/avillaflor/probcoll/experiments/rccar/sweep'
 exp_name: 'bair_car'
 
 ##########################
@@ -13,29 +13,11 @@ exp_name: 'bair_car'
 ##########################
 
 probcoll:
-  T: 28 # timesteps per trajectory
-  max_iter: 10
-  planner_type: 'sweep' # primitives / cem / teleop / straight / lattice
+  T: 256 # timesteps per trajectory
+  max_iter: 50
   asynchronous_training: True
-  control_noise:
-    type: 'sweep' # zero / gaussian / uniform
-
-    zero: {}
-    gaussian:
-      std: [3.0, 0.3]
-    uniform:
-      lower: [-5., 0.]
-      upper: [5., 0.]
-
-  epsilon_greedy:
-    epsilon: 'sweep'
-    control_range:
-      lower: [20., 16.]
-      upper: [80., 16.]
-
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-  validation_noise: False
-#  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
+#  init_data: '/home/avillaflor/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
 
   conditions:
@@ -65,8 +47,8 @@ model:
   T: 'sweep' # how many timesteps to predict
 
   control_range:
-    lower: [0., 0.]
-    upper: [99.0, 99.0]
+    lower: [0., -17.]
+    upper: [99.0, 17.]
   
   # what to use as input to prediction model
   X_order: []
@@ -79,8 +61,8 @@ model:
   gpu_fraction: 0.8 #TODO
   reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 'sweep'
-  beta1: 'sweep' # For Adam
-  beta2: 'sweep' # For Adam
+  beta1: 'sweep' # For avillaflor
+  beta2: 'sweep' # For avillaflor
   batch_size: 16
   display_batch: 100
   val_freq: 90 # How often you compute validation
@@ -94,9 +76,7 @@ model:
   dtype: 'float32'
   reg: 'sweep'
   num_bootstrap: 'sweep'
-  num_dropout_passes: 'sweep'
-  prob_coll_strictly_increasing: True 
-  recurrent: True
+  prob_coll_strictly_increasing: 'sweep' 
   mask: 'sweep' # all / last
 
   observation_graph:
@@ -106,6 +86,7 @@ model:
     strides: [2, 2, 2]
     padding: "VALID" 
     conv_activation: "relu" 
+    output_activation: 'tanh'
 
 #  action_graph:
 #    graph_type: 'fc' # fc / rnn
@@ -117,7 +98,6 @@ model:
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
-    num_units: 16 # state_size
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
     dropout: 0.9 # pct keep
 #    cell_args: # If you need to pass variables to cells 
@@ -131,31 +111,54 @@ model:
 
 planning:
   cost:
-    coll_cost: square # kinetic
-    eval_cost: 'speed * speed * sigmoid(probs_mean + 0.0*probs_std)'
-    weight: 1e3
-    coll_weight: 1e3 # TODO
-    u_des: [49.5, 16.] # TODO: hard-coded order: steering then speed
-    u_cost: [square, square]
-    u_weights: [1., 1.] # [0.0001, 0.2]
+    coll_cost:
+      cost: square # square
+      weight: [0., 1000.] # TODO
+    
+    control_cost:
+      des: [49.5, 16.] # TODO: hard-coded order: steering then speed
+      cost: square
+      weight: [1., 1.] # [0.0001, 0.2]
     # TODO uncertainty
-    pre_activation: True # wether std is before or after activation (sigmoid)
+#    pre_activation: True # wether std is before or after activation (sigmoid)
   
-  primitives:
-    steers: 'sweep'
-    speeds: 'sweep'
-    num_steers: 'sweep'
+  epsilon_greedy:
+    epsilon: 'sweep'
+    lower: [20., 16.]
+    upper: [80., 16.]
 
+  control_noise:
+    type: 'uniform' # zero / gaussian / uniform
+
+    zero: {}
+    gaussian:
+      std: [3.0, 0.3]
+    uniform:
+      lower: [-5., 0.]
+      upper: [5., 0.]
+  
+  num_dp: 8 # number of dropout passes to average over
+  planner_type: 'sweep' # random / primitives / cem
+  # specific to your primitives code
+  primitives:
+    steers: [20., 30., 40., 45., 50., 55., 60., 70., 80.]
+    speeds: [16.]
+    num_steers: 3
+
+  # control range for your planning algorithms
   control_range:
     lower: [20., 16.]
     upper: [80., 16.]
 
   random:
-    M: 128 # number of actions to sample from
+    K: 1024 # number of actions to sample from
 
   cem:
-    M: 128 # number of actions to sample from
+    init_M: 512 # number of actions to sample from
+    M: 128
     K: 16 # top actions you select
+    num_iters: 2 # does not include first sample    
+    eps: 0.01 # to ensure covariance is PD
 
 #############
 ### World ###
@@ -165,7 +168,7 @@ world:
 #  plot: False
   randomize: True
   sim: True 
-  do_back_up: False
+  do_back_up: True
 
   back_up:
     cmd_steer: [44.5, 54.5]
@@ -174,8 +177,8 @@ world:
 
 sim:
   srv: 'sim_env'
-  sim_env: 'hallway' # hallway / cory2
-  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
+  sim_env: 'cory2' # hallway / cory2
+  launch_file: '/home/avillaflor/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
   engineClamp: 1000.0

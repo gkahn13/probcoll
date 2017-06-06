@@ -44,7 +44,7 @@ class Planner(object):
         if self.params['epsilon_greedy']['epsilon'] > 0:
             self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], dtype=self.dtype)
 
-    def plan(self, x, o):
+    def plan(self, x, o, t):
         # TODO figure out general way to handle state
         o_input = o[self.probcoll_model.O_idxs()].reshape(1, -1)
         feed_dict = {self.X_inputs: [[[]]*self.probcoll_model.T], self.O_input: o_input}

@@ -2,8 +2,8 @@
 
 dt: 0.25
 random_seed: 2
-config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
-exp_dir: '/home/adam/probcoll/experiments/rccar'
+config_file: '/home/avillaflor/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
+exp_dir: '/home/avillaflor/probcoll/experiments/rccar'
 exp_name: 'bair_car_cory2'
 
 ##########################
@@ -11,14 +11,11 @@ exp_name: 'bair_car_cory2'
 ##########################
 
 probcoll:
-  T: 28 # timesteps per trajectory
+  T: 256 # timesteps per trajectory
   max_iter: 300
   asynchronous_training: True
-  
-  #TODO
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-  validation_noise: False
-#  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
+#  init_data: '/home/avillaflor/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
 
   conditions:
@@ -45,7 +42,7 @@ probcoll:
 ######################
     
 model:
-  T: 6 # how many timesteps to predict
+  T: 16 # how many timesteps to predict
 
   control_range:
     lower: [0., -17.]
@@ -58,12 +55,12 @@ model:
   output_order: ['collision'] # taken from observations O
 
   # NN training parameters
-  device: 0
+  device: 1
   gpu_fraction: 0.8 #TODO
-  reset_every_train: True # every time train is called, reinitialize weights?
+  reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 0.001
-  beta1: 0.9 # For Adam
-  beta2: 0.999 # For Adam
+  beta1: 0.9 # For avillaflor
+  beta2: 0.999 # For avillaflor
   batch_size: 16
   display_batch: 100 
   val_freq: 90 # How often you compute validation
@@ -131,7 +128,7 @@ planning:
     upper: [80., 16.]
 
   control_noise:
-    type: 'gaussian' # zero / gaussian / uniform
+    type: 'uniform' # zero / gaussian / uniform
 
     zero: {}
     gaussian:
@@ -141,12 +138,12 @@ planning:
       upper: [5., 0.]
   
   num_dp: 16 # number of dropout passes to average over
-  planner_type: 'cem' # random / primitives / cem
+  planner_type: 'primitives' # random / primitives / cem
   # specific to your primitives code
   primitives:
     steers: [40., 45., 50., 55., 60.]
     speeds: [16.]
-    num_steers: 6
+    num_steers: 3
 
   # control range for your planning algorithms
   control_range:
@@ -183,7 +180,7 @@ world:
 sim:
   srv: 'sim_env'
   sim_env: 'cory2' # hallway / cory2
-  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
+  launch_file: '/home/avillaflor/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
   engineClamp: 1000.0

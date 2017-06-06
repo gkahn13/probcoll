@@ -25,23 +25,26 @@ class Agent(object):
             T = policy._T
         policy_sample = Sample(meta_data=params, T=T)
         policy_sample.set_X(x0, t=0)
+        policy_sample_no_noise = Sample(meta_data=params, T=T)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
-            u_t = policy.act(x_t, o_t, t)
+            u_t, u_t_no_noise = policy.act(x_t, o_t, t)
 
             # record
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
             policy_sample.set_U(u_t, t=t)
+            policy_sample_no_noise.set_U(u_t_no_noise, t=t)
+
 
             # propagate dynamics
             if t < T-1:
                 x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
 
-        return policy_sample
+        return policy_sample, policy_sample_no_noise
 
     @abc.abstractmethod
     def reset(self, x):

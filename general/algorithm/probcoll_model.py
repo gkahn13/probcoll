@@ -1087,8 +1087,9 @@ class ProbcollModel:
             self._queue_threads = tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
             self.threads += self._queue_threads
 
-        self._logger.debug('Flushing queue')
-        self._flush_queue()
+        #TODO do you need to flush here
+#        self._logger.debug('Flushing queue')
+#        self._flush_queue()
         ### create plotter
         plotter = MLPlotter(
             self.save_dir,
