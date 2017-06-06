@@ -209,9 +209,10 @@ U:
 
 O:
   use_depth: True
-  
-  dim: 577
-  order: ['camera', 'collision']
+  use_back_camera: False
+
+  dim: 1153
+  order: ['camera', 'back_camera', 'collision']
 
   camera:
     idx: 0
@@ -220,7 +221,14 @@ O:
     width: 18
     num_channels: 1
     noise: 0.01
-  collision: {idx: 576, dim: 1, buffer: 0.0}
+  back_camera:
+    idx: 576
+    dim: 576
+    height: 32
+    width: 18
+    num_channels: 1
+    noise: 0.01
+  collision: {idx: 1152, dim: 1, buffer: 0.0}
 
 ##################
 ### ros topics ###

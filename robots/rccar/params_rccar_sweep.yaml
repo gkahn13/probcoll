@@ -1,13 +1,13 @@
 # Contains lists to sweep over for every sweep param in the base file
 
-random_seed: [0, 1, 2, 3, 4]
+random_seed: [0, 1, 2]
 
 ######################
 ### Probcoll model ###
 ######################
     
 model:
-  T: [8, 16, 24, 32] # how many timesteps to predict
+  T: [8, 16, 24] # how many timesteps to predict
 
   learning_rate: [0.001]
   beta1: [0.9] # For Adam

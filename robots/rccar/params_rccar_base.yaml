@@ -14,7 +14,7 @@ exp_name: 'bair_car'
 
 probcoll:
   T: 256 # timesteps per trajectory
-  max_iter: 50
+  max_iter: 150
   asynchronous_training: True
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 #  init_data: '/home/avillaflor/gps_quadrotor/experiments/rccar/init_data_real'
@@ -207,9 +207,9 @@ U:
 
 O:
   use_depth: 'sweep'
-  
-  dim: 577
-  order: ['camera', 'collision']
+
+  dim: 1153
+  order: ['camera', 'back_camera', 'collision']
 
   camera:
     idx: 0
@@ -218,7 +218,14 @@ O:
     width: 18
     num_channels: 1
     noise: 0.01
-  collision: {idx: 576, dim: 1, buffer: 0.0}
+  back_camera:
+    idx: 576
+    dim: 576
+    height: 32
+    width: 18
+    num_channels: 1
+    noise: 0.01
+  collision: {idx: 1152, dim: 1, buffer: 0.0}
 
 ##################
 ### ros topics ###
