@@ -42,6 +42,8 @@ class AgentRCcar(Agent):
             self.sim_coll = data.coll
             self.sim_image = data.image
             self.sim_depth = data.depth
+            self.sim_back_image = data.back_image
+            self.sim_back_depth = data.back_depth
             self.sim_state = data.pose
             self.sim_vel = 0.0
             self.sim_steer = 0.0
@@ -197,4 +199,6 @@ class AgentRCcar(Agent):
             self.sim_coll = data.coll
             self.sim_image = data.image
             self.sim_depth = data.depth
+            self.sim_back_image = data.back_image
+            self.sim_back_depth = data.back_depth
             self.sim_state = data.pose

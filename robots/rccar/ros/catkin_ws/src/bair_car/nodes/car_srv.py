@@ -15,7 +15,7 @@ import abc
 
 from panda3d.core import loadPrcFile
 from pandac.PandaModules import loadPrcFileData
-loadPrcFileData('', 'window-type offscreen')
+#loadPrcFileData('', 'window-type offscreen')
 from panda3d_camera_sensor import Panda3dCameraSensor
 import direct.directbase.DirectStart
 from direct.showbase.DirectObject import DirectObject
@@ -78,8 +78,8 @@ class CarSrv(DirectObject):
         # ROS
         self.crash_pub = rospy.Publisher('crash', std_msgs.msg.Empty, queue_size = 1)
         self.bridge = cv_bridge.CvBridge()
-#        taskMgr.add(self.update, 'updateWorld')
-        self.start_update_server()
+        taskMgr.add(self.update, 'updateWorld')
+#        self.start_update_server()
     
     # _____HANDLER_____
 
@@ -170,13 +170,20 @@ class CarSrv(DirectObject):
             
             # Get observation
             obs = self.camera_sensor.observe()
+            back_obs = self.back_camera_sensor.observe()
             cam_image = self.get_ros_image(obs[0])
             cam_depth = self.get_ros_image(obs[1], image_format="passthrough")
             self.camera_pub.publish_image(obs[0])
             self.depth_pub.publish_image(
                 obs[1],
                 image_format="passthrough")
-            return [collision, cam_image, cam_depth, state] 
+            back_cam_image = self.get_ros_image(back_obs[0])
+            back_cam_depth = self.get_ros_image(back_obs[1], image_format="passthrough")
+            self.back_camera_pub.publish_image(back_obs[0])
+            self.back_depth_pub.publish_image(
+                back_obs[1],
+                image_format="passthrough")
+            return [collision, cam_image, cam_depth, back_cam_image, back_cam_depth, state] 
         return sim_env_handler
 
     def load_vehicle(self, pos=(0.0, 0.0, -0.6), quat=None):
@@ -186,17 +193,18 @@ class CarSrv(DirectObject):
         shape = BulletBoxShape(Vec3(0.6, 1.4, 0.5))
         ts = TransformState.makePos(Point3(0, 0, 0.5))
 
-        self.vehicle_pointer = np = self.worldNP.attachNewNode(BulletRigidBodyNode('Vehicle'))
-        np.node().addShape(shape, ts)
+        self.vehicle_pointer = self.worldNP.attachNewNode(BulletRigidBodyNode('Vehicle'))
+        self.vehicle_node = self.vehicle_pointer.node()
+        self.vehicle_node.addShape(shape, ts)
         self.previous_pos = pos
-        np.setPos(pos[0], pos[1], pos[2])
+        self.vehicle_pointer.setPos(pos[0], pos[1], pos[2])
         if quat is not None:
-            np.setQuat(quat)
-        self.previous_quat = np.getQuat()
-        np.node().setMass(self._mass)
-        np.node().setDeactivationEnabled(False)
+            self.vehicle_pointer.setQuat(quat)
+        self.previous_quat = self.vehicle_pointer.getQuat()
+        self.vehicle_node.setMass(self._mass)
+        self.vehicle_node.setDeactivationEnabled(False)
 
-        first_person = self.params['first_person']
+#        first_person = self.params['first_person']
         self.camera_sensor = Panda3dCameraSensor(
             base,
             color=True,
@@ -204,28 +212,47 @@ class CarSrv(DirectObject):
             size=(160,90))
 
         self.camera_node = self.camera_sensor.cam
-        if first_person:
-            self.camera_node.reparentTo(np)
-            self.camera_node.setPos(0.0, 1.0, 1.0)
-            self.camera_node.lookAt(0.0, 6.0, 0.0)
-        else:
-            self.camera_node.reparentTo(np)
-            self.camera_node.setPos(0.0, -10.0, 5.0)
-            self.camera_node.lookAt(0.0, 5.0, 0.0)
-        
-        self.world.attachRigidBody(np.node())
+#        if first_person:
+#            self.camera_node.setPos(0.0, 1.0, 1.0)
+#            self.camera_node.lookAt(0.0, 6.0, 0.0)
+#        else:
+#            self.camera_node.setPos(0.0, -10.0, 5.0)
+#            self.camera_node.lookAt(0.0, 5.0, 0.0)
 
-        np.node().setCcdSweptSphereRadius(1.0)
-        np.node().setCcdMotionThreshold(1e-7)
+        self.camera_node.reparentTo(self.vehicle_pointer)
+        self.camera_node.setPos(0.0, 1.0, 1.0)
+        self.camera_node.lookAt(0.0, 6.0, 0.0)
+
+        self.back_camera_sensor = Panda3dCameraSensor(
+            base,
+            color=True,
+            depth=True,
+            size=(160,90))
+
+        self.back_camera_node = self.back_camera_sensor.cam
+#        if first_person:
+#            self.camera_node.setPos(0.0, 1.0, 1.0)
+#            self.camera_node.lookAt(0.0, 6.0, 0.0)
+#        else:
+#            self.camera_node.setPos(0.0, -10.0, 5.0)
+#            self.camera_node.lookAt(0.0, 5.0, 0.0)
+
+        self.back_camera_node.reparentTo(self.vehicle_pointer)
+        self.back_camera_node.setPos(0.0, -1.0, 1.0)
+        self.back_camera_node.lookAt(0.0, -6.0, 0.0)
+
+        self.world.attachRigidBody(self.vehicle_node)
+
+        self.vehicle_node.setCcdSweptSphereRadius(1.0)
+        self.vehicle_node.setCcdMotionThreshold(1e-7)
 
         # Vehicle
-        self.vehicle_node = np.node()
         self.vehicle = BulletVehicle(self.world, self.vehicle_node)
         self.vehicle.setCoordinateSystem(ZUp)
         self.world.attachVehicle(self.vehicle)
 
         self.yugoNP = loader.loadModel('../models/yugo/yugo.egg')
-        self.yugoNP.reparentTo(np)
+        self.yugoNP.reparentTo(self.vehicle_pointer)
 
         self._wheels = []
         # Right front wheel
@@ -271,6 +298,8 @@ class CarSrv(DirectObject):
         self.engineClamp = self.params['engineClamp']
         self.camera_pub = ImageROSPublisher("image")
         self.depth_pub = ImageROSPublisher("depth")
+        self.back_camera_pub = ImageROSPublisher("back_image")
+        self.back_depth_pub = ImageROSPublisher("back_depth")
         s = rospy.Service('sim_env', bair_car.srv.sim_env, self.get_handler())
         rospy.spin()
 
@@ -278,7 +307,8 @@ class CarSrv(DirectObject):
         dt = globalClock.getDt()
 
         self.world.doPhysics(dt, 10, 0.008)
-
+        obs = self.camera_sensor.observe()
+        obs = self.back_camera_sensor.observe()
         return task.cont
     
     def cleanup(self):

@@ -11,7 +11,7 @@ exp_name: 'bair_car_cory2'
 ##########################
 
 probcoll:
-  T: 28 # timesteps per trajectory
+  T: 256 # timesteps per trajectory
   max_iter: 300
   asynchronous_training: True
   
@@ -45,7 +45,7 @@ probcoll:
 ######################
     
 model:
-  T: 6 # how many timesteps to predict
+  T: 8 # how many timesteps to predict
 
   control_range:
     lower: [0., -17.]
@@ -141,12 +141,12 @@ planning:
       upper: [5., 0.]
   
   num_dp: 16 # number of dropout passes to average over
-  planner_type: 'cem' # random / primitives / cem
+  planner_type: 'primitives' # random / primitives / cem
   # specific to your primitives code
   primitives:
     steers: [40., 45., 50., 55., 60.]
     speeds: [16.]
-    num_steers: 6
+    num_steers: 3
 
   # control range for your planning algorithms
   control_range:
