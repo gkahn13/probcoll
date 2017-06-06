@@ -11,15 +11,12 @@ from general.tf.planning.planner_random import PlannerRandom
 from general.tf.planning.planner_cem import PlannerCem
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
-#from robots.rccar.algorithm.cost_probcoll_rccar import CostProbcollRCcar
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 import robots.rccar.ros.ros_utils as ros_utils
 from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 from robots.rccar.agent.agent_rccar import AgentRCcar
 from robots.rccar.dynamics.dynamics_rccar import DynamicsRCcar
-#from robots.rccar.planning.primitives_rccar import PrimitivesRCcar
-#from robots.rccar.planning.cost.cost_velocity_rccar import cost_velocity_rccar
 from robots.rccar.world.world_rccar import WorldRCcar
 from config import params
 

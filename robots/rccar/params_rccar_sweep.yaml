@@ -1,49 +1,35 @@
 # Contains lists to sweep over for every sweep param in the base file
 
-random_seed: [0]
-
-##########################
-### Probcoll algorithm ###
-##########################
-
-probcoll:
-  planner_type: ['primitives'] # primitives / cem / teleop / straight / lattice
-  control_noise:
-    type: ['uniform'] # zero / gaussian / uniform
-
-  epsilon_greedy:
-    epsilon: [0.1]
+random_seed: [0, 1, 2]
 
 ######################
 ### Probcoll model ###
 ######################
     
 model:
-  T: [6] # how many timesteps to predict
+  T: [8, 16, 24] # how many timesteps to predict
 
   learning_rate: [0.001]
-  beta1: [0.8] # For Adam
+  beta1: [0.9] # For Adam
   beta2: [0.999] # For Adam
 
   reg: [0.0]
   num_bootstrap: [1]
-  num_dropout_passes: [10]
-  mask: ["all"] # all / last
+  prob_coll_strictly_increasing: [True, False] 
+  mask: ['all', 'last'] # all / last
 
 #################################################
 ### Planning objective and optimizer settings ###
 #################################################
 
 planning:
-  primitives:
-    steers : [[40., 45., 50., 55., 60.]]
-    speeds : [[16.]]
-    num_steers : [2]
-  # TODO: other planning methods here
+  planner_type: ['random', 'cem']
+  epsilon_greedy:
+    epsilon: [0.0, 0.1]
 
 ######################################################
 ########### States, controls, observations ###########
 ######################################################
 
 O:
-  use_depth: [True, False]
+  use_depth: [True]

@@ -14,10 +14,7 @@ probcoll:
   T: 256 # timesteps per trajectory
   max_iter: 300
   asynchronous_training: True
-  
-  #TODO
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-  validation_noise: False
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
 
@@ -45,7 +42,7 @@ probcoll:
 ######################
     
 model:
-  T: 8 # how many timesteps to predict
+  T: 16 # how many timesteps to predict
 
   control_range:
     lower: [0., -17.]
@@ -60,10 +57,10 @@ model:
   # NN training parameters
   device: 0
   gpu_fraction: 0.8 #TODO
-  reset_every_train: True # every time train is called, reinitialize weights?
+  reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 0.001
-  beta1: 0.9 # For Adam
-  beta2: 0.999 # For Adam
+  beta1: 0.9 # For adam
+  beta2: 0.999 # For adam
   batch_size: 16
   display_batch: 100 
   val_freq: 90 # How often you compute validation
@@ -131,7 +128,7 @@ planning:
     upper: [80., 16.]
 
   control_noise:
-    type: 'gaussian' # zero / gaussian / uniform
+    type: 'uniform' # zero / gaussian / uniform
 
     zero: {}
     gaussian:
@@ -212,9 +209,9 @@ U:
 
 O:
   use_depth: True
-  
-  dim: 577
-  order: ['camera', 'collision']
+
+  dim: 1153
+  order: ['camera', 'back_camera', 'collision']
 
   camera:
     idx: 0
@@ -223,7 +220,14 @@ O:
     width: 18
     num_channels: 1
     noise: 0.01
-  collision: {idx: 576, dim: 1, buffer: 0.0}
+  back_camera:
+    idx: 576
+    dim: 576
+    height: 32
+    width: 18
+    num_channels: 1
+    noise: 0.01
+  collision: {idx: 1152, dim: 1, buffer: 0.0}
 
 ##################
 ### ros topics ###

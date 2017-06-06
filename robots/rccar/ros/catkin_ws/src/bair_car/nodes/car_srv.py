@@ -15,7 +15,7 @@ import abc
 
 from panda3d.core import loadPrcFile
 from pandac.PandaModules import loadPrcFileData
-#loadPrcFileData('', 'window-type offscreen')
+loadPrcFileData('', 'window-type offscreen')
 from panda3d_camera_sensor import Panda3dCameraSensor
 import direct.directbase.DirectStart
 from direct.showbase.DirectObject import DirectObject
@@ -78,8 +78,8 @@ class CarSrv(DirectObject):
         # ROS
         self.crash_pub = rospy.Publisher('crash', std_msgs.msg.Empty, queue_size = 1)
         self.bridge = cv_bridge.CvBridge()
-        taskMgr.add(self.update, 'updateWorld')
-#        self.start_update_server()
+#        taskMgr.add(self.update, 'updateWorld')
+        self.start_update_server()
     
     # _____HANDLER_____
 

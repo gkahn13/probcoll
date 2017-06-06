@@ -65,10 +65,10 @@ class AgentRCcar(Agent):
     def sample_policy(self, x0, policy, T=None, **policy_args):
         if T is None:
             T = policy._T
-        policy_sample = Sample(meta_data=params, T=T)
-
         rate = rospy.Rate(1. / params['dt'])
+        policy_sample = Sample(meta_data=params, T=T)
         policy_sample.set_X(x0, t=0)
+        policy_sample_no_noise = Sample(meta_data=params, T=T)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
@@ -76,7 +76,7 @@ class AgentRCcar(Agent):
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
-            u_t = policy.act(x_t, o_t, t)
+            u_t, u_t_no_noise = policy.act(x_t, o_t, t)
             self._logger.debug(time.time() - start)
             # only execute control if no collision
             if int(o_t[policy_sample.get_O_idxs(sub_obs='collision')][0]) == 0:
@@ -86,7 +86,8 @@ class AgentRCcar(Agent):
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
             policy_sample.set_U(u_t, t=t)
-
+            policy_sample_no_noise.set_U(u_t_no_noise, t=t)
+            
             # In sim we do not have cycles
             if self.sim:
                 policy_sample.set_O([int(self.sim_coll)], t=t, sub_obs='collision')
@@ -100,7 +101,7 @@ class AgentRCcar(Agent):
                 # see if collision in the past cycle
                 policy_sample.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
 
-        return policy_sample
+        return policy_sample, policy_sample_no_noise
 
     def reset(self, x):
         pass
@@ -129,6 +130,8 @@ class AgentRCcar(Agent):
             is_coll = self.sim_coll
             image_msg = self.sim_image
             depth_msg = self.sim_depth
+            back_image_msg = self.sim_back_image
+            back_depth_msg = self.sim_back_depth
         else:
             ### collision
             coll_time = self.coll_callback.get()
@@ -147,13 +150,15 @@ class AgentRCcar(Agent):
         
         if params['O'].get('use_depth', False):
             im = AgentRCcar.process_depth(depth_msg, self.cv_bridge)
-            ros_image = self.cv_bridge.cv2_to_imgmsg(im, "mono8")
+            back_im = AgentRCcar.process_depth(back_depth_msg, self.cv_bridge)
         else:
             im = AgentRCcar.process_image(image_msg, self.cv_bridge)
-            ros_image = self.cv_bridge.cv2_to_imgmsg(im, "mono8")
+            back_im = AgentRCcar.process_image(back_image_msg, self.cv_bridge)
 
+        ros_image = self.cv_bridge.cv2_to_imgmsg(back_im, "mono8")
         self.pred_image_pub.publish(ros_image)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
+        obs_sample.set_O(back_im.ravel(), t=0, sub_obs='back_camera')
         obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
         return obs_sample.get_O(t=0)
 
