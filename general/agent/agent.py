@@ -10,7 +10,7 @@ class Agent(object):
 
     def __init__(self, dynamics):
         self._dynamics = dynamics
-        self._logger = get_logger(self.__class__.__name__, 'info')
+        self._logger = get_logger(self.__class__.__name__, params['world']['logger'])
 
     def sample_policy(self, x0, policy, T=None, **policy_args):
         """

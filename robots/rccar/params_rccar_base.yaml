@@ -19,7 +19,7 @@ probcoll:
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 #  init_data: '/home/avillaflor/gps_quadrotor/experiments/rccar/init_data_real'
 #  init_epochs: 100
-
+  logger: 'fatal'
   conditions:
     repeats: 5 # TODO
     num_test: 1
@@ -45,11 +45,11 @@ probcoll:
     
 model:
   T: 'sweep' # how many timesteps to predict
-
+  logger: 'fatal'
   control_range:
     lower: [0., -17.]
     upper: [99.0, 17.]
-  
+  center_O: False 
   # what to use as input to prediction model
   X_order: []
   U_order: ['cmd_steer', 'cmd_vel']
@@ -77,16 +77,17 @@ model:
   reg: 'sweep'
   num_bootstrap: 'sweep'
   prob_coll_strictly_increasing: 'sweep' 
-  mask: 'sweep' # all / last
+  mask: 'all' # all / last
 
   observation_graph:
     graph_type: "cnn"
     filters: [4, 4, 4]
     kernels: [3, 3, 3]
     strides: [2, 2, 2]
-    padding: "VALID" 
+    padding: 'SAME'
+    use_batch_norm: True 
     conv_activation: "relu" 
-    output_activation: 'tanh'
+#    output_activation: 'tanh'
 
 #  action_graph:
 #    graph_type: 'fc' # fc / rnn
@@ -113,18 +114,18 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [0., 1000.] # TODO
+      weight: [0., 10.] # TODO
     
     control_cost:
       des: [49.5, 16.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [1., 1.] # [0.0001, 0.2]
+      weight: [0., 1.] # [0.0001, 0.2]
     # TODO uncertainty
 #    pre_activation: True # wether std is before or after activation (sigmoid)
   
   epsilon_greedy:
     epsilon: 'sweep'
-    lower: [20., 16.]
+    lower: [20., 8.]
     upper: [80., 16.]
 
   control_noise:
@@ -137,25 +138,25 @@ planning:
       lower: [-5., 0.]
       upper: [5., 0.]
   
-  num_dp: 8 # number of dropout passes to average over
+  num_dp: 16 # number of dropout passes to average over
   planner_type: 'sweep' # random / primitives / cem
   # specific to your primitives code
   primitives:
-    steers: [20., 30., 40., 45., 50., 55., 60., 70., 80.]
+    steers: [30., 40., 50., 60., 70.]
     speeds: [16.]
-    num_steers: 3
+    num_splits: 4
 
   # control range for your planning algorithms
   control_range:
-    lower: [20., 16.]
+    lower: [20., 8.]
     upper: [80., 16.]
 
   random:
-    K: 1024 # number of actions to sample from
+    K: 2048 # number of actions to sample from
 
   cem:
     init_M: 512 # number of actions to sample from
-    M: 128
+    M: 256
     K: 16 # top actions you select
     num_iters: 2 # does not include first sample    
     eps: 0.01 # to ensure covariance is PD
@@ -166,6 +167,7 @@ planning:
 
 world:
 #  plot: False
+  logger: 'fatal'
   randomize: True
   sim: True 
   do_back_up: True

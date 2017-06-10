@@ -5,6 +5,7 @@ import multiprocessing
 import subprocess
 import os
 import signal
+import time
 
 from robots.rccar.tf.planning.planner_primitives_rccar import PlannerPrimitivesRCcar
 from general.tf.planning.planner_random import PlannerRandom
@@ -12,7 +13,7 @@ from general.tf.planning.planner_cem import PlannerCem
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
-import robots.rccar.ros.ros_utils as ros_utils
+from robots.rccar.ros import ros_utils
 from general.state_info.conditions import Conditions
 from general.state_info.sample import Sample
 from robots.rccar.agent.agent_rccar import AgentRCcar
@@ -52,8 +53,6 @@ class ProbcollRCcar(Probcoll):
         ### load prediction neural net
         self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
 
-        self._async_on = False
-
         rccar_topics = params['rccar']['topics']
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
         self.good_rollout_callback = ros_utils.RosCallbackEmpty(rccar_topics['good_rollout'], std_msgs.msg.Empty)
@@ -88,7 +87,7 @@ class ProbcollRCcar(Probcoll):
     ### Run methods ###
     ###################
 
-    def _run_training(self):
+    def _run_training(self, itr):
         if self._asynchronous:
             self._probcoll_model.recover()
             if not self._async_on:
@@ -96,7 +95,72 @@ class ProbcollRCcar(Probcoll):
                 self._async_on = True
         else:
             self._probcoll_model.train(reset=params['model']['reset_every_train'])
-    
+   
+    def _run_testing(self, itr):
+        if (itr != 0 and (itr == self._max_iter - 1 \
+                or itr % params['world']['testing']['itr_freq'] == 0)): 
+            self._logger.info('Itr {0} testing'.format(itr))
+            if self._agent.sim:
+#                if self._async_on:
+#                    self._logger.debug('Recovering probcoll model')
+#                    self._probcoll_model.recover()
+                T = params['probcoll']['T']
+                conditions = params['world']['testing']['positions']
+                samples = []
+                reset_pos, reset_quat = self._agent.get_sim_state_data() 
+                for cond in xrange(len(conditions)):
+                    self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
+                    start = time.time()
+                    self._agent.execute_control(None, reset=True, pos=conditions[cond])
+                    x0 = self._conditions.get_cond(0)
+                    sample_T = Sample(meta_data=params, T=T)
+                    sample_T.set_X(x0, t=0)
+                    for t in xrange(T):
+                        x0 = sample_T.get_X(t=t)
+
+                        rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, T=1, use_noise=False)
+                        
+                        o = rollout.get_O(t=0)
+                        u = rollout_no_noise.get_U(t=0)
+
+                        sample_T.set_U(u, t=t)
+                        sample_T.set_O(o, t=t)
+                        
+                        if not self._use_dynamics:
+                            sample_T.set_X(rollout.get_X(t=0), t=t)
+                        
+                        if self._world.is_collision(sample_T, t=t):
+                            self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
+                            break
+
+                        if self._use_dynamics:
+                            if t < T-1:
+                                x_tp1 = self._dynamics.evolve(x0, u)
+                                sample_T.set_X(x_tp1, t=t+1)
+
+                    else:
+                        self._logger.info('\t\t\tLasted for t={0}'.format(t))
+
+                    sample = sample_T.match(slice(0, t + 1))
+
+                    if not self._is_good_rollout(sample, t):
+                        self._logger.warning('\t\t\tNot good rollout. Repeating rollout.'.format(t))
+                        continue
+
+                    samples.append(sample)
+
+                    assert(samples[-1].isfinite())
+                    elapsed = time.time() - start
+                    self._logger.info('\t\t\tFinished cond {0} of testing ({1:.1f}s, {2:.3f}x real-time)'.format(
+                        cond,
+                        elapsed,
+                        t*params['dt']/elapsed))
+
+                self._itr_save_samples(itr, samples, prefix='testing_')
+                self._agent.execute_control(None, reset=True, pos=reset_pos, quat=reset_quat)
+            else:
+                pass
+
     ####################
     ### Save methods ###
     ####################

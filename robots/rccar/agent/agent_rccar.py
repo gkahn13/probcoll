@@ -3,6 +3,7 @@ import cv2
 import rospy
 import sensor_msgs
 import std_msgs
+import geometry_msgs
 import cv_bridge
 import os
 import time
@@ -62,7 +63,7 @@ class AgentRCcar(Agent):
 
         self.cv_bridge = cv_bridge.CvBridge()
 
-    def sample_policy(self, x0, policy, T=None, **policy_args):
+    def sample_policy(self, x0, policy, T=None, use_noise=True, **policy_args):
         if T is None:
             T = policy._T
         rate = rospy.Rate(1. / params['dt'])
@@ -79,8 +80,12 @@ class AgentRCcar(Agent):
             u_t, u_t_no_noise = policy.act(x_t, o_t, t)
             self._logger.debug(time.time() - start)
             # only execute control if no collision
+            # TODO is this necessary
             if int(o_t[policy_sample.get_O_idxs(sub_obs='collision')][0]) == 0:
-                self.execute_control(u_t)
+                if use_noise:
+                    self.execute_control(u_t)
+                else:
+                    self.execute_control(u_t_no_noise)
 
             # record
             policy_sample.set_X(x_t, t=t)
@@ -122,7 +127,22 @@ class AgentRCcar(Agent):
         state_sample.set_X(state[3:], t=0, sub_state='orientation')
         x = np.nan_to_num(xt) + np.nan_to_num(state_sample.get_X(t=0))
         return x
-        
+
+    def get_sim_state_data(self):
+        state_msg = self.sim_state
+        pos = [
+                state_msg.position.x,
+                state_msg.position.y,
+                state_msg.position.z,
+            ]
+        quat = [
+                state_msg.orientation.x,
+                state_msg.orientation.y,
+                state_msg.orientation.z,
+                state_msg.orientation.w
+            ]
+        return pos, quat
+
     def get_observation(self, x):
         obs_sample = Sample(meta_data=params, T=2)
 
@@ -155,7 +175,7 @@ class AgentRCcar(Agent):
             im = AgentRCcar.process_image(image_msg, self.cv_bridge)
             back_im = AgentRCcar.process_image(back_image_msg, self.cv_bridge)
 
-        ros_image = self.cv_bridge.cv2_to_imgmsg(back_im, "mono8")
+        ros_image = self.cv_bridge.cv2_to_imgmsg(im, "mono8")
         self.pred_image_pub.publish(ros_image)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
         obs_sample.set_O(back_im.ravel(), t=0, sub_obs='back_camera')
@@ -185,7 +205,7 @@ class AgentRCcar(Agent):
             interpolation=cv2.INTER_AREA) #TODO how does this deal with aspect ratio 
         return im
 
-    def execute_control(self, u, reset=False):
+    def execute_control(self, u, reset=False, pos=None, quat=None):
         if u is not None:
             s = Sample(meta_data=params, T=2)
             steer = u[s.get_U_idxs('cmd_steer')][0]
@@ -198,7 +218,20 @@ class AgentRCcar(Agent):
             self.cmd_steer_pub.publish(std_msgs.msg.Float32(49.5))
             self.cmd_vel_pub.publish(std_msgs.msg.Float32(0.))
             if self.sim:
-                data = self.srv(reset=reset)
+                if reset:
+                    if quat is None:
+                        quat = [0.0, 0.0, 0.0, 0.0]
+                    if pos is None:
+                        if len(params['world']['testing']['positions']) > 0:
+                            pos = params['world']['testing']['positions'][np.random.randint(len(params['world']['testing']['positions']))]
+                        else:
+                            pos = [0.0, 0.0, 0.0]
+                    pose = geometry_msgs.msg.Pose()
+                    pose.position.x, pose.position.y, pose.position.z = pos
+                    pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w = quat
+                    data = self.srv(reset=True, pose=pose)
+                else:
+                    data = self.srv()
         if self.sim:
             self.sim_last_coll = self.sim_coll
             self.sim_coll = data.coll

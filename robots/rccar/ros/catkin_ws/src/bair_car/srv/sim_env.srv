@@ -3,6 +3,7 @@ float32 steer
 float32 motor
 float32 vel
 bool reset
+geometry_msgs/Pose pose
 ---
 #response fields
 bool coll

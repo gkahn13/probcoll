@@ -13,7 +13,6 @@ class Analyze:
         self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
 
         yamls = [fname for fname in os.listdir(self._save_dir) if '.yaml' in fname and '~' not in fname]
-#        assert(len(yamls) == 1)
         yaml_path = os.path.join(self._save_dir, yamls[0])
         load_params(yaml_path)
         params['yaml_path'] = yaml_path
@@ -51,6 +50,14 @@ class Analyze:
         return self._plot_stats_file.replace('.png', '.pkl')
 
     @property
+    def _plot_testing_stats_file(self):
+        return os.path.join(self._save_dir, self._image_folder, 'testing_stats_{0}.png'.format(params['exp_name']))
+
+    @property
+    def _plot_testing_stats_file_pkl(self):
+        return self._plot_testing_stats_file.replace('.png', '.pkl')
+
+    @property
     def _plot_pred_mean_file(self):
         return os.path.join(self._save_dir, self._image_folder, 'pred_mean_{0}.png'.format(params['exp_name']))
 
@@ -83,6 +90,15 @@ class Analyze:
     def _itr_load_samples(self, itr):
         fname = os.path.join(self._itr_dir(itr), 'samples_itr_{0}.npz'.format(itr))
         return Sample.load(fname)
+
+    def _itr_load_testing_samples(self, itr):
+        fname = os.path.join(self._itr_dir(itr), 'testing_samples_itr_{0}.npz'.format(itr))
+        if os.path.exists(fname):
+            return Sample.load(fname)
+        elif not os.path.exists(self._itr_dir(itr)):
+            raise Exception()
+        else:
+            return None
 
     def _itr_load_mpcs(self, itr):
         fname = os.path.join(self._itr_dir(itr), 'mpcs_itr_{0}.pkl'.format(itr))
@@ -133,6 +149,22 @@ class Analyze:
 
             self._logger.info('Loaded initial dataset of {0} samples'.format(num_init_samples))
 
+        return samples_itrs
+
+    def _load_testing_samples(self):
+        samples_itrs = []
+
+        itr = 0
+        while True:
+            try:
+                sample = self._itr_load_testing_samples(itr)
+                if sample is not None:
+                    samples_itrs.append(sample)
+                itr += 1
+            except:
+                break
+
+        self._logger.info('Loaded {0} testing iterations of samples'.format(len(samples_itrs)))
         return samples_itrs
 
     def _load_mpcs(self):

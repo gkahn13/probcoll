@@ -10,7 +10,7 @@ class World(object):
         """
         :param wp: world params
         """
-        self._logger = get_logger(self.__class__.__name__, 'info')
+        self._logger = get_logger(self.__class__.__name__, params['world']['logger'])
 
         self.wp = wp if wp is not None else params['world']
 

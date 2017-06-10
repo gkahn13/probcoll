@@ -120,7 +120,7 @@ class CarSrv(DirectObject):
             motor = req.motor
             vel = req.vel
             reset = req.reset
-            
+            pose = req.pose 
             # If motor is default then use velocity
             if motor==0.0:
                 cmd_motor = numpy.clip(vel * 3 + 49.5, 0., 99.)
@@ -135,18 +135,28 @@ class CarSrv(DirectObject):
             if reset:
                 self.steering = 0.0       # degree
                 self.engineForce = 0.0
-                self.doReset()
-            
+                pos = pose.position.x, pose.position.y, pose.position.z
+                quat = pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w
+                if numpy.all(numpy.array(pos) == 0.):
+                    self.doReset()
+                else:
+                    self.doReset(pos=pos, quat=quat)
+
             self.vehicle.setSteeringValue(self.steering, 0)
             self.vehicle.setSteeringValue(self.steering, 1)
             self.vehicle.setBrake(100.0, 2)
             self.vehicle.setBrake(100.0, 3)
             self.vehicle.applyEngineForce(self.engineForce, 2)
             self.vehicle.applyEngineForce(self.engineForce, 3)
-            
+           
+            pos = numpy.array(self.vehicle_pointer.getPos())
+            np_quat = self.vehicle_pointer.getQuat()
+            quat = numpy.array(np_quat)
+            self.previous_pos = pos
+            self.previous_quat = np_quat
+
             # TODO maybe change number of timesteps
             self.world.doPhysics(self.dt, 10, 0.05)
-            
             # Collision detection
             result = self.world.contactTest(self.vehicle_node)
             collision = result.getNumContacts() > 0
@@ -160,8 +170,6 @@ class CarSrv(DirectObject):
             pos = numpy.array(self.vehicle_pointer.getPos())
             np_quat = self.vehicle_pointer.getQuat()
             quat = numpy.array(np_quat)
-#            hpr = numpy.array(self.vehicle_pointer.getHpr())
-#            print(hpr)
             self.previous_pos = pos
             self.previous_quat = np_quat
             state.position.x, state.position.y, state.position.z = pos
@@ -186,7 +194,7 @@ class CarSrv(DirectObject):
             return [collision, cam_image, cam_depth, back_cam_image, back_cam_depth, state] 
         return sim_env_handler
 
-    def load_vehicle(self, pos=(0.0, 0.0, -0.6), quat=None):
+    def load_vehicle(self, pos=(0.0, -20.0, -0.6), quat=None):
         # Chassis
         self._mass = self.params['mass']
         #chassis_shape = self.params['chassis_shape']

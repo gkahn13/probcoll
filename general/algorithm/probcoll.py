@@ -1,5 +1,4 @@
 import abc
-
 import os, pickle, time, shutil
 import numpy as np
 from general.algorithm.probcoll_model import ProbcollModel
@@ -15,10 +14,11 @@ class Probcoll:
         self._planner_type = params['planning']['planner_type']
         self._read_only = read_only
         self._use_dynamics = True
+        self._async_on = False
         self._setup()
         self._logger = get_logger(
             self.__class__.__name__,
-            'info',
+            params['probcoll']['logger'],
             os.path.join(self._save_dir, 'dagger.txt'))
         self._mpc_policy = self._create_mpc()
         shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
@@ -78,9 +78,9 @@ class Probcoll:
             os.makedirs(dir)
         return dir
 
-    def _itr_samples_file(self, itr, create=True):
+    def _itr_samples_file(self, itr, prefix='', create=True):
         return os.path.join(self._itr_dir(itr, create=create),
-                            'samples_itr_{0}.npz'.format(itr))
+                            '{0}samples_itr_{1}.npz'.format(prefix, itr))
 
     def _itr_stats_file(self, itr, create=True):
         return os.path.join(self._itr_dir(itr, create=create),
@@ -96,8 +96,8 @@ class Probcoll:
         with open(fname, 'w') as f:
             pickle.dump(mpc_infos, f)
 
-    def _itr_save_samples(self, itr, samples):
-        Sample.save(self._itr_samples_file(itr), samples)
+    def _itr_save_samples(self, itr, samples, prefix=''):
+        Sample.save(self._itr_samples_file(itr, prefix=prefix), samples)
 
     @property
     def _img_dir(self):
@@ -143,18 +143,23 @@ class Probcoll:
 
         ### if any data and haven't trained on it already, train on it
         if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
-            self._run_training()
+            self._run_training(samples_start_itr)
         start_itr = samples_start_itr
 
         ### training loop
         for itr in xrange(start_itr, self._max_iter):
             self._run_itr(itr)
-            self._run_training()
+            self._run_training(itr)
+            self._run_testing(itr)
             if not self._probcoll_model.sess.graph.finalized:
                 self._probcoll_model.sess.graph.finalize()
         self._close()
 
     def _run_itr(self, itr):
+#        if self._async_on:
+#            self._logger.debug('Recovering probcoll model')
+#            self._probcoll_model.recover()
+        self._probcoll_model.recover()
         self._logger.info('')
         self._logger.info('=== Itr {0}'.format(itr))
         self._logger.info('')
@@ -167,8 +172,11 @@ class Probcoll:
     def _close(self):
         self._probcoll_model.close()
 
-    def _run_training(self):
+    def _run_training(self, itr):
         self._probcoll_model.train(reset=params['model']['reset_every_train'])
+
+    def _run_testing(self, itr):
+        pass
 
     def _run_rollout(self, itr):
         T = params['probcoll']['T']
@@ -183,6 +191,7 @@ class Probcoll:
             rep = 0
             while rep < self._conditions.repeats:
                 self._logger.info('\t\tStarting cond {0} rep {1} itr {2}'.format(cond, rep, itr))
+                start = time.time()
                 if (cond == 0 and rep == 0) or self._world.randomize:
                     self._reset_world(itr, cond, rep)
 
@@ -190,8 +199,6 @@ class Probcoll:
                 sample_T = Sample(meta_data=params, T=T)
                 sample_T.set_X(x0, t=0)
                 
-                # TODO For validation no noise
-                start = time.time()
                 for t in xrange(T):
                     self._update_world(sample_T, t)
 

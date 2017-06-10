@@ -4,8 +4,8 @@ from general.tf.nn import rnn_cell
 
 def rnn(
         inputs,
-        initial_state,
         params,
+        initial_state=None,
         dp_masks=None,
         dtype=tf.float32,
         scope="rnn",
@@ -24,11 +24,13 @@ def rnn(
         raise NotImplementedError(
             "Cell type {0} is not valid".format(params["cell_type"]))
 
-    num_units = initial_state[0].get_shape()[1].value
-    #    num_units = params["num_units"]
+    if initial_state is None:
+        num_units = params["num_units"]
+    else:
+        num_units = initial_state[0].get_shape()[1].value
     num_cells = params["num_cells"]
     dropout = params.get("dropout", None)
-    cell_args = params.get("cell_args", None)
+    cell_args = params.get("cell_args", {})
     if dp_masks is not None or dropout is None:
         dp_return_masks = None
     else:
@@ -51,21 +53,13 @@ def rnn(
             else:
                 dp = None
 
-            if cell_args is not None:
-                cell = cell_type(
-                    num_units,
-                    dropout_mask=dp,
-                    dtype=dtype,
-                    num_inputs=inputs.get_shape()[-1],
-                    weights_scope="{0}_{1}".format(params["cell_type"], i),
-                    **cell_args)
-            else:
-                cell = cell_type(
-                    num_units,
-                    dropout_mask=dp,
-                    dtype=dtype,
-                    num_inputs=inputs.get_shape()[-1],
-                    weights_scope="{0}_{1}".format(params["cell_type"], i))
+            cell = cell_type(
+                num_units,
+                dropout_mask=dp,
+                dtype=dtype,
+                num_inputs=inputs.get_shape()[-1],
+                weights_scope="{0}_{1}".format(params["cell_type"], i),
+                **cell_args)
             
             cells.append(cell)
             
@@ -76,7 +70,6 @@ def rnn(
             tf.cast(inputs, dtype),
             initial_state=initial_state,
             dtype=dtype,
-            swap_memory=True,
             time_major=False)
     
     return outputs, dp_return_masks

@@ -27,16 +27,23 @@ class AnalyzeRCcar(Analyze):
     def _bag_file(self, itr, cond, rep):
         return os.path.join(self._itr_dir(itr), 'bagfile_itr{0}_cond{1}_rep{2}.bag'.format(itr, cond, rep))
 
-    def _plot_trajectories_file(self, itr):
-        return os.path.join(self._save_dir, self._image_folder, 'trajectories_{0}.png'.format(itr))
+    def _plot_trajectories_file(self, itr, testing=False):
+        if testing:
+            prefix = 'testing'
+        else:
+            prefix = ''
+        return os.path.join(self._save_dir, self._image_folder, '{0}_trajectories_{1}.png'.format(prefix, itr))
 
     ################
     ### Plotting ###
     ################
 
-    def _plot_statistics(self):
+    def _plot_statistics(self, testing=False):
         ### get samples
-        samples_itrs = self._load_samples()
+        if testing:
+            samples_itrs = self._load_testing_samples()
+        else:
+            samples_itrs = self._load_samples()
         num_itrs = len(samples_itrs)
         samples_per_itr = len(samples_itrs[0])
         itrs = np.arange(num_itrs)
@@ -132,8 +139,6 @@ class AnalyzeRCcar(Analyze):
             x_vels_itrs.append(x_vels_itr)
         x_vel_min = np.hstack(x_vels_itrs).min()
         x_vel_max = np.hstack(x_vels_itrs).max()
-#        num_bins = len(params["planning"]["primitives"]["speeds"]) + 1
-#        bins = np.linspace(x_vel_min, x_vel_max, num_bins)
         bins = np.array(params["planning"]["primitives"]["speeds"] + [np.inf])
         x_vels_hist_itrs = []
         for x_vels_itr in x_vels_itrs:
@@ -149,27 +154,37 @@ class AnalyzeRCcar(Analyze):
         axes[3].set_ylabel('Pct')
         pkl_dict['U'] = [[s.get_U() for s in samples_itr] for samples_itr in samples_itrs]
 
-
-#        plt.show(block=False)
-#        plt.pause(0.1)
-        if not os.path.exists(os.path.dirname(self._plot_stats_file)):
-            os.makedirs(os.path.dirname(self._plot_stats_file))
-        f.savefig(self._plot_stats_file)
+        if testing:
+            if not os.path.exists(os.path.dirname(self._plot_testing_stats_file)):
+                os.makedirs(os.path.dirname(self._plot_testing_stats_file))
+            f.savefig(self._plot_testing_stats_file)
+        else:
+            if not os.path.exists(os.path.dirname(self._plot_stats_file)):
+                os.makedirs(os.path.dirname(self._plot_stats_file))
+            f.savefig(self._plot_stats_file)
 
         # TODO add sim specifics
         if params["sim"]:
-            positions_itrs = self._plot_position(samples_itrs)
+            positions_itrs = self._plot_position(samples_itrs, testing=testing)
             pkl_dict['positions'] = positions_itrs
 
-        with open(self._plot_stats_file_pkl, 'w') as f:
+        if testing:
+            stats_f = self._plot_testing_stats_file_pkl
+        else:
+            stats_f = self._plot_stats_file_pkl
+        
+        with open(stats_f, 'w') as f:
             pickle.dump(pkl_dict, f)
 
-    def _plot_position(self, samples_itrs):
+    def _plot_position(self, samples_itrs, testing=False):
         positions_itrs = [] 
         for itr, samples in enumerate(samples_itrs):
             positions_x, positions_y, collision = [], [], []
             plt.figure()
-            plt.title('Trajectories for itr {0}'.format(itr))
+            if testing:
+                plt.title('Trajectories for testing itr {0}'.format(itr))
+            else:
+                plt.title('Trajectories for itr {0}'.format(itr))
             plt.xlabel('X position')
             plt.ylabel('Y position')
             # TODO not make this hard coded
@@ -187,7 +202,7 @@ class AnalyzeRCcar(Analyze):
                 positions_x.append(pos_x)
                 positions_y.append(pos_y)
             positions_itrs.append([positions_x, positions_y, collision])
-            plt.savefig(self._plot_trajectories_file(itr)) 
+            plt.savefig(self._plot_trajectories_file(itr, testing)) 
             plt.close()
         return positions_itrs
     
@@ -197,5 +212,6 @@ class AnalyzeRCcar(Analyze):
 
     def run(self, plot_single, plot_traj, plot_samples, plot_groundtruth):
         self._plot_statistics()
-
+        if len(params['world']['testing']['positions']) > 0:
+            self._plot_statistics(testing=True)
         rospy.signal_shutdown('')

@@ -7,7 +7,6 @@ from general.tf.planning.cost.cost_coll import CostColl
 
 class PlannerRandom(Planner):
     def _setup(self):
-        # TODO include horizon
         with tf.name_scope('random_planner'):
             control_list = []
             k = self.params['random']['K']

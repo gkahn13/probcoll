@@ -26,7 +26,7 @@ class Planner(object):
     def _setup_noise(self):
         T = self.probcoll_model.T
         noise_type = self.params['control_noise']['type']
-        if noise_type == 'Zero':
+        if noise_type == 'zero':
             self.action_noisy = self.action
         elif noise_type == 'gaussian':
             noise = GaussianNoise(

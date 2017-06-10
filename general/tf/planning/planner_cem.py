@@ -7,7 +7,6 @@ from general.tf.planning.cost.cost_coll import CostColl
 
 class PlannerCem(Planner):
     def _setup(self):
-        # TODO include horizon
         with tf.name_scope('cem_planner'):
             control_list = []
             init_m = self.params['cem']['init_M']
@@ -29,11 +28,18 @@ class PlannerCem(Planner):
             flat_u_samples = tf.reshape(init_u_samples, (init_m, T * d))
             init_stack_u = tf.concat(0, [init_u_samples]*self.params['num_dp'])
             stack_x = tf.concat(0, [self.X_inputs]*self.params['num_dp'])
-            # TODO incorporate std later
+            embeddings = [
+                    self.probcoll_model.get_embedding(
+                        self.O_input,
+                        batch_size=1,
+                        reuse=True,
+                        scope="observation_graph_b{0}".format(b)) for b in xrange(self.probcoll_model.num_bootstrap)
+                ]
             init_output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
                 stack_x,
                 init_stack_u,
-                O_input=self.O_input,
+#                O_input=self.O_input,
+                bootstrap_initial_states=embeddings,
                 reuse=True) 
 
             init_pred_mean = tf.reduce_mean(
@@ -69,7 +75,8 @@ class PlannerCem(Planner):
                 output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
                     stack_x,
                     stack_u,
-                    O_input=self.O_input,
+    #                O_input=self.O_input,
+                    bootstrap_initial_states=embeddings,
                     reuse=True) 
 
                 pred_mean = tf.reduce_mean(

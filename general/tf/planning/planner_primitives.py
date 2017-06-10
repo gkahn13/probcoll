@@ -20,18 +20,16 @@ class PlannerPrimitives(Planner):
     @abc.abstractmethod
     def _create_primitives(self):
         """
-        :return tensor of primitive actions
+        :return tensor of primitive actions with shape (# primitives x T x dU)
         """
         raise NotImplementedError('Implement in subclass')
 
     def _setup(self):
-        # TODO include horizon
         with tf.name_scope('primitives_planner'):
             self.X_inputs = self.probcoll_model.d_eval['X_inputs']
             self.O_input = self.probcoll_model.d_eval['O_input']
             stack_u = tf.concat(0, [self.primitives]*self.params['num_dp'])
             stack_x = tf.concat(0, [self.X_inputs]*self.params['num_dp'])
-            # TODO incorporate std later
             output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
                 stack_x,
                 stack_u,
