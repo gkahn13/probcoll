@@ -131,7 +131,7 @@ class ProbcollModel:
         for key in ('X', 'U', 'O'):
             d[key] = params[key]
 
-        for key in ('observation_graph', 'action_graph', 'output_graph'):
+        for key in ('image_graph', 'action_graph', 'output_graph'):
             d[key] = pm_params[key]['graph_type']
 
         return hashlib.md5(str(d)).hexdigest()
@@ -247,9 +247,11 @@ class ProbcollModel:
         random.shuffle(npz_fnames)
         for npz_fname in npz_fnames:
             ### load samples
-            # self._logger.debug('\tOpening {0}'.format(npz_fname))
+            self._logger.debug('\tOpening {0}'.format(npz_fname))
 
             samples = Sample.load(npz_fname)
+            # Shuffle the data so validation and training data is shuffled
+            random.shuffle(samples)
             ### add to data
             for og_sample in samples:
                 for sample in self._modify_sample(og_sample):
@@ -268,8 +270,6 @@ class ProbcollModel:
 
                     if output[-1, 0] == 1:
                         # For collision data extend collision by T-1 (and buffer)
-#                        random_u = np.random.random((self.T - 1 - buffer_len, U.shape[1])) * \
-#                            self._control_width + np.array(self.control_range["lower"])
                         extend_u = np.zeros((self.T - 1 - buffer_len, U.shape[1]))
                         U_coll = np.vstack((U[-self.T:], extend_u))
 
@@ -296,26 +296,6 @@ class ProbcollModel:
         return no_coll_data, coll_data 
 
     def _save_tfrecords(
-            self,
-            tfrecords,
-            X_by_sample,
-            U_by_sample,
-            O_by_sample,
-            output_by_sample):
-        
-        if self.save_type == 'fixedlen':
-            save_tfrecords = self._save_tfrecords_fixedlen
-        else:
-            raise Exception('{0} not valid save type'.format(self.save_type))
-
-        self.save_tfrecords(
-            tfrecords,
-            X_by_sample,
-            U_by_sample,
-            O_by_sample,
-            output_by_sample)
-
-    def _save_tfrecords_fixedlen(
             self,
             tfrecords,
             X_by_sample,
@@ -402,28 +382,28 @@ class ProbcollModel:
         self._logger.info("Size of no collision data: {0}".format(tot_no))
         self._logger.info("Size of collision data: {0}".format(tot_coll))
 
-        self._save_tfrecords_fixedlen(
+        self._save_tfrecords(
             tfrecords_no_coll_train, 
             no_coll_data["X"][int(no_coll_len * self.val_pct):],
             no_coll_data["U"][int(no_coll_len * self.val_pct):],
             no_coll_data["O"][int(no_coll_len * self.val_pct):],
             no_coll_data["output"][int(no_coll_len * self.val_pct):])
 
-        self._save_tfrecords_fixedlen(
+        self._save_tfrecords(
             tfrecords_coll_train, 
             coll_data["X"][int(coll_len * self.val_pct):],
             coll_data["U"][int(coll_len * self.val_pct):],
             coll_data["O"][int(coll_len * self.val_pct):],
             coll_data["output"][int(coll_len * self.val_pct):])
 
-        self._save_tfrecords_fixedlen(
+        self._save_tfrecords(
             tfrecords_no_coll_val, 
             no_coll_data["X"][:int(no_coll_len * self.val_pct)],
             no_coll_data["U"][:int(no_coll_len * self.val_pct)],
             no_coll_data["O"][:int(no_coll_len * self.val_pct)],
             no_coll_data["output"][:int(no_coll_len * self.val_pct)])
 
-        self._save_tfrecords_fixedlen(
+        self._save_tfrecords(
             tfrecords_coll_val, 
             coll_data["X"][:int(coll_len * self.val_pct)],
             coll_data["U"][:int(coll_len * self.val_pct)],
@@ -529,14 +509,14 @@ class ProbcollModel:
 
     def get_embedding(self, observation, batch_size=1, reuse=False, scope=None, is_training=True):
         
-        obg_type = params["model"]["observation_graph"]["graph_type"]
+        obg_type = params["model"]["image_graph"]["graph_type"]
         if obg_type == "fc":
             observation_graph = fcnn
         elif obg_type == "cnn":
             observation_graph = convnn
         else:
             raise NotImplementedError(
-                "Observation graph {0} is not valid".format(obg_type))
+                "Image graph {0} is not valid".format(obg_type))
 
         obs_batch = observation.get_shape()[0].value
         # TODO if batch size is 1 then clearly not training
@@ -558,15 +538,23 @@ class ProbcollModel:
                 ])
             obs_shaped_list.append(obs_shaped)
         # TODO dropout
-        output, _ = observation_graph(
+        im_output, _ = observation_graph(
             tf.concat(3, obs_shaped_list),
-            params["model"]["observation_graph"],
+            params['model']['image_graph'],
             dtype=self.dtype,
             scope=scope,
             reuse=reuse,
             is_training=is_training)
-        if len(output.get_shape()) > 2:
-            output = tf.contrib.layers.flatten(output)
+        if len(im_output.get_shape()) > 2:
+            im_output = tf.contrib.layers.flatten(im_output)
+        # TODO this is where you concatenate other stuff
+        output, _ = fcnn(
+            im_output,
+            params['model']['observation_graph'],
+            dtype=self.dtype,
+            scope=scope,
+            reuse=reuse,
+            is_training=is_training)
         if obs_batch == 1 and batch_size != 1:
             output = tf.tile(output, [batch_size, 1])
         return output
@@ -821,7 +809,8 @@ class ProbcollModel:
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
 
-                        dp_masks += action_dp_masks
+                        if self.dropout is not None:
+                            dp_masks += action_dp_masks
 
                     if recurrent:
                         ag_output = tf.reshape(
@@ -852,12 +841,6 @@ class ProbcollModel:
                             self.dtype)
                         output_mat_b = tf.reshape(output_mat_b, (batch_size, self.T, self.doutput))
 
-#                    # Only care about final probability of collision
-#                    mask = tf.concat(0, [
-#                            tf.zeros((self.T - 1, self.doutput), dtype=self.dtype),
-#                            tf.ones((1, self.doutput), dtype=self.dtype),
-#                        ])
-#                    output_mat_b = tf.reduce_sum(mask * output_mat_b, axis=1)                     
                     output_pred_b = tf.sigmoid(output_mat_b, name='output_pred_b{0}'.format(b))
 
                 bootstrap_output_mats.append(output_mat_b)
@@ -897,10 +880,10 @@ class ProbcollModel:
                         maxlen=self.T,
                         dtype=self.dtype)
                     mask = tf.stack([one_mask] * self.doutput, 2)
-                    one_mask = tf.one_hot(
-                        tf.cast(length_b - 1, tf.int32),
-                        self.T) * tf.expand_dims(tf.cast(self.T - length_b, self.dtype), axis=1)
-                    mask = tf.stack([one_mask] * self.doutput, 2) * mask + mask
+#                    one_mask = tf.one_hot(
+#                        tf.cast(length_b - 1, tf.int32),
+#                        self.T) * tf.expand_dims(tf.cast(self.T - length_b, self.dtype), axis=1)
+#                    mask = tf.stack([one_mask] * self.doutput, 2) * mask + mask
                 else:
                     raise NotImplementedError(
                         "Mask {0} is not valid".format(
@@ -951,7 +934,7 @@ class ProbcollModel:
         return costs, weight_decay, cost, cross_entropy, err, err_on_coll, err_on_nocoll, num_coll, num_nocoll 
 
     def _graph_optimize(self, bootstrap_costs, reg_cost):
-        # TODO ensure that update ops are done (ie batch norm)
+        # Ensure that update ops are done (ie batch norm)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         # TODO should optimize each bootstrap individually
         grads = []
@@ -1075,9 +1058,6 @@ class ProbcollModel:
                     (self.tfrecords_no_coll_val_fnames, self.d_val['no_coll_dequeue']),
                     (self.tfrecords_coll_val_fnames, self.d_val['coll_dequeue'])
                 ):
-#            fnames
-#            while not np.all([(fname in tfrecords_fnames) for fname in self.sess.run(dequeue)]):
-#                pass
             closed = True
             while closed:
                 try:
@@ -1182,7 +1162,6 @@ class ProbcollModel:
                 self._flush_queue()
 
             ### validation
-#            if False:
             if (step != 0 and (step % int(self.val_freq * self.steps)) == 0):
                 val_values = defaultdict(list)
                 val_nums = defaultdict(float)

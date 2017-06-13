@@ -63,7 +63,7 @@ class AgentRCcar(Agent):
 
         self.cv_bridge = cv_bridge.CvBridge()
 
-    def sample_policy(self, x0, policy, T=None, use_noise=True, **policy_args):
+    def sample_policy(self, x0, policy, T=None, use_noise=True, only_noise=False, **policy_args):
         if T is None:
             T = policy._T
         rate = rospy.Rate(1. / params['dt'])
@@ -77,7 +77,7 @@ class AgentRCcar(Agent):
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
-            u_t, u_t_no_noise = policy.act(x_t, o_t, t)
+            u_t, u_t_no_noise = policy.act(x_t, o_t, t, only_noise=only_noise)
             self._logger.debug(time.time() - start)
             # only execute control if no collision
             # TODO is this necessary
@@ -91,7 +91,8 @@ class AgentRCcar(Agent):
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
             policy_sample.set_U(u_t, t=t)
-            policy_sample_no_noise.set_U(u_t_no_noise, t=t)
+            if not only_noise:
+                policy_sample_no_noise.set_U(u_t_no_noise, t=t)
             
             # In sim we do not have cycles
             if self.sim:

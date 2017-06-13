@@ -14,20 +14,36 @@ def rnn(
     """
     inputs is shape [batch_size x T x features].
     """
+    # TODO adjust state for Mulicell
     if params["cell_type"] == "rnn":
         cell_type = rnn_cell.DpRNNCell
-        inital_state = (initial_state,)
+        if initial_state is not None:
+            num_units = initial_state.get_shape()[1].value
+            inital_state = (initial_state,)
     elif params["cell_type"] == "mulint_rnn":
         cell_type = rnn_cell.DpMulintRNNCell
-        initial_state = (initial_state,)
+        if initial_state is not None:
+            num_units = initial_state.get_shape()[1].value
+            initial_state = (initial_state,)
+    elif params['cell_type'] == 'lstm':
+        cell_type = rnn_cell.DpLSTMCell
+        # TODO maybe change
+        if initial_state is not None:
+            c, h = tf.split(1, 2, initial_state)
+            num_units = c.get_shape()[1].value
+            initial_state = (tf.nn.rnn_cell.LSTMStateTuple(c, h),)
+    elif params['cell_type'] == 'mulint_lstm':
+        cell_type = rnn_cell.DpMulintLSTMCell
+        if initial_state is not None:
+            c, h = tf.split(1, 2, initial_state)
+            num_units = c.get_shape()[1].value
+            initial_state = (tf.nn.rnn_cell.LSTMStateTuple(c, h),)
     else:
         raise NotImplementedError(
             "Cell type {0} is not valid".format(params["cell_type"]))
 
     if initial_state is None:
         num_units = params["num_units"]
-    else:
-        num_units = initial_state[0].get_shape()[1].value
     num_cells = params["num_cells"]
     dropout = params.get("dropout", None)
     cell_args = params.get("cell_args", {})
@@ -64,7 +80,6 @@ def rnn(
             cells.append(cell)
             
         multi_cell = tf.nn.rnn_cell.MultiRNNCell(cells)
-        
         outputs, state = tf.nn.dynamic_rnn(
             multi_cell,
             tf.cast(inputs, dtype),

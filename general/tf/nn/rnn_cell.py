@@ -93,3 +93,123 @@ class DpMulintRNNCell(DpRNNCell):
         
         return output, output
 
+class DpLSTMCell(tf.nn.rnn_cell.BasicLSTMCell):
+    
+    def __init__(
+            self,
+            num_units,
+            forget_bias=1.0,
+            dropout_mask=None,
+            activation=tf.tanh,
+            dtype=tf.float32,
+            num_inputs=None,
+            weights_scope=None):
+        
+        self._num_units = num_units
+        self._forget_bias = forget_bias
+        self._dropout_mask = dropout_mask
+        self._activation = activation
+        self._dtype = dtype
+        self._state_is_tuple = True
+
+        with tf.variable_scope(weights_scope or type(self).__name__):
+            self._weights = tf.get_variable(
+                "weights",
+                [num_inputs + num_units, 4 * num_units],
+                dtype=dtype,
+                initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
+                regularizer=tf.contrib.layers.l2_regularizer(0.5))
+
+    def __call__(
+            self,
+            inputs,
+            state,
+            scope=None):
+        """Most basic LSTM with same dropout at every time step."""
+        with tf.variable_scope(scope or type(self).__name__):  # "BasicRNNCell"
+            
+            c, h = state
+            ins = tf.concat(1, [inputs, h])
+            output = self._activation(tf.matmul(ins, self._weights))
+
+            i, j, f, o = tf.split(1, 4, output)
+            
+            forget = c * tf.nn.sigmoid(f + self._forget_bias)
+            new = tf.nn.sigmoid(i) * self._activation(j)
+            new_c = forget + new
+            
+            # TODO make sure this is correct
+            if self._dropout_mask is not None:
+                new_c = new_c * self._dropout_mask
+
+            new_h = self._activation(new_c) * tf.nn.sigmoid(o)
+            new_state = tf.nn.rnn_cell.LSTMStateTuple(new_c, new_h)
+
+        return new_h, new_state
+
+class DpMulintLSTMCell(DpLSTMCell):
+    
+    def __init__(
+            self,
+            num_units,
+            forget_bias=1.0,
+            dropout_mask=None,
+            activation=tf.tanh,
+            dtype=tf.float32,
+            num_inputs=None,
+            weights_scope=None):
+        
+        self._num_units = num_units
+        self._forget_bias = forget_bias
+        self._dropout_mask = dropout_mask
+        self._activation = activation
+        self._dtype = dtype
+        self._state_is_tuple = True
+        
+        with tf.variable_scope(weights_scope or type(self).__name__):
+            self._weights_W = tf.get_variable(
+                "weights_W",
+                [num_inputs, 4 * num_units],
+                dtype=dtype,
+                initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
+                regularizer=tf.contrib.layers.l2_regularizer(0.5))
+
+            self._weights_U = tf.get_variable(
+                "weights_U",
+                [num_units, 4 * num_units],
+                dtype=dtype,
+                initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
+                regularizer=tf.contrib.layers.l2_regularizer(0.5))
+
+    def __call__(
+            self,
+            inputs,
+            state,
+            scope=None):
+        """Most basic RNN: output = new_state = tanh(W * input + U * state + B)."""
+        with tf.variable_scope(scope or type(self).__name__):  # "BasicRNNCell"
+            
+            c, h = state
+            
+            Wx = tf.matmul(inputs, self._weights_W)
+            Uz = tf.matmul(h, self._weights_U)
+            output = self._activation(
+		tf_utils.multiplicative_integration(
+                    [Wx, Uz],
+                    4 * self._num_units,
+                    dtype=self._dtype,
+                    weights_already_calculated=True))
+            
+            i, j, f, o = tf.split(1, 4, output)
+            
+            forget = c * tf.nn.sigmoid(f + self._forget_bias)
+            new = tf.nn.sigmoid(i) * self._activation(j)
+            new_c = forget + new
+            
+            # TODO make sure this is correct
+            if self._dropout_mask is not None:
+                new_c = new_c * self._dropout_mask
+
+            new_h = self._activation(new_c) * tf.nn.sigmoid(o)
+            new_state = tf.nn.rnn_cell.LSTMStateTuple(new_c, new_h)
+        return new_h, new_state

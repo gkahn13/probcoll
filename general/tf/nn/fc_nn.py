@@ -1,13 +1,15 @@
 from general.tf import tf_utils
 import tensorflow as tf
 
+#TODO batch norm
 def fcnn(
         inputs,
         params,
         dp_masks=None,
         dtype=tf.float32,
         scope="fcnn",
-        reuse=False):
+        reuse=False,
+        is_training=True):
     
     if "hidden_activation" not in params:
         hidden_activation = None

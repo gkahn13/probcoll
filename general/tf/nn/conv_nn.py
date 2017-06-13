@@ -16,8 +16,12 @@ def convnn(inputs, params, scope="convnn", dtype=tf.float32, reuse=False, is_tra
         output_activation = tf.nn.sigmoid
     elif params["output_activation"] == "softmax":
         output_activation = tf.nn.softmax
+    elif params['output_activation'] == 'spatial_softmax':
+        output_activation = lambda x: tf_utils.spatial_soft_argmax(x, dtype) 
     elif params["output_activation"] == "tanh":
         output_activation = tf.nn.tanh
+    elif params['output_activation'] == 'relu':
+        output_activation = tf.nn.relu
     else:
         raise NotImplementedError(
             "Output activation {0} is not valid".format(

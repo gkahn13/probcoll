@@ -43,12 +43,39 @@ class Planner(object):
                 "Noise type {0} is not valid".format(noise_type))
         if self.params['epsilon_greedy']['epsilon'] > 0:
             self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], dtype=self.dtype)
+    
+    def visualize(
+            self,
+            actions_considered,
+            action,
+            action_noisy,
+            coll_cost,
+            des_cost):
+        pass
 
-    def plan(self, x, o, t):
+    def plan(self, x, o, t, only_noise, visualize=False):
         # TODO figure out general way to handle state
         o_input = o[self.probcoll_model.O_idxs()].reshape(1, -1)
         feed_dict = {self.X_inputs: [[[]]*self.probcoll_model.T], self.O_input: o_input}
-        action_noisy, action = self.probcoll_model.sess.run(
-            [self.action_noisy, self.action],
-            feed_dict)
+        if visualize:
+            action_noisy, action, actions_considered, noisy_action, \
+                coll_cost, des_cost  = self.probcoll_model.sess.run(
+                    [self.action_noisy, self.action],
+                    feed_dict)
+            self.visualize(
+                actions_considered,
+                action,
+                action_noisy,
+                coll_cost,
+                des_cost)
+        else:
+            if only_noise:
+                action_noisy = self.probcoll_model.sess.run(
+                    self.action_noisy,
+                    feed_dict)
+                action=None
+            else:
+                action_noisy, action = self.probcoll_model.sess.run(
+                    [self.action_noisy, self.action],
+                    feed_dict)
         return action_noisy, action

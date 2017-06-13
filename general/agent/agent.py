@@ -12,7 +12,7 @@ class Agent(object):
         self._dynamics = dynamics
         self._logger = get_logger(self.__class__.__name__, params['world']['logger'])
 
-    def sample_policy(self, x0, policy, T=None, **policy_args):
+    def sample_policy(self, x0, policy, T=None, only_noise=False, **policy_args):
         """
         Run the policy and collect the trajectory data
 
@@ -36,7 +36,8 @@ class Agent(object):
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
             policy_sample.set_U(u_t, t=t)
-            policy_sample_no_noise.set_U(u_t_no_noise, t=t)
+            if not only_noise:
+                policy_sample_no_noise.set_U(u_t_no_noise, t=t)
 
 
             # propagate dynamics

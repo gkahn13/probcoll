@@ -204,7 +204,7 @@ class Probcoll:
 
                     x0 = sample_T.get_X(t=t)
 
-                    rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, T=1)
+                    rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, T=1, only_noise=label_with_noise)
                     
                     o = rollout.get_O(t=0)
                     if label_with_noise:

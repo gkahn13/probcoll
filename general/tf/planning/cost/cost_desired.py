@@ -18,4 +18,5 @@ class CostDesired(Cost):
         diff = data - self.des
         components = self.cost(diff) * self.weight
         weighted_sum = tf.reduce_sum(components, axis=[1, 2])
+        
         return weighted_sum

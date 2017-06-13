@@ -1,20 +1,28 @@
 import tensorflow as tf
 from general.tf.planning.cost.cost import Cost
 
-# TODO make this better
 class CostColl(Cost):
     """Cost for collision.
     """
 
     def __init__(self, params):
         self.weight = tf.constant(params['weight'])
+        self.std_weight = params.get('std_weight', 0.)
+        self.pre_activation = params.get('pre_activation', False)
         if params['cost'] == "square":
             self.cost = tf.square
         else:
             raise NotImplementedError(
                 "CostColl {0} is not valid".format(cost))
 
-    def eval(self, probcoll, data):
+    def eval(self, data, pred_mean=None, mat_mean=None, pred_std=None, mat_std=None):
+        if self.std_weight > 0:
+            if self.pre_activation:
+                probcoll = tf.nn.sigmoid(mat_mean + std_weight * mat_std) 
+            else:
+                probcoll = pred_mean + std_weight * pred_std
+        else:
+            probcoll = pred_mean
         components = self.cost(data) * probcoll
         weighted_sum = tf.reduce_sum(components * self.weight, axis=(1, 2))
         return weighted_sum
