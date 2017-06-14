@@ -32,8 +32,11 @@ class PlannerRandom(Planner):
             pred_std = tf.reduce_mean(
                 tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
 
+            mat_mean = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+
             mat_std = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], mat_std), axis=0)
+                tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
 
             control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
             coll_cost_fn = CostColl(self.params['cost']['coll_cost'])

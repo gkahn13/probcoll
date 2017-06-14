@@ -44,7 +44,7 @@ class AgentPointquad(Agent):
                                                   self.meta_data['O']['signed_distance']['sizes'],
                                                   self.meta_data['O']['signed_distance']['max_dist'])
 
-    def sample_policy(self, x0, policy, T=None, **policy_args):
+    def sample_policy(self, x0, policy, T=None, only_noise=False, **policy_args):
         """
         Run the policy and collect the trajectory data
 
@@ -58,11 +58,12 @@ class AgentPointquad(Agent):
         policy_sample = Sample(meta_data=self.meta_data, T=T)
 
         policy_sample.set_X(x0, t=0)
+        policy_sample_no_noise = Sample(meta_data=params, T=T)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
-            u_t = policy.act(x_t, o_t, t, **policy_args)
+            u_t, u_t_noise = policy.act(x_t, o_t, t, only_noise=only_noise, **policy_args)
             if self.dyn_noise:
                 noise = []
                 for dyn_noise_i in self.dyn_noise:
@@ -76,13 +77,14 @@ class AgentPointquad(Agent):
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
             policy_sample.set_U(u_t, t=t)
-
+            if not only_noise:
+                policy_sample_no_noise.set_U(u_t_no_noise, t=t)
             # propagate dynamics
             if t < T-1:
                 x_tp1 = self._dynamics.evolve(x_t, u_t)
                 policy_sample.set_X(x_tp1, t=t+1)
 
-        return policy_sample
+        return policy_sample, policy_sample_no_noise
 
     def reset(self, x):
         """

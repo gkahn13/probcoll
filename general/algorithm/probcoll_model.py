@@ -924,12 +924,12 @@ class ProbcollModel:
                     num_coll > 0,
                     lambda: (1. / tf.cast(num_coll, self.dtype)) * num_errs_on_coll,
                     lambda: tf.constant(np.nan, dtype=self.dtype))
-#                    lambda: tf.constant(0, dtype=self.dtype))
+                   # lambda: tf.constant(0, dtype=self.dtype))
                 err_on_nocoll = tf.cond(
                     num_nocoll > 0,
                     lambda: (1. / tf.cast(num_nocoll, self.dtype)) * num_errs_on_nocoll,
                     lambda: tf.constant(np.nan, dtype=self.dtype))
-#                    lambda: tf.constant(0, dtype=self.dtype))
+                   # lambda: tf.constant(0, dtype=self.dtype))
 
         return costs, weight_decay, cost, cross_entropy, err, err_on_coll, err_on_nocoll, num_coll, num_nocoll 
 

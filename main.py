@@ -8,6 +8,7 @@ import numpy as np, random
 from config import load_params, set_params, params
 
 try:
+    # import IPython;IPython.embed()
     from robots.pointquad.algorithm.probcoll_pointquad import ProbcollPointquad
     from robots.pointquad.algorithm.analyze_pointquad import AnalyzePointquad
 except:

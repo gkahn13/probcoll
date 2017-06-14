@@ -1,6 +1,6 @@
 import numpy as np
 
-from general.planning.cost.cost import Cost
+from general.tf.planning.cost.cost import Cost
 from general.planning.cost.approx import CostApprox
 
 from config import params
