@@ -55,9 +55,9 @@ class Planner(object):
 
     def plan(self, x, o, t, only_noise, visualize=False):
         # TODO figure out general way to handle state
-        # import IPython; IPython.embed()
-        o_input = o[self.probcoll_model.O_idxs()].reshape(1, -1)
-        feed_dict = {self.X_inputs: [[[]]*self.probcoll_model.T], self.O_input: o_input}
+        o_im_input = o[self.probcoll_model.O_im_idxs()].reshape(1, -1)
+        o_vec_input = o[self.probcoll_model.O_vec_idxs()].reshape(1, -1)
+        feed_dict = {self.X_inputs: [[[]]*self.probcoll_model.T], self.O_im_input: o_im_input, self.O_vec_input: o_vec_input}
         if visualize:
             action_noisy, action, actions_considered, noisy_action, \
                 coll_cost, des_cost  = self.probcoll_model.sess.run(

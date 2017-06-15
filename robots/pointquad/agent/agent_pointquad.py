@@ -56,7 +56,6 @@ class AgentPointquad(Agent):
         if T is None:
             T = policy._T
         policy_sample = Sample(meta_data=self.meta_data, T=T)
-
         policy_sample.set_X(x0, t=0)
         policy_sample_no_noise = Sample(meta_data=params, T=T)
         for t in xrange(T):
@@ -105,7 +104,6 @@ class AgentPointquad(Agent):
         for sub_state in [s for s in self.meta_data['X']['order'] if s in self.meta_data['O']['order']]:
             idxs = obs_sample.get_X_idxs(sub_state=sub_state)
             obs_sample.set_O(x[idxs], t=0, sub_obs=sub_state)
-
         x_pos = x[obs_sample.get_X_idxs(sub_state='position')]
         x_ori = x[obs_sample.get_X_idxs(sub_state='orientation')]
         origin = posquat_to_pose(x_pos, x_ori)
@@ -115,6 +113,7 @@ class AgentPointquad(Agent):
         if 'collision' in self.meta_data['O']:
             is_collision = self._world.is_collision(obs_sample, t=0)
             obs_sample.set_O([float(is_collision)], t=0, sub_obs='collision')
+
         if self.depth_sensor:
             zbuffer = self.depth_sensor.read(origin, plot=False).ravel()
             if noise:
@@ -141,9 +140,7 @@ class AgentPointquad(Agent):
         if self.sd_sensor:
             sd = self.sd_sensor.read(origin, noise=noise).ravel()
             obs_sample.set_O(sd, t=0, sub_obs='signed_distance')
-
         obs = obs_sample.get_O(t=0)
         assert (np.isfinite(obs).all())
-
         return obs
 

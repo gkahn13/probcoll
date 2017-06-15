@@ -16,14 +16,16 @@ class PlannerRandom(Planner):
                 control_range['upper'])
             u_samples = tf.cast(u_distribution.sample(sample_shape=(k, self.probcoll_model.T)), self.dtype)
             self.X_inputs = self.probcoll_model.d_eval['X_inputs']
-            self.O_input = self.probcoll_model.d_eval['O_input']
+            self.O_im_input = self.probcoll_model.d_eval['O_im_input']
+            self.O_vec_input = self.probcoll_model.d_eval['O_vec_input']
             stack_u = tf.concat(0, [u_samples]*self.params['num_dp'])
             stack_x = tf.concat(0, [self.X_inputs]*self.params['num_dp'])
             # TODO incorporate std later
             output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
                 stack_x,
                 stack_u,
-                O_input=self.O_input,
+                O_im_input=self.O_im_input,
+                O_vec_input=self.O_vec_input,
                 reuse=True) 
 
             pred_mean = tf.reduce_mean(

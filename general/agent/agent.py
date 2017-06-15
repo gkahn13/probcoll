@@ -31,7 +31,6 @@ class Agent(object):
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
             u_t, u_t_no_noise = policy.act(x_t, o_t, t)
-
             # record
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
