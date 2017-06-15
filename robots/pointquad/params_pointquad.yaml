@@ -104,7 +104,8 @@ model:
   # How to save tfrecords
   save_type: 'fixedlen' # varlen / fixedlen
   dtype: 'float32'
-  num_bootstrap: 1 # TODO
+  num_bootstrap: 1 # TODOTotal 0 (delta 0), reused 0 (delta 0)
+
   reg: 0.0001
   prob_coll_strictly_increasing: True
   mask: 'all' # all / last
