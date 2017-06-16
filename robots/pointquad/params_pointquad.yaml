@@ -81,8 +81,8 @@ model:
   # what to use as input to prediction model
   X_order: []
   U_order: ['linearvel']
-  O_im_order: ['camera']
-  O_vec_order: []
+  O_im_order: []
+  O_vec_order: ['position']
   O_order: ['camera']
   output_order: ['collision'] # taken from observations O
 
@@ -215,11 +215,12 @@ world:
 
   obstacles:
     - type: cylinder
-      center: [1.5, 0., 0.5]
+      center: [1, 0., 0.5]
       radius: 0.3
       height: 0.4
       texture: # png
       color: [1, 0, 0]
+
 
 ######################################################
 ########### States, controls, observations ###########

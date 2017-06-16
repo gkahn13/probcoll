@@ -538,53 +538,62 @@ class ProbcollModel:
         return X_inputs, U_inputs, O_im_inputs, O_vec_inputs
 
     def get_embedding(self, observation_im, observation_vec, batch_size=1, reuse=False, scope=None, is_training=True):
-        obg_type = params["model"]["image_graph"]["graph_type"]
-        if obg_type == "fc":
-            observation_graph = fcnn
-        elif obg_type == "cnn":
-            observation_graph = convnn
-        else:
-            raise NotImplementedError(
-                "Image graph {0} is not valid".format(obg_type))
-
         obs_batch = observation_im.get_shape()[0].value
-        # TODO if batch size is 1 then clearly not training
         is_training = is_training and obs_batch != 1
-        obs_im_float = tf.cast(observation_im, self.dtype) / 255.
-        if params['model']['center_O']:
-            obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
-        num_devices = len(params['model']['O_order'])
-        obs_im_split = tf.split(1, num_devices, obs_im_float)
-        # obs_vec_split = tf.split(1, num_devices, observation_vec)
-        obs_shaped_list = []
-        for obs, device in zip(obs_im_split, params['model']['O_im_order']):
-            obs_shaped = tf.reshape(
-                obs,
-                [
-                    obs_batch,
-                    params["O"][device]["height"],
-                    params["O"][device]["width"],
-                    params["O"][device]["num_channels"]
-                ])
-            obs_shaped_list.append(obs_shaped)
-        # TODO dropout
-        im_output, _ = observation_graph(
-            tf.concat(3, obs_shaped_list),
-            params['model']['image_graph'],
-            dtype=self.dtype,
-            scope=scope,
-            reuse=reuse,
-            is_training=is_training)
-        if len(im_output.get_shape()) > 2:
-            im_output = tf.contrib.layers.flatten(im_output)
+        if observation_im.get_shape()[1] > 0:
+            obg_type = params["model"]["image_graph"]["graph_type"]
+            if obg_type == "fc":
+                observation_graph = fcnn
+            elif obg_type == "cnn":
+                observation_graph = convnn
+            else:
+                raise NotImplementedError(
+                    "Image graph {0} is not valid".format(obg_type))
+
+            # TODO if batch size is 1 then clearly not training
+            obs_im_float = tf.cast(observation_im, self.dtype) / 255.
+            if params['model']['center_O']:
+                obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
+            num_devices = len(params['model']['O_order'])
+            obs_im_split = tf.split(1, num_devices, obs_im_float)
+            # obs_vec_split = tf.split(1, num_devices, observation_vec)
+            obs_shaped_list = []
+            for obs, device in zip(obs_im_split, params['model']['O_im_order']):
+                obs_shaped = tf.reshape(
+                    obs,
+                    [
+                        obs_batch,
+                        params["O"][device]["height"],
+                        params["O"][device]["width"],
+                        params["O"][device]["num_channels"]
+                    ])
+                obs_shaped_list.append(obs_shaped)
+            # TODO dropout
+            im_output, _ = observation_graph(
+                tf.concat(3, obs_shaped_list),
+                params['model']['image_graph'],
+                dtype=self.dtype,
+                scope=scope,
+                reuse=reuse,
+                is_training=is_training)
+            if len(im_output.get_shape()) > 2:
+                im_output = tf.contrib.layers.flatten(im_output)
         # TODO this is where you concatenate other stuff
-        output, _ = fcnn(
-            tf.concat(1, [im_output, observation_vec]),
-            params['model']['observation_graph'],
-            dtype=self.dtype,
-            scope=scope,
-            reuse=reuse,
-            is_training=is_training)
+            output, _ = fcnn(
+                tf.concat(1, [im_output, observation_vec]),
+                params['model']['observation_graph'],
+                dtype=self.dtype,
+                scope=scope,
+                reuse=reuse,
+                is_training=is_training)
+        else:
+            output, _ = fcnn(
+                observation_vec,
+                params['model']['observation_graph'],
+                dtype=self.dtype,
+                scope=scope,
+                reuse=reuse,
+                is_training=is_training)
         if obs_batch == 1 and batch_size != 1:
             output = tf.tile(output, [batch_size, 1])
         return output
