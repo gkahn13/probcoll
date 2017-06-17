@@ -57,7 +57,7 @@ probcoll:
       position:
         min: [0, -0.5, 0.5] # TODO
         max: [0, 0.5, 0.5] # TODO
-        num: [1, 20, 1] # TODO
+        num: [1, 6, 1] # TODO
 
     perturb: # repetition perturbations
       position: [0.1, 0.1, 0.0] # TODO
@@ -81,9 +81,9 @@ model:
   # what to use as input to prediction model
   X_order: []
   U_order: ['linearvel']
-  O_im_order: []
-  O_vec_order: ['position']
-  O_order: ['camera']
+#  O_order: ['camera']
+  O_im_order: ['camera']
+  O_vec_order: []
   output_order: ['collision'] # taken from observations O
 
   # NN training parameters

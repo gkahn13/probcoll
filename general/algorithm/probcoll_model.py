@@ -127,7 +127,7 @@ class ProbcollModel:
         d = {}
 
         pm_params = params['model']
-        for key in ('T', 'num_bootstrap', 'val_pct', 'X_order', 'U_order', 'O_order', 'output_order', 'save_type'):
+        for key in ('T', 'num_bootstrap', 'val_pct', 'X_order', 'U_order', 'O_im_order','O_vec_order', 'output_order', 'save_type'):
             d[key] = pm_params[key]
 
         for key in ('X', 'U', 'O'):
@@ -554,7 +554,7 @@ class ProbcollModel:
             obs_im_float = tf.cast(observation_im, self.dtype) / 255.
             if params['model']['center_O']:
                 obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
-            num_devices = len(params['model']['O_order'])
+            num_devices = len(params['model']['O_im_order'])
             obs_im_split = tf.split(1, num_devices, obs_im_float)
             # obs_vec_split = tf.split(1, num_devices, observation_vec)
             obs_shaped_list = []

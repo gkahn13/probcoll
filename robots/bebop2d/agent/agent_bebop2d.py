@@ -43,27 +43,27 @@ class AgentBebop2d(Agent):
 
         self.cv_bridge = cv_bridge.CvBridge()
 
-    def sample_policy(self, x0, policy, T=None, **policy_args):
+    def sample_policy(self, x0, policy, T=None, only_noise=False, **policy_args):
         if T is None:
             T = policy._T
         policy_sample = Sample(meta_data=params, T=T)
-        noise = policy_args.get('noise', ZeroNoise(params))
-
+        # noise = policy_args.get('noise', ZeroNoise(params))
+        policy_sample_no_noise = Sample(meta_data=params, T=T)
         rate = rospy.Rate(1. / params['dt'])
         policy_sample.set_X(x0, t=0)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
-            u_t = policy.act(x_t, o_t, t, noise=noise)
-            if params['probcoll']['planner_type'] != 'teleop': # TODO hack
+            u_t, u_t_noise = policy.act(x_t, o_t, t, only_noise=only_noise, **policy_args)
+            if params['planning']['planner_type'] != 'teleop': # TODO hack
                 self.execute_control(u_t)
-
             # record
             policy_sample.set_X(x_t, t=t)
             policy_sample.set_O(o_t, t=t)
             policy_sample.set_U(u_t, t=t)
-
+            if not only_noise:
+                policy_sample_no_noise.set_U(u_t_noise, t=t)
             # propagate dynamics
             if t < T-1:
                 x_tp1 = self._dynamics.evolve(x_t, u_t)
@@ -73,7 +73,7 @@ class AgentBebop2d(Agent):
             # see if collision in the past cycle
             policy_sample.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
 
-        return policy_sample
+        return policy_sample, policy_sample_no_noise
 
     def reset(self, x):
         pass
