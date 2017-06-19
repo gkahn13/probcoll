@@ -4,15 +4,15 @@ dt: 0.25
 random_seed: 0
 config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'bair_car_lstm'
+exp_name: 'bair_car_4_pos_1_obs_eps_sched'
 
 ##########################
 ### Probcoll algorithm ###
 ##########################
 
 probcoll:
-  T: 28 # timesteps per trajectory
-  max_iter: 50
+  T: 256 # timesteps per trajectory
+  max_iter: 300
   logger: 'debug' # debug/info/fatal what level to log
   asynchronous_training: True
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -42,46 +42,44 @@ probcoll:
 ######################
     
 model:
-  T: 8 # how many timesteps to predict
-  logger: 'fatal' # debug/info/fatal what level to log
+  T: 12 # how many timesteps to predict
+  logger: 'info' # debug/info/fatal what level to log
   control_range:
     lower: [0., -17.]
     upper: [99., 17.]
-  center_O: False 
   # what to use as input to prediction model
   X_order: []
   U_order: ['cmd_steer', 'cmd_vel']
   O_order: ['camera'] # / 'back_camera'
   output_order: ['collision'] # taken from observations O
-
+  num_O: 1
+  scale_O: True
+  center_O: False 
   # NN training parameters
   device: 0
   gpu_fraction: 0.8 #TODO
   reset_every_train: False # every time train is called, reinitialize weights?
-  learning_rate: 0.01
+  learning_rate: 1.e-4
   beta1: 0.9 # For adam
   beta2: 0.999 # For adam
-  batch_size: 16
+  batch_size: 64
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
   steps: 1000
   val_pct: 0.2
 
-  # How to save tfrecords
-  save_type: 'fixedlen' # fixedlen
-  
   dtype: 'float32'
-  reg: 0.000001
+  reg: 1.e-5
   num_bootstrap: 1
-  prob_coll_strictly_increasing: False # True / False 
+  prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
 
   image_graph:
     graph_type: 'cnn'
-    filters: [16, 16, 16]
-    kernels: [3, 3, 3]
-    strides: [2, 2, 2]
+    filters: [32, 64, 64]
+    kernels: [8, 4, 3]
+    strides: [4, 2, 1]
     padding: 'SAME' 
     use_batch_norm: True
     conv_activation: 'relu'
@@ -96,14 +94,12 @@ model:
 #    dropout: 0.9
   observation_graph:
     hidden_activation: 'tanh' 
-    output_dim: 64 # This is the hidden size of the rnn
+    output_dim: 128 # This is the hidden size of the rnn
   
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
-    # TODO num_units isnt used because we use cnn output size as num_units
-#    num_units: 16 # state_size
-    cell_type: 'mulint_lstm' #rnn / mulint_rnn
+    cell_type: 'mulint_rnn' #rnn / mulint_rnn
 #    dropout: 0.8 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
@@ -125,12 +121,13 @@ planning:
     control_cost:
       des: [49.5, 16.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [0.01, 1.0]     
+      weight: [0.001, 1.0]     
   
   epsilon_greedy:
-    epsilon: 0.1
-    lower: [30., 16.]
-    upper: [70., 16.]
+    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
+    outside_value: 0.01
+    lower: [20., 16.]
+    upper: [80., 16.]
 
   control_noise:
     type: 'uniform' # zero / gaussian / uniform
@@ -139,8 +136,8 @@ planning:
     gaussian:
       std: [3.0, 0.3]
     uniform:
-      lower: [-5., -3.]
-      upper: [5., 3.]
+      lower: [-5., 0.]
+      upper: [5., 0.]
   
   num_dp: 1 # number of dropout passes to average over
   planner_type: 'cem' # random / primitives / cem
@@ -148,12 +145,12 @@ planning:
   primitives:
     steers: [30., 40., 50., 60., 70.]
     speeds: [16.]
-    num_splits: 4
+    num_splits: 3
 
   # control range for your planning algorithms
   control_range:
-    lower: [30., 16.]
-    upper: [70., 16.]
+    lower: [20., 16.]
+    upper: [80., 16.]
 
   random:
     K: 2048 # number of actions to sample from
@@ -162,11 +159,15 @@ planning:
     init_M: 1024 # number of actions to sample from
     M: 256
     K: 16 # top actions you select
-    num_iters: 2 # does not include first sample    
+    num_iters: 4 # does not include first sample    
     eps: 0.01 # to ensure covariance is PD
 
   # TODO: other planning methods here
-
+  visualize: False
+  topics:
+    debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
+    debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
+  
 #############
 ### World ###
 #############
@@ -186,11 +187,15 @@ world:
 
   testing:
     itr_freq: 2
-    positions: []
+#    positions: []
 #    positions: [[-95., 0., -0.6], [-80., 60., -0.6], [13., 48., -0.6], [0., -20., -0.6]]
+    positions: [[40., -40., 0.2], [-40., -40., 0.2], [40., 20., 0.2], [-40., 20., 0.2]]
+#    positions: [[40., -40., 0.2], [40., 20., 0.2]]
+#    positions: [[40., 20., 0.2]]
+
 sim:
   srv: 'sim_env'
-  sim_env: 'hallway' # hallway / cory2
+  sim_env: 'square' # hallway / cory2 / square
   launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
@@ -221,24 +226,24 @@ U:
 O:
   use_depth: True
 
-  dim: 1153
+  dim: 4609
   order: ['camera', 'back_camera', 'collision']
 
   camera:
     idx: 0
-    dim: 576
-    height: 32
-    width: 18
+    dim: 2304
+    height: 64
+    width: 36
     num_channels: 1
     noise: 0.01
   back_camera:
-    idx: 576
-    dim: 576
-    height: 32
-    width: 18
+    idx: 2304
+    dim: 2304
+    height: 64
+    width: 36
     num_channels: 1
     noise: 0.01
-  collision: {idx: 1152, dim: 1, buffer: 0.0}
+  collision: {idx: 4608, dim: 1, buffer: 0.0}
 
 ##################
 ### ros topics ###

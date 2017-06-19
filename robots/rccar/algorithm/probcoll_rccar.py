@@ -8,7 +8,7 @@ import signal
 import time
 
 from robots.rccar.tf.planning.planner_primitives_rccar import PlannerPrimitivesRCcar
-from general.tf.planning.planner_random import PlannerRandom
+from robots.rccar.tf.planning.planner_random_rccar import PlannerRandomRCcar
 from general.tf.planning.planner_cem import PlannerCem
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
@@ -74,8 +74,6 @@ class ProbcollRCcar(Probcoll):
             subprocess.call(command)
         except Exception as e:
             print(e)
-        finally:
-            self._logger.info("Ending Simulation!")
 
     def _close(self):
         for p in self._jobs:
@@ -118,7 +116,7 @@ class ProbcollRCcar(Probcoll):
                     for t in xrange(T):
                         x0 = sample_T.get_X(t=t)
 
-                        rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, T=1, use_noise=False)
+                        rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, 0., T=1, use_noise=False)
                         
                         o = rollout.get_O(t=0)
                         u = rollout_no_noise.get_U(t=0)
@@ -216,7 +214,7 @@ class ProbcollRCcar(Probcoll):
         """ Must initialize MPC """
         self._logger.debug('\t\t\tCreating MPC')
         if self._planner_type == 'random':
-            planner = PlannerRandom(self._probcoll_model, params['planning'])
+            planner = PlannerRandomRCcar(self._probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         elif self._planner_type == 'primitives':
             planner = PlannerPrimitivesRCcar(self._probcoll_model, params['planning'])

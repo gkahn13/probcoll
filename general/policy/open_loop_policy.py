@@ -6,6 +6,6 @@ class OpenLoopPolicy(Policy):
         self._planner = planner
 
     # TODO
-    def act(self, x, obs, t, only_noise=False):
-        u, u_no_noise = self._planner.plan(x, obs, t, only_noise=only_noise)
+    def act(self, obs_frame, t, rollout_num, only_noise=False, visualize=False):
+        u, u_no_noise = self._planner.plan(obs_frame, t, rollout_num, only_noise=only_noise, visualize=visualize)
         return u, u_no_noise

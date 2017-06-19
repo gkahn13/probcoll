@@ -16,10 +16,6 @@ class ProbcollModelBebop2d(ProbcollModel):
     ### Initializing ###
     ####################
 
-    def __init__(self, read_only=False, finalize=True):
-        dist_eps = params['O']['collision']['buffer']
-        ProbcollModel.__init__(self, dist_eps, read_only=read_only, finalize=finalize)
-
     #############
     ### Files ###
     #############

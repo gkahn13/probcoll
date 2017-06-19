@@ -1,7 +1,5 @@
 import tensorflow as tf
 from general.tf.planning.planner import Planner
-
-import tensorflow as tf
 from general.tf.planning.cost.cost_desired import CostDesired
 from general.tf.planning.cost.cost_coll import CostColl
 
@@ -15,13 +13,11 @@ class PlannerRandom(Planner):
                 control_range['lower'],
                 control_range['upper'])
             u_samples = tf.cast(u_distribution.sample(sample_shape=(k, self.probcoll_model.T)), self.dtype)
-            self.X_inputs = self.probcoll_model.d_eval['X_inputs']
+            self.actions_considered = u_samples
             self.O_input = self.probcoll_model.d_eval['O_input']
             stack_u = tf.concat(0, [u_samples]*self.params['num_dp'])
-            stack_x = tf.concat(0, [self.X_inputs]*self.params['num_dp'])
             # TODO incorporate std later
             output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
-                stack_x,
                 stack_u,
                 O_input=self.O_input,
                 reuse=True) 
@@ -33,14 +29,17 @@ class PlannerRandom(Planner):
                 tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
 
             mat_std = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], mat_std), axis=0)
-
+                tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
+            
+            mat_mean = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+            
             control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
             coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
             
-            control_cost = control_cost_fn.eval(u_samples)
-            coll_cost = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
+            self.control_costs = control_cost_fn.eval(u_samples)
+            self.coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
 
-            total_cost = control_cost + coll_cost
+            total_cost = self.control_costs + self.coll_costs
             index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
             self.action = u_samples[index, 0]

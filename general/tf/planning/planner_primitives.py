@@ -26,12 +26,10 @@ class PlannerPrimitives(Planner):
 
     def _setup(self):
         with tf.name_scope('primitives_planner'):
-            self.X_inputs = self.probcoll_model.d_eval['X_inputs']
+            self.actions_considered = self.primitives
             self.O_input = self.probcoll_model.d_eval['O_input']
             stack_u = tf.concat(0, [self.primitives]*self.params['num_dp'])
-            stack_x = tf.concat(0, [self.X_inputs]*self.params['num_dp'])
             output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
-                stack_x,
                 stack_u,
                 O_input=self.O_input,
                 reuse=True) 
@@ -42,9 +40,9 @@ class PlannerPrimitives(Planner):
             control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
             coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
             
-            control_cost = control_cost_fn.eval(self.primitives)
-            coll_cost = coll_cost_fn.eval(pred_mean, self.primitives)
+            self.control_costs = control_cost_fn.eval(self.primitives)
+            self.coll_costs = coll_cost_fn.eval(pred_mean, self.primitives)
 
-            total_cost = control_cost + coll_cost
-            index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
+            total_costs = self.control_costs + self.coll_costs
+            index = tf.cast(tf.argmin(total_costs, axis=0), tf.int32)
             self.action = self.primitives[index, 0]

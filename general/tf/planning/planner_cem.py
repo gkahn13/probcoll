@@ -18,7 +18,6 @@ class PlannerCem(Planner):
             T = self.probcoll_model.T
             control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
             coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
-            self.X_inputs = self.probcoll_model.d_eval['X_inputs']
             self.O_input = self.probcoll_model.d_eval['O_input']
             
             init_distribution = tf.contrib.distributions.Uniform(
@@ -27,7 +26,6 @@ class PlannerCem(Planner):
             init_u_samples = tf.cast(init_distribution.sample(sample_shape=(init_m, T)), self.dtype)
             flat_u_samples = tf.reshape(init_u_samples, (init_m, T * d))
             init_stack_u = tf.concat(0, [init_u_samples]*self.params['num_dp'])
-            stack_x = tf.concat(0, [self.X_inputs]*self.params['num_dp'])
             embeddings = [
                     self.probcoll_model.get_embedding(
                         self.O_input,
@@ -36,9 +34,7 @@ class PlannerCem(Planner):
                         scope="observation_graph_b{0}".format(b)) for b in xrange(self.probcoll_model.num_bootstrap)
                 ]
             init_output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
-                stack_x,
                 init_stack_u,
-#                O_input=self.O_input,
                 bootstrap_initial_states=embeddings,
                 reuse=True) 
 
@@ -73,7 +69,6 @@ class PlannerCem(Planner):
                 stack_u = tf.concat(0, [u_samples]*self.params['num_dp'])
                 # TODO incorporate std later
                 output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
-                    stack_x,
                     stack_u,
     #                O_input=self.O_input,
                     bootstrap_initial_states=embeddings,

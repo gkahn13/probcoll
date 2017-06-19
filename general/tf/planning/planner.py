@@ -1,10 +1,12 @@
 import abc
 import tensorflow as tf
+import numpy as np
 
 from general.tf.planning.noise import ZeroNoise
 from general.tf.planning.noise import GaussianNoise
 from general.tf.planning.noise import UniformNoise
 from general.tf.planning.epsilon_greedy import epsilon_greedy
+from general.utility import schedules
 
 class Planner(object):
     __metaclass__ = abc.ABCMeta
@@ -18,7 +20,7 @@ class Planner(object):
 
     @abc.abstractmethod
     def _setup(self):
-        """Needs to define the placeholders self.X_inputs self.O_input and 
+        """Needs to define the placeholders self.O_input and 
         output self.action.
         """
         raise NotImplementedError('Implement in subclass')
@@ -41,33 +43,49 @@ class Planner(object):
         else:
             raise NotImplementedError(
                 "Noise type {0} is not valid".format(noise_type))
-        if self.params['epsilon_greedy']['epsilon'] > 0:
-            self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], dtype=self.dtype)
-    
+        # Epsilon greedy 
+        self.eps_schedule = schedules.PiecewiseSchedule(
+            endpoints=self.params['epsilon_greedy']['endpoints'],
+            outside_value=self.params['epsilon_greedy']['outside_value'])
+        self.eps_ph = tf.placeholder(self.dtype, [])
+        self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], eps=self.eps_ph, dtype=self.dtype)
+
     def visualize(
             self,
             actions_considered,
             action,
             action_noisy,
-            coll_cost,
-            des_cost):
+            coll_costs,
+            control_costs):
         pass
 
-    def plan(self, x, o, t, only_noise, visualize=False):
+    def plan(self, obs_frame, t, rollout_num, only_noise=False, visualize=False):
         # TODO figure out general way to handle state
-        o_input = o[self.probcoll_model.O_idxs()].reshape(1, -1)
-        feed_dict = {self.X_inputs: [[[]]*self.probcoll_model.T], self.O_input: o_input}
+        o_input = []
+        for o in obs_frame:
+            o_input.append(o[self.probcoll_model.O_idxs()])
+        o_input = np.concatenate(o_input).reshape(1, -1)
+        feed_dict = {
+                self.O_input: o_input,
+                self.eps_ph: self.eps_schedule.value(rollout_num)
+            }
         if visualize:
-            action_noisy, action, actions_considered, noisy_action, \
-                coll_cost, des_cost  = self.probcoll_model.sess.run(
-                    [self.action_noisy, self.action],
+            action_noisy, action, actions_considered, \
+                coll_costs, control_costs  = self.probcoll_model.sess.run(
+                    [
+                        self.action_noisy,
+                        self.action,
+                        self.actions_considered,
+                        self.coll_costs,
+                        self.control_costs
+                    ],
                     feed_dict)
             self.visualize(
                 actions_considered,
                 action,
                 action_noisy,
-                coll_cost,
-                des_cost)
+                coll_costs,
+                control_costs)
         else:
             if only_noise:
                 action_noisy = self.probcoll_model.sess.run(

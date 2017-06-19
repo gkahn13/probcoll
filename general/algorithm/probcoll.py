@@ -23,7 +23,6 @@ class Probcoll:
         self._mpc_policy = self._create_mpc()
         shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
 
-
     @abc.abstractmethod
     def _setup(self):
         ### load prediction neural net
@@ -185,7 +184,7 @@ class Probcoll:
         samples = []
         world_infos = []
         mpc_infos = []
-
+        rollout_num = itr * (self._conditions.length * self._conditions.repeats)
         self._conditions.reset()
         for cond in xrange(self._conditions.length):
             rep = 0
@@ -204,7 +203,7 @@ class Probcoll:
 
                     x0 = sample_T.get_X(t=t)
 
-                    rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, T=1, only_noise=label_with_noise)
+                    rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, rollout_num, T=1, only_noise=label_with_noise)
                     
                     o = rollout.get_O(t=0)
                     if label_with_noise:
@@ -252,6 +251,7 @@ class Probcoll:
                                                                                                          elapsed,
                                                                                                          t*params['dt']/elapsed))
                 rep += 1
+                rollout_num += 1
 
         self._itr_save_samples(itr, samples)
         self._itr_save_worlds(itr, world_infos)

@@ -1,21 +1,30 @@
 #!/usr/bin/env python
 import rospy
+from car_srv import CarSrv
+from panda3d.core import Vec3
 from panda3d.core import BitMask32
 from panda3d.bullet import BulletHelper
+from panda3d.bullet import BulletWorld
 from panda3d.bullet import BulletRigidBodyNode
-from car_srv import CarSrv
 
-class Cory2SrvNode(CarSrv):
+class SquareSrvNode(CarSrv):
+
+    def doReset(self, pos=None, quat=None):
+        if pos is None:
+            pos = (42.5, -42.5, 0.2)
+            self.load_vehicle(pos=pos)
+        else:
+            self.load_vehicle(pos=pos, quat=quat)
 
     def setup(self):
         # collision
-        visNP = loader.loadModel('../models/coryf2.egg')
+        visNP = loader.loadModel('../models/square_hallway.egg')
         visNP.clearModelNodes()
         visNP.reparentTo(render)
-        pos = (7., 60.0, 3.8)
+        pos = (0., 0., 0.)
         visNP.setPos(pos[0], pos[1], pos[2])
 
-        bodyNPs = BulletHelper.fromCollisionSolids(visNP, True);
+        bodyNPs = BulletHelper.fromCollisionSolids(visNP, True)
         for bodyNP in bodyNPs:
             bodyNP.reparentTo(render)
             bodyNP.setPos(pos[0], pos[1], pos[2])
@@ -28,6 +37,5 @@ class Cory2SrvNode(CarSrv):
 
 if __name__ == '__main__':
     rospy.init_node('car_node', anonymous=True)
-    game = Cory2SrvNode()
+    game = SquareSrvNode()
     base.run()
-

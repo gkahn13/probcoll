@@ -1,45 +1,22 @@
-import tensorflow as tf
+from general.tf.planning.planner_random import PlannerRandom
 import numpy as np
+import tensorflow as tf
 import rospy
 import visualization_msgs.msg as vm
 import geometry_msgs.msg as gm
 import matplotlib.cm as cm
 import robots.rccar.ros.ros_utils as ros_utils
-from general.tf.planning.planner_primitives import PlannerPrimitives
 
-class PlannerPrimitivesRCcar(PlannerPrimitives):
+
+class PlannerRandomRCcar(PlannerRandom):
     def __init__(self, probcoll_model, params, dtype=tf.float32):
-        super(PlannerPrimitivesRCcar, self).__init__(probcoll_model, params, dtype=dtype)
+        super(PlannerRandomRCcar, self).__init__(probcoll_model, params, dtype=dtype)
         topics = params['topics']
         self.debug_cost_probcoll_pub = ros_utils.Publisher(
             topics['debug_cost_probcoll'],
             vm.MarkerArray,
             queue_size=10)
     
-    def _create_primitives(self):
-        steers = self.params['primitives']['steers']
-        speeds = self.params['primitives']['speeds']
-        num_splits = self.params['primitives']['num_splits']        
-        controls = []
-        s_len = len(steers)
-        m_len = len(speeds)
-        for n in xrange((s_len * m_len)**num_splits):
-            s_val = n
-            m_val = n // (s_len ** num_splits)
-            control = []
-            horizon_left = self.probcoll_model.T
-            for i in xrange(num_splits):
-                s_index = s_val % s_len
-                s_val = s_val // s_len
-                m_index = m_val % m_len
-                m_val = m_val // m_len
-                cur_len = horizon_left // (num_splits - i)
-                control += [[steers[s_index], speeds[m_index]]] * cur_len
-                horizon_left -= cur_len
-            controls.append(np.array(control))
-        controls = np.array(controls)
-        self.primitives = tf.constant(controls, dtype=self.probcoll_model.dtype)
-
     def visualize(
             self,
             actions_considered,

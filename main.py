@@ -19,11 +19,12 @@ try:
 except:
     print('main.py: not importing Bebop2d')
 
-#try:
-from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
-#except:
-#    print('main.py: not importing RC car')
+try:
+    from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
+    from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
+    from robots.rccar.algorithm.train_rccar import TrainRCcar
+except:
+    print('main.py: not importing RC car')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -35,9 +36,11 @@ if __name__ == '__main__':
     parser_analyze.set_defaults(run='analyze')
     parser_replay_probcoll = subparsers.add_parser('replay_prediction')
     parser_replay_probcoll.set_defaults(run='replay_prediction')
-
+    parser_train = subparsers.add_parser('train')
+    parser_train.set_defaults(run='train')
+    
     ### arguments common to all
-    for subparser in (parser_probcoll, parser_analyze, parser_replay_probcoll):
+    for subparser in (parser_probcoll, parser_analyze, parser_replay_probcoll, parser_train):
         subparser.add_argument('robot', type=str, choices=('quadrotor', 'pointquad', 'bebop2d', 'rccar', 'point2d', 'point1d'),
                                help='robot type')
         subparser.add_argument('-exp_name', type=str, default=None,
@@ -55,6 +58,8 @@ if __name__ == '__main__':
     parser_analyze.add_argument('--plot_traj', action='store_true')
     parser_analyze.add_argument('--plot_samples', action='store_true')
     parser_analyze.add_argument('--plot_groundtruth', action='store_true')
+
+    parser_train.add_argument('--plot_dir', type=str, default=None)
 
     args = parser.parse_args()
     run = args.run
@@ -108,6 +113,14 @@ if __name__ == '__main__':
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 
         analyze.run(args.plot_single, args.plot_traj, args.plot_samples, args.plot_groundtruth)
+
+    elif run == 'train':
+        if robot == 'rccar':
+            train = TrainRCcar(plot_dir=args.plot_dir)
+        else:
+            raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
+
+        train.run()
 
     elif run == 'replay_probcoll':
         if robot == 'pointquad':

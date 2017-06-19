@@ -188,8 +188,15 @@ class AnalyzeRCcar(Analyze):
             plt.xlabel('X position')
             plt.ylabel('Y position')
             # TODO not make this hard coded
-            plt.ylim([-50, 75])
-            plt.xlim([-110, 25])
+            if params['sim']['sim_env'] == 'cory2':
+                plt.ylim([-50, 75])
+                plt.xlim([-110, 25])
+            elif params['sim']['sim_env'] == 'square':
+                plt.ylim([-60, 60])
+                plt.xlim([-60, 60])
+            elif params['sim']['sim_env'] == 'hallway':
+                plt.ylim([-10, 60])
+                plt.xlim([-20, 20])
             for s in samples:
                 pos = s.get_X(sub_state='position')
                 is_coll = s.get_O(t=-1, sub_obs='collision')

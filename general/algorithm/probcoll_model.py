@@ -29,9 +29,11 @@ class ProbcollModel:
     ### Initializing ###
     ####################
 
-    def __init__(self, dist_eps, read_only=False, finalize=True):
-        self.dist_eps = dist_eps
-        self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
+    def __init__(self, save_dir=None, read_only=False, finalize=True):
+        if save_dir is None:
+            self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
+        else:
+            self.save_dir = save_dir
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         self._logger = get_logger(
@@ -43,22 +45,12 @@ class ProbcollModel:
         for k, v in params['model'].items():
             setattr(self, k, v)
 
-        self.dX = len(self.X_idxs())
+        self.num_O = params['model'].get('num_O', 1)
+
         self.dU = len(self.U_idxs())
-        self.dO = len(self.O_idxs())
+        self.dO = len(self.O_idxs()) * self.num_O
         self.doutput = len(self.output_idxs())
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
-
-        self.tfrecords_train_fnames = [
-                self.tfrecords_no_coll_train_fnames,
-                self.tfrecords_coll_train_fnames
-            ]
-
-        self.tfrecords_val_fnames = [
-                self.tfrecords_no_coll_val_fnames,
-                self.tfrecords_coll_val_fnames
-            ]
-                
         self.preprocess_fnames = []
         self.threads = []
 
@@ -86,7 +78,6 @@ class ProbcollModel:
     def _this_file(self):
         raise NotImplementedError('Implement in subclass')
 
-    
     @property
     def tfrecords_no_coll_train_fnames(self):
         return [
@@ -125,10 +116,10 @@ class ProbcollModel:
         d = {}
 
         pm_params = params['model']
-        for key in ('T', 'num_bootstrap', 'val_pct', 'X_order', 'U_order', 'O_order', 'output_order', 'save_type'):
+        for key in ('T', 'num_bootstrap', 'val_pct', 'U_order', 'O_order', 'output_order'):
             d[key] = pm_params[key]
 
-        for key in ('X', 'U', 'O'):
+        for key in ('U', 'O'):
             d[key] = params[key]
 
         for key in ('image_graph', 'action_graph', 'output_graph'):
@@ -195,17 +186,9 @@ class ProbcollModel:
             os.makedirs(dir)
         return dir
     
-
     ############
     ### Data ###
     ############
-
-    def X_idxs(self, p=None, without=[]):
-        if p is None: p = params
-        return list(itertools.chain(*[range(p['X'][ord]['idx'],
-                                            p['X'][ord]['idx']+p['X'][ord]['dim'])
-                                      for ord in self.X_order if ord not in without]))
-
     def U_idxs(self, p=None, without=[]):
         if p is None: p = params
         return list(itertools.chain(*[range(p['U'][ord]['idx'],
@@ -241,8 +224,8 @@ class ProbcollModel:
         :return: no_coll_data, coll_data 
         """
 
-        no_coll_data = {"X": [], "U": [], "O": [], "output": [], "len": []}
-        coll_data = {"X": [], "U": [], "O": [], "output": [], "len": []}
+        no_coll_data = {"U": [], "O": [], "output": [], "len": []}
+        coll_data = {"U": [], "O": [], "output": [], "len": []}
 
         random.shuffle(npz_fnames)
         for npz_fname in npz_fnames:
@@ -256,15 +239,14 @@ class ProbcollModel:
             for og_sample in samples:
                 for sample in self._modify_sample(og_sample):
                     s_params = sample._meta_data
-                    X = sample.get_X()[:, self.X_idxs(p=s_params)]
                     U = sample.get_U()[:, self.U_idxs(p=s_params)]
                     O = sample.get_O()[:, self.O_idxs(p=s_params)]
                     output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
                     buffer_len = 1
-                    if len(X) < 1 + buffer_len: # used to be self.T, but now we are extending
+                    if len(U) < 1 + buffer_len: # used to be self.T, but now we are extending
                         continue
                     
-                    for arr in (X, U, O, output):
+                    for arr in (U, O, output):
                         assert(np.all(np.isfinite(arr)))
                         assert(not np.any(np.isnan(arr)))
 
@@ -273,22 +255,18 @@ class ProbcollModel:
                         extend_u = np.zeros((self.T - 1 - buffer_len, U.shape[1]))
                         U_coll = np.vstack((U[-self.T:], extend_u))
 
-                        X_coll = np.vstack((X[-self.T:], np.tile([X[-1]], (self.T - 1 - buffer_len, 1))))
                         O_coll = np.vstack((O[-self.T:], np.tile([O[-1]], (self.T - 1 - buffer_len, 1))))
                         output_coll = np.vstack((output[-self.T:], np.tile([output[-1]], (self.T - 1 - buffer_len, 1))))
-                        coll_data["X"].append(X_coll)
                         coll_data["U"].append(U_coll)
                         coll_data["O"].append(O_coll)
                         coll_data["output"].append(output_coll)
                         # For noncollision data remove the collision
-                        X = X[:-1]
                         U = U[:-1]
                         O = O[:-1]
                         output = output[:-1]
                    
                     # Only add if non-collision part is long enough
-                    if len(X) >= self.T:
-                        no_coll_data["X"].append(X)
+                    if len(U) >= self.T:
                         no_coll_data["U"].append(U)
                         no_coll_data["O"].append(O)
                         no_coll_data["output"].append(output)
@@ -298,7 +276,6 @@ class ProbcollModel:
     def _save_tfrecords(
             self,
             tfrecords,
-            X_by_sample,
             U_by_sample,
             O_by_sample,
             output_by_sample):
@@ -315,16 +292,20 @@ class ProbcollModel:
         writer = tf.python_io.TFRecordWriter(tfrecords)
 
         record_num = 0
-        for i, (X, U, O, output) in enumerate(zip(X_by_sample, U_by_sample, O_by_sample, output_by_sample)):
-            assert(len(X) >= self.T)
-            for j in range(len(X) - self.T + 1):
+        for i, (U, O, output) in enumerate(zip(U_by_sample, O_by_sample, output_by_sample)):
+            assert(len(U) >= self.T)
+            for j in range(len(U) - self.T + 1):
                 feature = {
                     'fname': _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(record_num)),
                 }
-                feature['X'] = _floatlist_feature(np.ravel(X[j:j+self.T]).tolist())
                 feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
                 # TODO figure out how to keep types properly
-                feature['O'] = _floatlist_feature(np.ravel(O[j]).tolist())
+                if j < self.num_O - 1:
+                    obs = O[:j].ravel()
+                    obs_extended = np.concatenate([obs, np.zeros(self.dO - obs.shape[0])])
+                    feature['O'] = _floatlist_feature(obs_extended.tolist())
+                else:
+                    feature['O'] = _floatlist_feature(np.ravel(O[j-self.num_O+1:j+1]).tolist())
                 output_list = np.ravel(output[j:j+self.T])
                 feature['output'] = _bytes_feature(output_list.tostring())
                 index = np.argmax(output_list)
@@ -375,8 +356,8 @@ class ProbcollModel:
             tfrecords_coll_val, tfrecords_no_coll_val = tfrecords
         self._logger.info('Saving tfrecords')
         no_coll_data, coll_data = self._load_samples(npz_fnames)
-        no_coll_len = len(no_coll_data["X"])
-        coll_len = len(coll_data["X"])
+        no_coll_len = len(no_coll_data["U"])
+        coll_len = len(coll_data["U"])
         tot_coll = sum([np.argmax(coll_data["output"][i]) + 1 for i in range(coll_len)])
         tot_no = sum([len(no_coll_data["output"][i]) - self.T + 1 for i in range(no_coll_len)])
         self._logger.info("Size of no collision data: {0}".format(tot_no))
@@ -384,28 +365,24 @@ class ProbcollModel:
 
         self._save_tfrecords(
             tfrecords_no_coll_train, 
-            no_coll_data["X"][int(no_coll_len * self.val_pct):],
             no_coll_data["U"][int(no_coll_len * self.val_pct):],
             no_coll_data["O"][int(no_coll_len * self.val_pct):],
             no_coll_data["output"][int(no_coll_len * self.val_pct):])
 
         self._save_tfrecords(
             tfrecords_coll_train, 
-            coll_data["X"][int(coll_len * self.val_pct):],
             coll_data["U"][int(coll_len * self.val_pct):],
             coll_data["O"][int(coll_len * self.val_pct):],
             coll_data["output"][int(coll_len * self.val_pct):])
 
         self._save_tfrecords(
             tfrecords_no_coll_val, 
-            no_coll_data["X"][:int(no_coll_len * self.val_pct)],
             no_coll_data["U"][:int(no_coll_len * self.val_pct)],
             no_coll_data["O"][:int(no_coll_len * self.val_pct)],
             no_coll_data["output"][:int(no_coll_len * self.val_pct)])
 
         self._save_tfrecords(
             tfrecords_coll_val, 
-            coll_data["X"][:int(coll_len * self.val_pct)],
             coll_data["U"][:int(coll_len * self.val_pct)],
             coll_data["O"][:int(coll_len * self.val_pct)],
             coll_data["output"][:int(coll_len * self.val_pct)])
@@ -415,14 +392,6 @@ class ProbcollModel:
     #############
 
     def _graph_inputs_outputs_from_file(self, name):
-        if self.save_type == 'fixedlen':
-            graph_inputs_outputs_from_file = self._graph_inputs_outputs_from_file_fixedlen
-        else:
-            raise Exception('{0} is not valid save type'.format(self.save_type))
-
-        return graph_inputs_outputs_from_file(name)
-
-    def _graph_inputs_outputs_from_file_fixedlen(self, name):
         with tf.name_scope(name + '_file_input'):
             filename_vars = ( 
                     tf.get_variable(
@@ -457,7 +426,6 @@ class ProbcollModel:
                 'fname': tf.FixedLenFeature([], tf.string)
             }
 
-            features['X'] = tf.FixedLenFeature([self.dX * self.T], tf.float32)
             features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
             features['O'] = tf.FixedLenFeature([self.dO], tf.float32)
             features['output'] = tf.FixedLenFeature([], tf.string)
@@ -472,8 +440,6 @@ class ProbcollModel:
                     ]
 
                 fname = parsed_example[0]['fname']
-                bootstrap_X_input = [tf.reshape(parsed_example[b]['X'], (self.T, self.dX))
-                                     for b in xrange(self.num_bootstrap)]
                 bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_O_input = [tf.reshape(parsed_example[b]['O'], (self.dO,))
@@ -481,7 +447,7 @@ class ProbcollModel:
                 bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
                 bootstrap_len = [tf.reshape(parsed_example[b]['len'], ())
                                  for b in xrange(self.num_bootstrap)]
-                inputs[i] = (fname,) + tuple(bootstrap_X_input + bootstrap_U_input + bootstrap_O_input + bootstrap_output + bootstrap_len)
+                inputs[i] = (fname,) + tuple(bootstrap_U_input + bootstrap_O_input + bootstrap_output + bootstrap_len)
 
             shuffled = tf.train.shuffle_batch_join(
                 inputs,
@@ -491,21 +457,19 @@ class ProbcollModel:
                 )
             
             fname_batch = shuffled[0]
-            bootstrap_X_inputs = shuffled[1:1+self.num_bootstrap]
-            bootstrap_U_inputs = shuffled[1+self.num_bootstrap:1+2*self.num_bootstrap]
-            bootstrap_O_inputs = shuffled[1+2*self.num_bootstrap:1+3*self.num_bootstrap]
-            bootstrap_outputs = shuffled[1+3*self.num_bootstrap:1+4*self.num_bootstrap]
-            bootstrap_lens = shuffled[1+4*self.num_bootstrap:1+5*self.num_bootstrap]
+            bootstrap_U_inputs = shuffled[1:1+1*self.num_bootstrap]
+            bootstrap_O_inputs = shuffled[1+1*self.num_bootstrap:1+2*self.num_bootstrap]
+            bootstrap_outputs = shuffled[1+2*self.num_bootstrap:1+3*self.num_bootstrap]
+            bootstrap_lens = shuffled[1+3*self.num_bootstrap:1+4*self.num_bootstrap]
 
-        return fname_batch, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs,\
+        return fname_batch, bootstrap_U_inputs, bootstrap_O_inputs, bootstrap_outputs,\
                bootstrap_lens, filename_queues, filename_vars
 
     def _graph_inputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
-            X_inputs = tf.placeholder(self.dtype, [None, self.T, self.dX])
             U_inputs = tf.placeholder(self.dtype, [None, self.T, self.dU])
             O_input = tf.placeholder(self.dtype, [1, self.dO])
-        return X_inputs, U_inputs, O_input
+        return U_inputs, O_input
 
     def get_embedding(self, observation, batch_size=1, reuse=False, scope=None, is_training=True):
         
@@ -521,22 +485,27 @@ class ProbcollModel:
         obs_batch = observation.get_shape()[0].value
         # TODO if batch size is 1 then clearly not training
         is_training = is_training and obs_batch != 1
-        obs_float = tf.cast(observation, self.dtype) / 255.
-        if params['model']['center_O']:
+        obs_float = tf.cast(observation, self.dtype)
+        if params['model'].get('scale_O', False):
+            obs_float = obs_float / 255.
+        if params['model'].get('center_O', False):
             obs_float = obs_float - tf.reduce_mean(obs_float, axis=0)
         num_devices = len(params['model']['O_order'])
-        obss = tf.split(1, num_devices, obs_float)
         obs_shaped_list = []
-        for obs, device in zip(obss, params['model']['O_order']):
-            obs_shaped = tf.reshape(
-                obs,
-                [
-                    obs_batch,
-                    params["O"][device]["height"],
-                    params["O"][device]["width"],
-                    params["O"][device]["num_channels"]
-                ])
-            obs_shaped_list.append(obs_shaped)
+        obs_frames = tf.split(1, self.num_O, obs_float)
+        # TODO do reshaping in better way 
+        for obs_t in obs_frames:
+            obss = tf.split(1, num_devices, obs_t)
+            for obs, device in zip(obss, params['model']['O_order']):
+                obs_shaped = tf.reshape(
+                    obs,
+                    [
+                        obs_batch,
+                        params["O"][device]["height"],
+                        params["O"][device]["width"],
+                        params["O"][device]["num_channels"]
+                    ])
+                obs_shaped_list.append(obs_shaped)
         # TODO dropout
         im_output, _ = observation_graph(
             tf.concat(3, obs_shaped_list),
@@ -560,7 +529,7 @@ class ProbcollModel:
         return output
    
     def _graph_inference(
-            self, name, bootstrap_X_inputs, bootstrap_U_inputs, bootstrap_O_inputs,
+            self, name, bootstrap_U_inputs, bootstrap_O_inputs,
             reuse=False, finalize=True, tf_debug={}):
         assert(name == 'train' or name == 'val')
         num_bootstrap = params['model']['num_bootstrap']
@@ -587,23 +556,13 @@ class ProbcollModel:
 
             for b in xrange(num_bootstrap):
                 ### inputs
-                x_input_b = bootstrap_X_inputs[b]
                 u_input_b = bootstrap_U_inputs[b]
                 o_input_b = bootstrap_O_inputs[b]
-                batch_size = tf.shape(x_input_b)[0]
+                batch_size = tf.shape(u_input_b)[0]
 
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     concat_list = []
-                    if self.dX > 0:
-                        
-                        if recurrent:
-                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T, self.dX])
-                        else:
-                            x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T * self.dX])
-                        
-                        concat_list.append(x_input_flat_b)
-                    
                     if self.dU > 0:
                         control_mean = (np.array(params['model']['control_range']['lower']) + \
                             np.array(params['model']['control_range']['upper']))/2.
@@ -687,7 +646,7 @@ class ProbcollModel:
         return bootstrap_output_mats
 
     def graph_eval_inference(
-            self, X_input, U_input, O_input=None, bootstrap_initial_states=None,
+            self, U_input, O_input=None, bootstrap_initial_states=None,
             reuse=False, finalize=True, tf_debug={}):
         
         bootstrap_output_mats = []
@@ -714,21 +673,11 @@ class ProbcollModel:
 
         with tf.name_scope('eval_inference'):
             tf.set_random_seed(self.random_seed)
-            x_input_b = X_input
             u_input_b = U_input
             o_input_b = O_input
            
             base_concat_list = []
 
-            if self.dX > 0:
-                
-                if recurrent:
-                    x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T, self.dX])
-                else:
-                    x_input_flat_b = tf.reshape(x_input_b, [batch_size, self.T * self.dX])
-                
-                base_concat_list.append(x_input_flat_b)
-            
             if self.dU > 0:
                 control_mean = (np.array(params['model']['control_range']['lower']) + \
                     np.array(params['model']['control_range']['upper']))/2.
@@ -989,14 +938,13 @@ class ProbcollModel:
 
         ### prepare for training
         for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
-            d['fnames'], d['X_inputs'], d['U_inputs'], d['O_inputs'], d['outputs'], d['len'], \
+            d['fnames'], d['U_inputs'], d['O_inputs'], d['outputs'], d['len'], \
             queues, queue_vars = self._graph_inputs_outputs_from_file(name)
             d['no_coll_queue'], d['coll_queue'] = queues
             d['no_coll_dequeue'], d['coll_dequeue'] = self._graph_dequeue(*queues)
             d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
             d['output_mats'] = self._graph_inference(
                 name,
-                d['X_inputs'],
                 d['U_inputs'],
                 d['O_inputs'],
                 reuse=i>0,
@@ -1008,11 +956,10 @@ class ProbcollModel:
             self._graph_optimize(self.d_train['bootstraps_cost'], self.d_train['reg_cost'])
 
         ### prepare for eval
-        self.d_eval['X_inputs'], self.d_eval['U_inputs'], self.d_eval['O_input'] = self._graph_inputs_from_placeholders()
+        self.d_eval['U_inputs'], self.d_eval['O_input'] = self._graph_inputs_from_placeholders()
         self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
         self.d_eval['output_mat_std'] = \
             self.graph_eval_inference(
-                self.d_eval['X_inputs'],
                 self.d_eval['U_inputs'],
                 self.d_eval['O_input'],
                 reuse=True)
@@ -1044,8 +991,8 @@ class ProbcollModel:
     ### Training ###
     ################
 
-    def _create_input(self, X, U, O):
-        return X, U, O
+    def _create_input(self, U, O):
+        return U, O
 
     def _create_output(self, output):
         return output
@@ -1275,152 +1222,152 @@ class ProbcollModel:
         plotter.save(self._plots_dir, suffix=str(model_num))
         plotter.close()
 
-    ##################
-    ### Evaluating ###
-    ##################
-
-    def eval(self, X, U, O, num_avg=1, pre_activation=False):
-        return self.eval_batch([X], [U], [O], num_avg=num_avg, pre_activation=pre_activation)
-
-    def eval_batch(self, Xs, Us, Os, num_avg=1, pre_activation=False):
-        X_inputs, U_inputs, O_inputs = [], [], []
-        for X, U, O in zip(Xs, Us, Os):
-            assert(len(X) >= self.T)
-            assert(len(U) >= self.T)
-            assert(len(O) >= 1)
-
-            X_input, U_input, O_input = self._create_input(X, U, O)
-            X_input = X_input[:self.T]
-            U_input = U_input[:self.T]
-            O_input = O_input[:self.T]
-            assert(not np.isnan(X_input).any())
-            assert(not np.isnan(U_input).any())
-            assert(not np.isnan(O_input).any())
-            for _ in xrange(num_avg):
-                X_inputs.append(X_input)
-                U_inputs.append(U_input)
-                O_inputs.append(O_input)
-
-        feed = {}
-        for b in xrange(self.num_bootstrap):
-            feed[self.d_eval['X_inputs'][b]] = X_inputs
-            feed[self.d_eval['U_inputs'][b]] = U_inputs
-            feed[self.d_eval['O_inputs'][b]] = O_inputs
-        # want analysis_dropout for each X/U/O to be the same
-        # want dropout for each num_avg to be different
-        # -->
-        # create num_avg different dropout for each dropout mask
-        # use same dropout mask for each X/U/O
-        #
-        # if num_avg = 3
-        # 0 1 2 0 1 2 0 1 2
-        if pre_activation:
-            output_pred_mean, output_pred_std = self.sess.run(
-                [self.d_eval['output_mat_mean'],
-                self.d_eval['output_mat_std']],
-                feed_dict=feed)
-        else:
-            output_pred_mean, output_pred_std = self.sess.run(
-                [self.d_eval['output_pred_mean'],
-                self.d_eval['output_pred_std']],
-                feed_dict=feed)
-
-        if num_avg > 1:
-            mean, std = [], []
-            for i in xrange(len(Xs)):
-                mean.append(output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
-                std.append(output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
-            output_pred_mean = np.array(mean)
-            output_pred_std = np.array(std)
-
-            assert(len(output_pred_mean) == len(Xs))
-            assert(len(output_pred_std) == len(Xs))
-
-        assert((output_pred_std >= 0).all())
-
-        return output_pred_mean, output_pred_std
-
-    def eval_sample(self, sample):
-        X = sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
-        U = sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
-        O = sample.get_O()[:self.T, self.O_idxs(sample._meta_data)]
-
-        return self.eval(X, U, O)
-
-    def eval_sample_batch(self, samples, num_avg=1, pre_activation=False):
-        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
-        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
-        Os = [sample.get_O()[:self.T, self.O_idxs(sample._meta_data)] for sample in samples]
-
-        return self.eval_batch(
-            Xs,
-            Us,
-            Os,
-            num_avg=num_avg,
-            pre_activation=pre_activation)
-
-    def eval_control_batch(self, samples, num_avg=1, pre_activation=False):
-        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
-            for sample in samples]
-        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
-            for sample in samples]
-        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].reshape(1, -1)
-        assert(not np.isnan(O_input).any())
-        X_inputs, U_inputs = [], []
-        for X, U in zip(Xs, Us):
-            assert(len(X) == self.T)
-            assert(len(U) == self.T)
-
-            # TODO remove create_input
-            X_input, U_input, _ = self._create_input(X, U, None)
-            assert(not np.isnan(X_input).any())
-            assert(not np.isnan(U_input).any())
-            for _ in xrange(num_avg):
-                X_inputs.append(X_input)
-                U_inputs.append(U_input)
-        feed = {}
-        feed[self.d_eval['X_inputs']] = X_inputs
-        feed[self.d_eval['U_inputs']] = U_inputs
-        feed[self.d_eval['O_input']] = O_input
-        # want dropout for each X/U/O to be the same
-        # want dropout for each num_avg to be different
-        # -->
-        # create num_avg different dropout for each dropout mask
-        # use same dropout mask for each X/U/O
-        #
-        # if num_avg = 3
-        # 0 1 2 0 1 2 0 1 2
-        if pre_activation:
-            output_pred_mean, output_pred_std = self.sess.run(
-                [self.d_eval['output_mat_mean'],
-                self.d_eval['output_mat_std']],
-                feed_dict=feed)
-        else:
-            output_pred_mean, output_pred_std = self.sess.run(
-                [self.d_eval['output_pred_mean'],
-                self.d_eval['output_pred_std']],
-                feed_dict=feed)
-
-        if num_avg > 1:
-            mean, std = [], []
-            for i in xrange(len(Xs)):
-                mean.append(
-                    output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
-                std.append(
-                    output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
-
-            output_pred_mean = np.array(mean)
-            output_pred_std = np.array(std)
-
-            assert(len(output_pred_mean) == len(Xs))
-            assert(len(output_pred_std) == len(Xs))
-
-        if not (output_pred_std >= 0).all():
-            import ipdb; ipdb.set_trace()
-
-        assert((output_pred_std >= 0).all())
-        return output_pred_mean, output_pred_std
-
+#    ##################
+#    ### Evaluating ###
+#    ##################
+#
+#    def eval(self, X, U, O, num_avg=1, pre_activation=False):
+#        return self.eval_batch([X], [U], [O], num_avg=num_avg, pre_activation=pre_activation)
+#
+#    def eval_batch(self, Xs, Us, Os, num_avg=1, pre_activation=False):
+#        X_inputs, U_inputs, O_inputs = [], [], []
+#        for X, U, O in zip(Xs, Us, Os):
+#            assert(len(X) >= self.T)
+#            assert(len(U) >= self.T)
+#            assert(len(O) >= 1)
+#
+#            X_input, U_input, O_input = self._create_input(X, U, O)
+#            X_input = X_input[:self.T]
+#            U_input = U_input[:self.T]
+#            O_input = O_input[:self.T]
+#            assert(not np.isnan(X_input).any())
+#            assert(not np.isnan(U_input).any())
+#            assert(not np.isnan(O_input).any())
+#            for _ in xrange(num_avg):
+#                X_inputs.append(X_input)
+#                U_inputs.append(U_input)
+#                O_inputs.append(O_input)
+#
+#        feed = {}
+#        for b in xrange(self.num_bootstrap):
+#            feed[self.d_eval['X_inputs'][b]] = X_inputs
+#            feed[self.d_eval['U_inputs'][b]] = U_inputs
+#            feed[self.d_eval['O_inputs'][b]] = O_inputs
+#        # want analysis_dropout for each X/U/O to be the same
+#        # want dropout for each num_avg to be different
+#        # -->
+#        # create num_avg different dropout for each dropout mask
+#        # use same dropout mask for each X/U/O
+#        #
+#        # if num_avg = 3
+#        # 0 1 2 0 1 2 0 1 2
+#        if pre_activation:
+#            output_pred_mean, output_pred_std = self.sess.run(
+#                [self.d_eval['output_mat_mean'],
+#                self.d_eval['output_mat_std']],
+#                feed_dict=feed)
+#        else:
+#            output_pred_mean, output_pred_std = self.sess.run(
+#                [self.d_eval['output_pred_mean'],
+#                self.d_eval['output_pred_std']],
+#                feed_dict=feed)
+#
+#        if num_avg > 1:
+#            mean, std = [], []
+#            for i in xrange(len(Xs)):
+#                mean.append(output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
+#                std.append(output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
+#            output_pred_mean = np.array(mean)
+#            output_pred_std = np.array(std)
+#
+#            assert(len(output_pred_mean) == len(Xs))
+#            assert(len(output_pred_std) == len(Xs))
+#
+#        assert((output_pred_std >= 0).all())
+#
+#        return output_pred_mean, output_pred_std
+#
+#    def eval_sample(self, sample):
+#        X = sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
+#        U = sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
+#        O = sample.get_O()[:self.T, self.O_idxs(sample._meta_data)]
+#
+#        return self.eval(X, U, O)
+#
+#    def eval_sample_batch(self, samples, num_avg=1, pre_activation=False):
+#        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
+#        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
+#        Os = [sample.get_O()[:self.T, self.O_idxs(sample._meta_data)] for sample in samples]
+#
+#        return self.eval_batch(
+#            Xs,
+#            Us,
+#            Os,
+#            num_avg=num_avg,
+#            pre_activation=pre_activation)
+#
+#    def eval_control_batch(self, samples, num_avg=1, pre_activation=False):
+#        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
+#            for sample in samples]
+#        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
+#            for sample in samples]
+#        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].reshape(1, -1)
+#        assert(not np.isnan(O_input).any())
+#        X_inputs, U_inputs = [], []
+#        for X, U in zip(Xs, Us):
+#            assert(len(X) == self.T)
+#            assert(len(U) == self.T)
+#
+#            # TODO remove create_input
+#            X_input, U_input, _ = self._create_input(X, U, None)
+#            assert(not np.isnan(X_input).any())
+#            assert(not np.isnan(U_input).any())
+#            for _ in xrange(num_avg):
+#                X_inputs.append(X_input)
+#                U_inputs.append(U_input)
+#        feed = {}
+#        feed[self.d_eval['X_inputs']] = X_inputs
+#        feed[self.d_eval['U_inputs']] = U_inputs
+#        feed[self.d_eval['O_input']] = O_input
+#        # want dropout for each X/U/O to be the same
+#        # want dropout for each num_avg to be different
+#        # -->
+#        # create num_avg different dropout for each dropout mask
+#        # use same dropout mask for each X/U/O
+#        #
+#        # if num_avg = 3
+#        # 0 1 2 0 1 2 0 1 2
+#        if pre_activation:
+#            output_pred_mean, output_pred_std = self.sess.run(
+#                [self.d_eval['output_mat_mean'],
+#                self.d_eval['output_mat_std']],
+#                feed_dict=feed)
+#        else:
+#            output_pred_mean, output_pred_std = self.sess.run(
+#                [self.d_eval['output_pred_mean'],
+#                self.d_eval['output_pred_std']],
+#                feed_dict=feed)
+#
+#        if num_avg > 1:
+#            mean, std = [], []
+#            for i in xrange(len(Xs)):
+#                mean.append(
+#                    output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
+#                std.append(
+#                    output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
+#
+#            output_pred_mean = np.array(mean)
+#            output_pred_std = np.array(std)
+#
+#            assert(len(output_pred_mean) == len(Xs))
+#            assert(len(output_pred_std) == len(Xs))
+#
+#        if not (output_pred_std >= 0).all():
+#            import ipdb; ipdb.set_trace()
+#
+#        assert((output_pred_std >= 0).all())
+#        return output_pred_mean, output_pred_std
+#
     #############################
     ### Load/save/reset/close ###
     #############################

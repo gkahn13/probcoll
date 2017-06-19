@@ -30,7 +30,7 @@ class AgentRCcar(Agent):
             os.path.join(
                 os.path.join(params['exp_dir'], params['exp_name']),
                 'debug.txt'))
-        
+
         self.sim = params['world']['sim']
 
         if self.sim:
@@ -51,6 +51,8 @@ class AgentRCcar(Agent):
             self.sim_reset = False
             self.sim_last_coll = False
 
+        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+
         ### subscribers
         self.image_callback = ros_utils.RosCallbackAll(rccar_topics['camera'], sensor_msgs.msg.Image,
                                                        max_num_msgs=2, clear_msgs=False)
@@ -63,21 +65,24 @@ class AgentRCcar(Agent):
 
         self.cv_bridge = cv_bridge.CvBridge()
 
-    def sample_policy(self, x0, policy, T=None, use_noise=True, only_noise=False, **policy_args):
+    def sample_policy(self, x0, policy, rollout_num, T=None, use_noise=True, only_noise=False, **policy_args):
         if T is None:
             T = policy._T
         rate = rospy.Rate(1. / params['dt'])
         policy_sample = Sample(meta_data=params, T=T)
         policy_sample.set_X(x0, t=0)
         policy_sample_no_noise = Sample(meta_data=params, T=T)
+        visualize = params['planning'].get('visualize', False)
         for t in xrange(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
+            self.last_n_obs.pop()
+            self.last_n_obs.insert(0, o_t)
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
-            u_t, u_t_no_noise = policy.act(x_t, o_t, t, only_noise=only_noise)
+            u_t, u_t_no_noise = policy.act(self.last_n_obs, t, rollout_num, only_noise=only_noise, visualize=visualize)
             self._logger.debug(time.time() - start)
             # only execute control if no collision
             # TODO is this necessary
@@ -145,7 +150,7 @@ class AgentRCcar(Agent):
         return pos, quat
 
     def get_observation(self, x):
-        obs_sample = Sample(meta_data=params, T=2)
+        obs_sample = Sample(meta_data=params, T=1)
 
         if self.sim:
             is_coll = self.sim_coll
@@ -188,12 +193,13 @@ class AgentRCcar(Agent):
         image = (cvb.imgmsg_to_cv2(depth_msg))
         mono_image = np.array(np.fromstring(image.tostring(), np.int32), np.float32)
         # TODO this is hardcoded
-        mono_image = (1.0653532e9 - mono_image)/ (1.76e5) * 255 
+        mono_image = (1.0653532e9 - mono_image) / (1.76e5) * 255 
         im = cv2.resize(
             np.reshape(mono_image, (image.shape[0], image.shape[1])),
             (params['O']['camera']['height'], params['O']['camera']['width']),
             interpolation=cv2.INTER_AREA)
         return im.astype(np.uint8)
+
     @staticmethod
     def process_image(image_msg, cvb):
         def rgb2gray(rgb):
