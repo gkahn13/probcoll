@@ -7,7 +7,7 @@ import geometry_msgs
 import cv_bridge
 import os
 import time
-
+import tf as ros_tf
 try:
     import bair_car.srv
 except:
@@ -80,7 +80,6 @@ class AgentRCcar(Agent):
             o_t = self.get_observation(x_t)
             self.last_n_obs.pop(0)
             self.last_n_obs.append(o_t)
-#            self.last_n_obs.insert(0, o_t)
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
@@ -234,8 +233,16 @@ class AgentRCcar(Agent):
                     if quat is None:
                         quat = [1.0, 0.0, 0.0, 0.0]
                     if pos is None:
-                        if len(params['world']['testing']['positions']) > 0:
-                            pos = params['world']['testing']['positions'][np.random.randint(len(params['world']['testing']['positions']))]
+                        if params['world']['testing'].get('position_ranges', None) is not None:
+                            ranges = params['world']['testing']['position_ranges'] 
+                            ran = ranges[np.random.randint(len(ranges))]
+                            pos_ori = np.random.uniform(ran[0], ran[1])
+                            pos = pos_ori[:3]
+                            quat = ros_tf.transformations.quaternion_from_euler(pos_ori[3], 0, 0)
+                        elif len(params['world']['testing']['positions']) > 0:
+                            pos_ori = params['world']['testing']['positions'][np.random.randint(len(params['world']['testing']['positions']))]
+                            pos = pos_ori[:3]
+                            quat = ros_tf.transformations.quaternion_from_euler(pos_ori[3], 0, 0)
                         else:
                             pos = [0.0, 0.0, 0.0]
                     pose = geometry_msgs.msg.Pose()

@@ -6,6 +6,7 @@ import subprocess
 import os
 import signal
 import time
+import tf as ros_tf 
 
 from robots.rccar.tf.planning.planner_primitives_rccar import PlannerPrimitivesRCcar
 from robots.rccar.tf.planning.planner_random_rccar import PlannerRandomRCcar
@@ -111,6 +112,9 @@ class ProbcollRCcar(Probcoll):
                 for cond in xrange(len(conditions)):
                     self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
                     start = time.time()
+                    pos_ori = conditions[cond]
+                    pos = pos_ori[:3]
+                    quat = ros_tf.transformations.quaternion_from_euler(pos_ori[3], 0, 0)
                     self._agent.execute_control(None, reset=True, pos=conditions[cond])
                     x0 = self._conditions.get_cond(0)
                     sample_T = Sample(meta_data=params, T=T)

@@ -4,15 +4,15 @@ dt: 0.25
 random_seed: 0
 config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'bair_car_hallway_random'
+exp_name: 'bair_car_square_random'
 
 ##########################
 ### Probcoll algorithm ###
 ##########################
 
 probcoll:
-  T: 28 # timesteps per trajectory
-  max_iter: 300
+  T: 256 # timesteps per trajectory
+  max_iter: 20000
   logger: 'debug' # debug/info/fatal what level to log
   is_training: False
   asynchronous_training: True
@@ -194,10 +194,11 @@ world:
 #    positions: [[40., -35., 0.2], [-40., -35., 0.2], [40., 20., 0.2], [-40., 20., 0.2]]
 #    positions: [[40., -40., 0.2], [40., 20., 0.2]]
 #    positions: [[40., 20., 0.2]]
+    position_ranges: [[[40., -40., 0.2, 0.0], [40., 40., 0.2, 6.28]]]
 
 sim:
   srv: 'sim_env'
-  sim_env: 'hallway' # hallway / cory2 / square
+  sim_env: 'square' # hallway / cory2 / square
   launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
