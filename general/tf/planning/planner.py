@@ -61,12 +61,16 @@ class Planner(object):
 
     def plan(self, obs_frame, t, rollout_num, only_noise=False, visualize=False):
         # TODO figure out general way to handle state
-        o_input = []
+        o_im_input = []
+        o_vec_input = []
         for o in obs_frame:
-            o_input.append(o[self.probcoll_model.O_idxs()])
-        o_input = np.concatenate(o_input).reshape(1, -1)
+            o_im_input.append(o[self.probcoll_model.O_im_idxs()])
+            o_vec_input.append(o[self.probcoll_model.O_vec_idxs()])
+        o_im_input = np.concatenate(o_im_input).reshape(1, -1)
+        o_vec_input = np.concatenate(o_vec_input).reshape(1, -1)
         feed_dict = {
-                self.O_input: o_input,
+                self.O_im_input: o_im_input,
+                self.O_vec_input: o_vec_input,
                 self.eps_ph: self.eps_schedule.value(rollout_num)
             }
         if visualize:

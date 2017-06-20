@@ -4,7 +4,7 @@ import threading
 import Queue
 import os
 import time
-import numpy
+import numpy as np
 import sys
 import cv_bridge
 import bair_car.srv
@@ -145,6 +145,17 @@ class CarSrv(DirectObject):
         # ROS
         self.crash_pub = rospy.Publisher('crash', std_msgs.msg.Empty, queue_size = 1)
         self.bridge = cv_bridge.CvBridge()
+        
+        self.steering = 0.0       # degree
+        self.steeringClamp = self.params['steeringClamp']
+        self.engineForce = 0.0
+        self.brakeForce = 0.0
+        self.engineClamp = self.params['engineClamp']
+        self.camera_pub = ImageROSPublisher("image")
+        self.depth_pub = ImageROSPublisher("depth")
+        self.back_camera_pub = ImageROSPublisher("back_image")
+        self.back_depth_pub = ImageROSPublisher("back_depth")
+        
 #        taskMgr.add(self.update_task, 'updateWorld')
         self.start_update_server()
     
@@ -171,34 +182,36 @@ class CarSrv(DirectObject):
 
     def forward(self):
         self.engineForce = 1000.0
-    
+        self.brakeForce = 0.0
+
     def backward(self):
         self.engineForce = -1000.0
+        self.brakeForce = 0.0
+    
+    def right(self):
+        self.steering = np.min([np.max([-15, self.steering - 5]), 0.0])
 
     def left(self):
-        self.steering = -22.5
-
-    def right(self):
-        self.steering = 22.5
+        self.steering = np.max([np.min([15, self.steering + 5]), 0.0])
 
     # Vehicle and ROS
         
-    def update(self):
+    def update(self, dt=1.0):
         self.vehicle.setSteeringValue(self.steering, 0)
         self.vehicle.setSteeringValue(self.steering, 1)
-        self.vehicle.setBrake(100.0, 2)
-        self.vehicle.setBrake(100.0, 3)
+        self.vehicle.setBrake(self.brakeForce, 2)
+        self.vehicle.setBrake(self.brakeForce, 3)
         self.vehicle.applyEngineForce(self.engineForce, 2)
         self.vehicle.applyEngineForce(self.engineForce, 3)
       
-        pos = numpy.array(self.vehicle_pointer.getPos())
+        pos = np.array(self.vehicle_pointer.getPos())
         np_quat = self.vehicle_pointer.getQuat()
-        quat = numpy.array(np_quat)
+        quat = np.array(np_quat)
         self.previous_pos = pos
         self.previous_quat = np_quat
         
         # TODO maybe change number of timesteps
-        self.world.doPhysics(self.dt, 10, 0.05)
+        self.world.doPhysics(dt, int(dt/0.05), 0.05)
         
         # Collision detection
         result = self.world.contactTest(self.vehicle_node)
@@ -210,9 +223,9 @@ class CarSrv(DirectObject):
             self.doReset(pos=self.previous_pos, quat=self.previous_quat)
 
         self.state = geometry_msgs.msg.Pose()
-        pos = numpy.array(self.vehicle_pointer.getPos())
+        pos = np.array(self.vehicle_pointer.getPos())
         np_quat = self.vehicle_pointer.getQuat()
-        quat = numpy.array(np_quat)
+        quat = np.array(np_quat)
         self.previous_pos = pos
         self.previous_quat = np_quat
         self.state.position.x, self.state.position.y, self.state.position.z = pos
@@ -220,8 +233,8 @@ class CarSrv(DirectObject):
                 self.state.orientation.z, self.state.orientation.w = quat
         
         # Get observation
-        self.obs = self.camera_sensor.observe()
         self.back_obs = self.back_camera_sensor.observe()
+        self.obs = self.camera_sensor.observe()
         self.camera_pub.publish_image(self.obs[0])
         self.depth_pub.publish_image(
             self.obs[1],
@@ -244,26 +257,31 @@ class CarSrv(DirectObject):
             pose = req.pose 
             # If motor is default then use velocity
             if motor==0.0:
-                cmd_motor = numpy.clip(vel * 3 + 49.5, 0., 99.)
+                cmd_motor = np.clip(vel * 3 + 49.5, 0., 99.)
             else:
-                cmd_motor = numpy.clip(motor, 0., 99.)
+                cmd_motor = np.clip(motor, 0., 99.)
             
             self.steering = self.steeringClamp * \
                 ((cmd_steer - 49.5) / 49.5)
             self.engineForce = self.engineClamp * \
                 ((cmd_motor - 49.5) / 49.5)
 
+            if self.engineForce == 0.0:
+                self.brakeForce = 1000.0
+            else:
+                self.brakeForce = 0.0
+
             if reset:
                 self.steering = 0.0       # degree
                 self.engineForce = 0.0
                 pos = pose.position.x, pose.position.y, pose.position.z
                 quat = pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w
-                if numpy.all(numpy.array(pos) == 0.):
+                if np.all(np.array(pos) == 0.):
                     self.doReset()
                 else:
                     self.doReset(pos=pos, quat=quat)
 
-            self.update()
+            self.update(dt=self.dt)
             vel = self.vehicle.getCurrentSpeedKmHour()
             cam_image = self.get_ros_image(self.obs[0])
             cam_depth = self.get_ros_image(self.obs[1], image_format="passthrough")
@@ -272,38 +290,32 @@ class CarSrv(DirectObject):
             return [self.collision, cam_image, cam_depth, back_cam_image, back_cam_depth, self.state, vel] 
         return sim_env_handler
 
-    def load_vehicle(self, pos=(0.0, -20.0, -0.6), quat=None):
+    def load_vehicle(self, pos=(40.0, 20.0, 0.2), quat=(1.0, 0.0, 0.0, 0.0)):
+        
+        self.steering = 0.0
+        self.engineForce = 0.0
+        self.brakeForce = 1000.0
         self.vehicle.setSteeringValue(0.0, 0)
         self.vehicle.setSteeringValue(0.0, 1)
         self.vehicle.setBrake(1000.0, 2)
         self.vehicle.setBrake(1000.0, 3)
         self.vehicle.applyEngineForce(0.0, 2)
         self.vehicle.applyEngineForce(0.0, 3)
-        for wheel in self.vehicle.getWheels():
-            wheel.setRotation(0.0)
 
         self.previous_pos = pos
         self.vehicle_pointer.setPos(pos[0], pos[1], pos[2])
         if quat is not None:
             self.vehicle_pointer.setQuat(quat)
         self.previous_quat = self.vehicle_pointer.getQuat()
-        self.world.doPhysics(1.0, 10, 0.008)
-
-        self.vehicle.setSteeringValue(0.0, 0)
-        self.vehicle.setSteeringValue(0.0, 1)
-        self.vehicle.setBrake(1000.0, 2)
-        self.vehicle.setBrake(1000.0, 3)
-        self.vehicle.applyEngineForce(0.0, 2)
-        self.vehicle.applyEngineForce(0.0, 3)
-        for wheel in self.vehicle.getWheels():
-            wheel.setRotation(0.0)
-
-        self.previous_pos = pos
-        self.vehicle_pointer.setPos(pos[0], pos[1], pos[2])
-        if quat is not None:
-            self.vehicle_pointer.setQuat(quat)
-        self.previous_quat = self.vehicle_pointer.getQuat()
-        self.world.doPhysics(1.0, 10, 0.008)
+        
+        while abs(self.vehicle.getCurrentSpeedKmHour()) > 4.0:
+            self.world.doPhysics(self.dt, int(self.dt/0.05), 0.05)
+            self.previous_pos = pos
+            self.vehicle_pointer.setPos(pos[0], pos[1], pos[2])
+            if quat is not None:
+                self.vehicle_pointer.setQuat(quat)
+            self.previous_quat = self.vehicle_pointer.getQuat()
+        
 
     def addWheel(self, pos, front, wheel_np):
         wheel = self.vehicle.createWheel()
@@ -316,25 +328,17 @@ class CarSrv(DirectObject):
         wheel.setSuspensionStiffness(40.0)
         wheel.setWheelsDampingRelaxation(2.3)
         wheel.setWheelsDampingCompression(4.4)
-        wheel.setFrictionSlip(1e3)
+        wheel.setFrictionSlip(1e2)
         wheel.setRollInfluence(0.0)
         wheel.setNode(wheel_np.node())
     
     def start_update_server(self):
-        self.steering = 0.0       # degree
-        self.steeringClamp = self.params['steeringClamp']
-        self.engineForce = 0.0
-        self.engineClamp = self.params['engineClamp']
-        self.camera_pub = ImageROSPublisher("image")
-        self.depth_pub = ImageROSPublisher("depth")
-        self.back_camera_pub = ImageROSPublisher("back_image")
-        self.back_depth_pub = ImageROSPublisher("back_depth")
         s = rospy.Service('sim_env', bair_car.srv.sim_env, self.get_handler())
         rospy.spin()
 
     def update_task(self, task):
         dt = globalClock.getDt()
-        self.update()
+        self.update(dt=dt)
         print(self.vehicle.getCurrentSpeedKmHour())
         return task.cont
     

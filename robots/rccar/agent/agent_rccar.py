@@ -46,8 +46,9 @@ class AgentRCcar(Agent):
             self.sim_back_image = data.back_image
             self.sim_back_depth = data.back_depth
             self.sim_state = data.pose
-            self.sim_vel = 0.0
-            self.sim_steer = 0.0
+            self.sim_vel = data.vel
+#            self.sim_vel = 0.0
+#            self.sim_steer = 0.0
             self.sim_reset = False
             self.sim_last_coll = False
 
@@ -77,8 +78,9 @@ class AgentRCcar(Agent):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)
-            self.last_n_obs.pop()
-            self.last_n_obs.insert(0, o_t)
+            self.last_n_obs.pop(0)
+            self.last_n_obs.append(o_t)
+#            self.last_n_obs.insert(0, o_t)
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
@@ -114,8 +116,8 @@ class AgentRCcar(Agent):
 
         return policy_sample, policy_sample_no_noise
 
-    def reset(self, x):
-        pass
+    def reset(self):
+        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
 
     def _get_sim_state(self, xt):
         state_sample = Sample(meta_data=params, T=1)
@@ -158,6 +160,7 @@ class AgentRCcar(Agent):
             depth_msg = self.sim_depth
             back_image_msg = self.sim_back_image
             back_depth_msg = self.sim_back_depth
+            vel = self.sim_vel
         else:
             ### collision
             coll_time = self.coll_callback.get()
@@ -185,6 +188,7 @@ class AgentRCcar(Agent):
         self.pred_image_pub.publish(ros_image)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
         obs_sample.set_O(back_im.ravel(), t=0, sub_obs='back_camera')
+        obs_sample.set_O([vel], t=0, sub_obs='vel')
         obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
         return obs_sample.get_O(t=0)
 
@@ -226,8 +230,9 @@ class AgentRCcar(Agent):
             self.cmd_vel_pub.publish(std_msgs.msg.Float32(0.))
             if self.sim:
                 if reset:
+                    self.reset()
                     if quat is None:
-                        quat = [0.0, 0.0, 0.0, 0.0]
+                        quat = [1.0, 0.0, 0.0, 0.0]
                     if pos is None:
                         if len(params['world']['testing']['positions']) > 0:
                             pos = params['world']['testing']['positions'][np.random.randint(len(params['world']['testing']['positions']))]
@@ -247,3 +252,4 @@ class AgentRCcar(Agent):
             self.sim_back_image = data.back_image
             self.sim_back_depth = data.back_depth
             self.sim_state = data.pose
+            self.sim_vel = data.vel

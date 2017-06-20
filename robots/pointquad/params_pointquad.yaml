@@ -2,7 +2,8 @@
 
 dt: 0.2
 random_seed: 0
-exp_dir: '/home/bding/probcoll/experiments/pointquad'
+config_file: '/home/bding/Desktop/adam_code/probcoll/robots/pointquad/params_pointquad.yaml'
+exp_dir: '/home/bding/Desktop/adam_code/probcoll/experiments/pointquad'
 exp_name: 'test'
 
 ##########################
@@ -11,7 +12,8 @@ exp_name: 'test'
 
 probcoll:
   T: 30 # timesteps per trajectory
-  max_iter: 10
+  max_iter: 20
+  logger: 'debug' # debug/info/fatal what level to log
   asychronous_training: False
   dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
   control_noise:
@@ -19,9 +21,9 @@ probcoll:
 
     zero: {}
     gaussian:
-      std: [0.1, 0.1, 0]
+      std: [0.0, 0.05, 0]
     smoothedgaussian:
-      std: [0.1, 0.1, 0]
+      std: [0.0, 0.1, 0]
       T: 30
     ou:
       std: [0.1, 0.1, 0]
@@ -49,12 +51,13 @@ probcoll:
       position: [0, 0, 0.5]
       orientation: [1, 0, 0, 0]
       linearvel: [0., 0, 0]
+
       angularvel: [0, 0, 0]
 
     range:
       position:
-        min: [0, -0.8, 0.5] # TODO
-        max: [0, 0.8, 0.5] # TODO
+        min: [0, -0.5, 0.5] # TODO
+        max: [0, 0.5, 0.5] # TODO
         num: [1, 20, 1] # TODO
 
     perturb: # repetition perturbations
@@ -69,65 +72,80 @@ probcoll:
 #me/adam' 
 
 model:
-  T: 6 # how many timesteps to predict
-
+  T: 8 # how many timesteps to predict
+  logger: 'fatal' # debug/info/fatal what level to log
+  center_O_im: False
+  scale_O_im: True
   control_range:
-    lower: [-1., -1., -1.]
-    upper: [1., 1., 1.]
+    lower: [0., -0.5, -1]
+    upper: [0.5, 0.5, 1]
 
   # what to use as input to prediction model
   X_order: []
   U_order: ['linearvel']
-  O_order: ['camera']
+  O_im_order: ['camera']
+  O_vec_order: []
   output_order: ['collision'] # taken from observations O
 
   # NN training parameters
   device: 0
   gpu_fraction: 0.8
-  reset_every_train: True # every time train is called, reinitialize weights?
+  reset_every_train: False # every time train is called, reinitialize weights?
   early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
   beta1: 0.9
   beta2: 0.999
   learning_rate: 0.001
   batch_size: 16
-  display_batch: 20
-  steps: 2500
-  val_freq: 250
+  display_steps: 20
+  steps: 5000
+  val_freq: .1
   val_steps: 200
   val_pct: 0.2
 
   # How to save tfrecords
   save_type: 'fixedlen' # varlen / fixedlen
   dtype: 'float32'
-  num_bootstrap: 1 # TODO
-  reg: 0.
+  num_bootstrap: 1 # TODOTotal 0 (delta 0), reused 0 (delta 0)
+
+  reg: 0.0001
   prob_coll_strictly_increasing: True
   mask: 'all' # all / last
 
-  observation_graph:
-    graph_type: "cnn"
+  image_graph:
+    graph_type: 'cnn'
     filters: [4, 4, 4]
     kernels: [3, 3, 3]
-    strides: [2, 1, 1]
-    padding: "VALID" 
-    conv_activation: "relu" 
+    strides: [2, 2, 2]
+    padding: 'SAME'
+    use_batch_norm: True
+    conv_activation: 'relu'
+    output_activation: 'relu'
+  observation_graph:
+    hidden_activation: 'tanh'
+    output_dim: 64
+#    graph_type: "cnn"
+#    filters: [4, 4, 4]
+#    kernels: [3, 3, 3]
+#    strides: [2, 1, 1]
+#    padding: "VALID"
+#    conv_activation: "relu"
     # output_activation: "tanh"
-       
-  action_graph:
-    graph_type: 'fc' # fc / rnn
-    hidden_layers: [16, 16]
-    output_dim: 24 # Has to be divisible by T
-    hidden_activation: 'relu'
-    dropout: 0.9
+#
+#  action_graph:
+#    graph_type: 'fc' # fc / rnn
+#    hidden_layers: [16, 16]
+#    output_dim: 24 # Has to be divisible by T
+#    hidden_activation: 'relu'
+#    dropout: 0.9
   
-   # action_graph:
-#     graph_type: 'rnn' # fc / rnn
-#     num_cells: 1
+  action_graph:
+    graph_type: 'rnn' # fc / rnn
+    num_cells: 1
 #     # TODO num_units isnt used because we use cnn output size as num_units
 # #    num_units: 16 # state_size
-#     cell_type: 'mulint_rnn' #rnn / mulint_rnn
-#     dropout: 0.9 # pct keep
-# #    cell_args: # If you need to pass variables to cells 
+    cell_type: 'mulint_rnn' #rnn / mulint_rnn
+    dropout: 0.9 # pct keep
+# #    cell_args: # If you need to pass variables to cells
 
   output_graph: # Must have dropout 1.0
     graph_type: 'fc' # fc / rnn
@@ -139,23 +157,40 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [100., 0., 0.] # TODO
+      weight: [100, 0., 0.] # TODO
     
     control_cost:
-      des: [0.5, 0., 0.] # TODO: hard-coded order: steering then speed
+      des: [0.2, 0., 0.] # TODO: hard-coded order: steering then speed
       cost: square
       weight: [1., 1., 0.] # [0.0001, 0.2]
     # TODO uncertainty    lower: [-0.5, -0.5, 0.0]
 
 #    pre_activation: True # wether std is before or after activation (sigmoid)
-  
+
+  epsilon_greedy:
+    epsilon: 0.0
+    lower: [0.2, -0.5, 0]
+    upper: [0.2, 0.5, 0]
+
+
+  control_noise:
+    type: 'uniform' # zero / gaussian / uniform
+    zero: {}
+    gaussian:
+      std: [0.1, 0.1, 0]
+    uniform:
+      lower: [0.0, -0.5, 0]
+      upper: [0.0, 0.5, 0]
+
+
+
   num_dp: 16 # number of dropout passes to average over
   planner_type: 'random' # random / primitives / cem
 
   # control range for your planning algorithms
   control_range:
-    lower: [0.0, -0.5, 0.0]
-    upper: [0.5, 0.5, 0.0]
+    lower: [0.2, -0.5, 0.0]
+    upper: [0.2, 0.5, 0.0]
 
   random:
     K: 512 # number of actions to sample from
@@ -174,14 +209,15 @@ planning:
 #############
 
 world:
+  logger: 'info' # debug/info/fatal what level to log for world and agent
   view_rave: False
   plot: False
   randomize: False
 
   obstacles:
     - type: cylinder
-      center: [1., 0., 0.5]
-      radius: 0.2
+      center: [1.5, 0., 0.5]
+      radius: 0.3
       height: 0.4
       texture: # png
       color: [1, 0, 0]
@@ -206,10 +242,8 @@ U:
   linearvel: {idx: 0, dim: 3}
 
 O:
-  use_depth: False
-  dim: 297
-  order: ['camera', 'cage', 'collision'] # 'camera', 'cage', 'laserscan', 'signed_distance'
-
+  dim: 260
+  order: ['camera', 'position', 'collision']
   camera:
     num_channels: 1
     idx: 0
@@ -217,8 +251,7 @@ O:
     height: 16
     width: 16
     noise: 0.01
-  cage:
+  position:
     idx: 256
-    dim: 40
-    range: 1.5
-  collision: {idx: 296, dim: 1, buffer: 0.0}
+    dim: 3
+  collision: {idx: 259, dim: 1, buffer: 0.0}

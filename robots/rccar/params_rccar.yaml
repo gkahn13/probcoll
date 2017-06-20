@@ -4,16 +4,17 @@ dt: 0.25
 random_seed: 0
 config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'bair_car_4_pos_1_obs_eps_sched'
+exp_name: 'bair_car_hallway_random'
 
 ##########################
 ### Probcoll algorithm ###
 ##########################
 
 probcoll:
-  T: 256 # timesteps per trajectory
+  T: 28 # timesteps per trajectory
   max_iter: 300
   logger: 'debug' # debug/info/fatal what level to log
+  is_training: False
   asynchronous_training: True
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 #  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
@@ -48,13 +49,13 @@ model:
     lower: [0., -17.]
     upper: [99., 17.]
   # what to use as input to prediction model
-  X_order: []
   U_order: ['cmd_steer', 'cmd_vel']
-  O_order: ['camera'] # / 'back_camera'
+  O_im_order: ['camera'] # / 'back_camera'
+  O_vec_order: ['vel']
   output_order: ['collision'] # taken from observations O
-  num_O: 1
-  scale_O: True
-  center_O: False 
+  num_O: 4
+  scale_O_im: True
+  center_O_im: False 
   # NN training parameters
   device: 0
   gpu_fraction: 0.8 #TODO
@@ -62,7 +63,7 @@ model:
   learning_rate: 1.e-4
   beta1: 0.9 # For adam
   beta2: 0.999 # For adam
-  batch_size: 64
+  batch_size: 32
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
@@ -124,10 +125,11 @@ planning:
       weight: [0.001, 1.0]     
   
   epsilon_greedy:
-    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
+    endpoints: [[0, 1.0], [10, 1.0], [20, 0.01]]
+    #    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
     outside_value: 0.01
-    lower: [20., 16.]
-    upper: [80., 16.]
+    lower: [40., 16.]
+    upper: [60., 16.]
 
   control_noise:
     type: 'uniform' # zero / gaussian / uniform
@@ -140,7 +142,7 @@ planning:
       upper: [5., 0.]
   
   num_dp: 1 # number of dropout passes to average over
-  planner_type: 'cem' # random / primitives / cem
+  planner_type: 'random_policy' # random / primitives / cem / random_policy
   # specific to your primitives code
   primitives:
     steers: [30., 40., 50., 60., 70.]
@@ -187,15 +189,15 @@ world:
 
   testing:
     itr_freq: 2
-#    positions: []
+    positions: []
 #    positions: [[-95., 0., -0.6], [-80., 60., -0.6], [13., 48., -0.6], [0., -20., -0.6]]
-    positions: [[40., -40., 0.2], [-40., -40., 0.2], [40., 20., 0.2], [-40., 20., 0.2]]
+#    positions: [[40., -35., 0.2], [-40., -35., 0.2], [40., 20., 0.2], [-40., 20., 0.2]]
 #    positions: [[40., -40., 0.2], [40., 20., 0.2]]
 #    positions: [[40., 20., 0.2]]
 
 sim:
   srv: 'sim_env'
-  sim_env: 'square' # hallway / cory2 / square
+  sim_env: 'hallway' # hallway / cory2 / square
   launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
@@ -226,8 +228,8 @@ U:
 O:
   use_depth: True
 
-  dim: 4609
-  order: ['camera', 'back_camera', 'collision']
+  dim: 4610
+  order: ['camera', 'back_camera', 'vel', 'collision']
 
   camera:
     idx: 0
@@ -243,7 +245,8 @@ O:
     width: 36
     num_channels: 1
     noise: 0.01
-  collision: {idx: 4608, dim: 1, buffer: 0.0}
+  vel: {idx: 4608, dim: 1}
+  collision: {idx: 4609, dim: 1, buffer: 0.0}
 
 ##################
 ### ros topics ###

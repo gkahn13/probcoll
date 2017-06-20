@@ -18,8 +18,9 @@ class PlannerCem(Planner):
             T = self.probcoll_model.T
             control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
             coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
-            self.O_input = self.probcoll_model.d_eval['O_input']
-            
+            self.O_im_input = self.probcoll_model.d_eval['O_im_input']
+            self.O_vec_input = self.probcoll_model.d_eval['O_vec_input']
+
             init_distribution = tf.contrib.distributions.Uniform(
                 control_range['lower'],
                 control_range['upper'])
@@ -28,23 +29,36 @@ class PlannerCem(Planner):
             init_stack_u = tf.concat(0, [init_u_samples]*self.params['num_dp'])
             embeddings = [
                     self.probcoll_model.get_embedding(
-                        self.O_input,
+                        self.O_im_input,
+                        self.O_vec_input,
                         batch_size=1,
                         reuse=True,
                         scope="observation_graph_b{0}".format(b)) for b in xrange(self.probcoll_model.num_bootstrap)
                 ]
-            init_output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
+            output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
                 init_stack_u,
                 bootstrap_initial_states=embeddings,
                 reuse=True) 
 
-            init_pred_mean = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], init_output_pred_mean), axis=0)
+            pred_mean = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_pred_mean), axis=0)
 
-            init_control_cost = control_cost_fn.eval(init_u_samples)
-            init_coll_cost = coll_cost_fn.eval(init_pred_mean, init_u_samples)
+            pred_std = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
 
-            total_cost = init_control_cost + init_coll_cost
+            mat_mean = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+
+            mat_std = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
+            
+            mat_mean = tf.reduce_mean(
+                tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+            
+            init_control_costs = control_cost_fn.eval(init_u_samples)
+            init_coll_costs = coll_cost_fn.eval(init_u_samples, pred_mean, mat_mean, pred_std, mat_std)
+
+            total_cost = init_control_costs + init_coll_costs
             
             for _ in xrange(num_iters):
             
@@ -68,19 +82,30 @@ class PlannerCem(Planner):
 
                 stack_u = tf.concat(0, [u_samples]*self.params['num_dp'])
                 # TODO incorporate std later
-                output_pred_mean, _, _, _ = self.probcoll_model.graph_eval_inference(
+                output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
                     stack_u,
-    #                O_input=self.O_input,
                     bootstrap_initial_states=embeddings,
                     reuse=True) 
 
                 pred_mean = tf.reduce_mean(
                     tf.split(0, self.params['num_dp'], output_pred_mean), axis=0)
 
-                control_cost = control_cost_fn.eval(u_samples)
-                coll_cost = coll_cost_fn.eval(pred_mean, u_samples)
+                pred_std = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
 
-                total_cost = control_cost + coll_cost
+                mat_mean = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
 
+                mat_std = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
+                
+                mat_mean = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+                
+                control_costs = control_cost_fn.eval(u_samples)
+                coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
+
+                total_cost = control_costs + coll_costs
+                
             index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
             self.action = u_samples[index, 0]

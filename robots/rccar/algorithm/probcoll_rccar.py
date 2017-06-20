@@ -12,6 +12,7 @@ from robots.rccar.tf.planning.planner_random_rccar import PlannerRandomRCcar
 from general.tf.planning.planner_cem import PlannerCem
 from general.algorithm.probcoll import Probcoll
 from general.policy.open_loop_policy import OpenLoopPolicy
+from general.policy.random_policy import RandomPolicy
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 from robots.rccar.ros import ros_utils
 from general.state_info.conditions import Conditions
@@ -86,13 +87,14 @@ class ProbcollRCcar(Probcoll):
     ###################
 
     def _run_training(self, itr):
-        if self._asynchronous:
-            self._probcoll_model.recover()
-            if not self._async_on:
-                self._probcoll_model.async_training()
-                self._async_on = True
-        else:
-            self._probcoll_model.train(reset=params['model']['reset_every_train'])
+        if params['probcoll']['is_training']:
+            if self._asynchronous:
+                self._probcoll_model.recover()
+                if not self._async_on:
+                    self._probcoll_model.async_training()
+                    self._async_on = True
+            else:
+                self._probcoll_model.train(reset=params['model']['reset_every_train'])
    
     def _run_testing(self, itr):
         if (itr != 0 and (itr == self._max_iter - 1 \
@@ -213,7 +215,9 @@ class ProbcollRCcar(Probcoll):
     def _create_mpc(self):
         """ Must initialize MPC """
         self._logger.debug('\t\t\tCreating MPC')
-        if self._planner_type == 'random':
+        if self._planner_type == 'random_policy':
+            mpc_policy = RandomPolicy()
+        elif self._planner_type == 'random':
             planner = PlannerRandomRCcar(self._probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         elif self._planner_type == 'primitives':

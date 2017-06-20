@@ -330,11 +330,17 @@ class AnalyzePointquad(Analyze):
     ### Plotting ###
     ################
 
+    def _plot_trajectories_file(self, itr, testing=False):
+        if testing:
+            prefix = 'testing'
+        else:
+            prefix = ''
+        return os.path.join(self._save_dir, self._image_folder, '{0}_trajectories_{1}.png'.format(prefix, itr))
+
     def _plot_statistics(self):
         ### get samples and stats
         samples_itrs = self._load_samples()
         itrs = np.arange(len(samples_itrs))
-
         ### pkl dict to save to
         pkl_dict = {}
 
@@ -462,6 +468,17 @@ class AnalyzePointquad(Analyze):
 
         with open(self._plot_stats_file_pkl, 'w') as f:
             pickle.dump(pkl_dict, f)
+
+        for i in xrange(len(samples_itrs)):
+            plt.figure()
+            temp_dir = self._save_dir+ '/iter_{0}.png'.format(i)
+            for sample in samples_itrs[i]:
+                traj = sample.get_X(sub_state='position')
+                plt.plot(traj[:, 0], traj[:,1])
+            # import IPython; IPython.embed()
+            plt.savefig(temp_dir)
+
+
 
     def _plot_probcoll_model(self):
         itrs_Xs, itrs_prob_means, itrs_prob_stds, itrs_costs = self._evaluate_probcoll_model()
