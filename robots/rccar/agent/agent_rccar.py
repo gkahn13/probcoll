@@ -160,6 +160,7 @@ class AgentRCcar(Agent):
             back_image_msg = self.sim_back_image
             back_depth_msg = self.sim_back_depth
             vel = self.sim_vel
+#            print(vel)
         else:
             ### collision
             coll_time = self.coll_callback.get()

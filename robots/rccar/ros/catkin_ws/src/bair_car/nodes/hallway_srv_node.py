@@ -10,13 +10,9 @@ from panda3d.bullet import BulletRigidBodyNode
 
 class HallwaySrvNode(CarSrv):
 
-    def doReset(self, pos=None, quat=None):
-        if pos is None:
-            rand_val = np.random.random() * 8 - 4.0 
-            pos = (rand_val, 0.0, -0.6)
-            self.load_vehicle(pos=pos)
-        else:
-            self.load_vehicle(pos=pos, quat=quat)
+    def default_pos(self):
+        rand_val = np.random.random() * 8 - 4.0 
+        return (rand_val, 0.0, -0.6)
 
     def setup(self):
         shape = BulletPlaneShape(Vec3(0, 0, 1), 0)
@@ -44,8 +40,8 @@ class HallwaySrvNode(CarSrv):
                 (-11.0, 0.0, 0.0),
                 (11.0, 0.0, 0.0),
                 (0.0, -12.0, 0.0),
-                (0.5, 12.0, 1.0),
-                (-0.5, 12.0, 1.0)]:
+                (0.5, 30.0, 1.0),
+                (-0.5, 30.0, 1.0)]:
             translate = False
             if (abs(pos[0]) == 0.5):
                 translate = True

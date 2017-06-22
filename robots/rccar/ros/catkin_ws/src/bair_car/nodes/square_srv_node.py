@@ -9,12 +9,8 @@ from panda3d.bullet import BulletRigidBodyNode
 
 class SquareSrvNode(CarSrv):
 
-    def doReset(self, pos=None, quat=None):
-        if pos is None:
-            pos = (42.5, -42.5, 0.2)
-            self.load_vehicle(pos=pos)
-        else:
-            self.load_vehicle(pos=pos, quat=quat)
+    def default_pos(self):
+        return (42.5, -42.5, 0.2)
 
     def setup(self):
         # collision

@@ -99,8 +99,8 @@ class CarSrv(DirectObject):
         ts = TransformState.makePos(Point3(0, 0, 0.5))
         self.vehicle_node = BulletRigidBodyNode('Vehicle')
         self.vehicle_node.addShape(shape, ts)
-        self._mass = self.params['mass']
-        self.vehicle_node.setMass(self._mass)
+        self.mass = self.params['mass']
+        self.vehicle_node.setMass(self.mass)
         self.vehicle_node.setDeactivationEnabled(False)
         self.vehicle_node.setCcdSweptSphereRadius(1.0)
         self.vehicle_node.setCcdMotionThreshold(1e-7)
@@ -137,9 +137,12 @@ class CarSrv(DirectObject):
         self.accept('f2', self.toggleTexture)
         self.accept('f5', self.doScreenshot)
 
-        self.accept('w', self.forward)
+        self.accept('q', self.forward_0)
+        self.accept('w', self.forward_1)
+        self.accept('e', self.forward_2)
         self.accept('a', self.left)
-        self.accept('s', self.backward)
+        self.accept('s', self.stop)
+        self.accept('x', self.backward)
         self.accept('d', self.right)
 
         # ROS
@@ -150,7 +153,14 @@ class CarSrv(DirectObject):
         self.steeringClamp = self.params['steeringClamp']
         self.engineForce = 0.0
         self.brakeForce = 0.0
-        self.engineClamp = self.params['engineClamp']
+        self.p = self.params['p']
+        self.i = self.params['i']
+        self.d = self.params['d']
+        self.des_vel = None
+        self.last_err = 0.0
+        self.curr_time = 0.0
+        self.accelClamp = self.params['accelClamp']
+        self.engineClamp = self.accelClamp * self.mass
         self.camera_pub = ImageROSPublisher("image")
         self.depth_pub = ImageROSPublisher("depth")
         self.back_camera_pub = ImageROSPublisher("back_image")
@@ -180,12 +190,28 @@ class CarSrv(DirectObject):
     def doScreenshot(self):
         base.screenshot('Bullet')
 
-    def forward(self):
-        self.engineForce = 1000.0
+    def forward_0(self):
+        self.des_vel = 14.4
+#        self.engineForce = 1000.0
+        self.brakeForce = 0.0
+    
+    def forward_1(self):
+        self.des_vel = 28.8
+#        self.engineForce = 1000.0
+        self.brakeForce = 0.0
+    
+    def forward_2(self):
+        self.des_vel = 48.
+#        self.engineForce = 1000.0
+        self.brakeForce = 0.0
+   
+    def stop(self):
+        self.des_vel = 0.0
         self.brakeForce = 0.0
 
     def backward(self):
-        self.engineForce = -1000.0
+        self.des_vel = -28.8
+#        self.engineForce = -1000.0
         self.brakeForce = 0.0
     
     def right(self):
@@ -195,14 +221,18 @@ class CarSrv(DirectObject):
         self.steering = np.max([np.min([15, self.steering + 5]), 0.0])
 
     # Vehicle and ROS
-        
+ 
+    def default_pos(self):
+        return (0.0, 0.0, 0.0)
+
+    def default_quat(self):
+        return (1.0, 0.0, 0.0, 0.0)
+
     def update(self, dt=1.0):
         self.vehicle.setSteeringValue(self.steering, 0)
         self.vehicle.setSteeringValue(self.steering, 1)
         self.vehicle.setBrake(self.brakeForce, 2)
         self.vehicle.setBrake(self.brakeForce, 3)
-        self.vehicle.applyEngineForce(self.engineForce, 2)
-        self.vehicle.applyEngineForce(self.engineForce, 3)
       
         pos = np.array(self.vehicle_pointer.getPos())
         np_quat = self.vehicle_pointer.getQuat()
@@ -210,12 +240,42 @@ class CarSrv(DirectObject):
         self.previous_pos = pos
         self.previous_quat = np_quat
         
-        # TODO maybe change number of timesteps
-        self.world.doPhysics(dt, int(dt/0.05), 0.05)
-        
-        # Collision detection
-        result = self.world.contactTest(self.vehicle_node)
-        self.collision = result.getNumContacts() > 0
+        step = 0.05
+        if dt > step:
+            # TODO maybe change number of timesteps
+            for i in xrange(int(dt/step)):
+                if self.des_vel is not None:
+                    vel = self.vehicle.getCurrentSpeedKmHour()
+                    err = self.des_vel - vel
+                    d_err = (err - self.last_err)/step
+                    self.last_err = err
+                    self.engineForce = np.clip(self.p * err + self.d * d_err, -self.engineClamp, self.engineClamp)
+                self.vehicle.applyEngineForce(self.engineForce, 2)
+                self.vehicle.applyEngineForce(self.engineForce, 3)
+                self.world.doPhysics(step, 1, step)
+                # Collision detection
+                result = self.world.contactTest(self.vehicle_node)
+                self.collision = result.getNumContacts() > 0
+                if self.collision:
+                    break
+        else:
+            self.curr_time += dt
+            if self.curr_time > 0.05:
+                if self.des_vel is not None:
+                    vel = self.vehicle.getCurrentSpeedKmHour()
+                    print(vel, self.curr_time)
+                    err = self.des_vel - vel
+                    d_err = (err - self.last_err)/0.05
+                    self.last_err = err
+                    self.engineForce = np.clip(self.p * err + self.d * d_err, -self.engineClamp, self.engineClamp)
+                self.curr_time = 0.0
+            self.vehicle.applyEngineForce(self.engineForce, 2)
+            self.vehicle.applyEngineForce(self.engineForce, 3)
+            self.world.doPhysics(dt, 1, dt)
+
+            # Collision detection
+            result = self.world.contactTest(self.vehicle_node)
+            self.collision = result.getNumContacts() > 0
         
         if self.collision:
             # TODO figure out why this causes problems
@@ -257,16 +317,22 @@ class CarSrv(DirectObject):
             pose = req.pose 
             # If motor is default then use velocity
             if motor==0.0:
-                cmd_motor = np.clip(vel * 3 + 49.5, 0., 99.)
+                # conversion from m/s to km/h
+                self.des_vel = vel * 3.6
+#                cmd_motor = np.clip(vel * 3 + 49.5, 0., 99.)
+#                self.engineForce = self.engineClamp * \
+#                    ((cmd_motor - 49.5) / 49.5)
+#                self.des_vel = None
             else:
                 cmd_motor = np.clip(motor, 0., 99.)
+                self.engineForce = self.engineClamp * \
+                    ((cmd_motor - 49.5) / 49.5)
+                self.des_vel = None
             
             self.steering = self.steeringClamp * \
                 ((cmd_steer - 49.5) / 49.5)
-            self.engineForce = self.engineClamp * \
-                ((cmd_motor - 49.5) / 49.5)
 
-            if self.engineForce == 0.0:
+            if self.engineForce == 0.0 and (self.des_vel is None or self.des_vel == 0.0):
                 self.brakeForce = 1000.0
             else:
                 self.brakeForce = 0.0
@@ -274,6 +340,8 @@ class CarSrv(DirectObject):
             if reset:
                 self.steering = 0.0       # degree
                 self.engineForce = 0.0
+                self.brakeForce = 1000.0
+                self.des_vel = None
                 pos = pose.position.x, pose.position.y, pose.position.z
                 quat = pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w
                 if np.all(np.array(pos) == 0.):
@@ -290,8 +358,12 @@ class CarSrv(DirectObject):
             return [self.collision, cam_image, cam_depth, back_cam_image, back_cam_depth, self.state, vel] 
         return sim_env_handler
 
-    def load_vehicle(self, pos=(40.0, 20.0, 0.2), quat=(1.0, 0.0, 0.0, 0.0)):
-        
+    def load_vehicle(self, pos=None, quat=None):
+       
+        if pos is None:
+            pos = self.default_pos()
+        if quat is None:
+            quat = self.default_quat()
         self.steering = 0.0
         self.engineForce = 0.0
         self.brakeForce = 1000.0
@@ -329,7 +401,7 @@ class CarSrv(DirectObject):
         wheel.setWheelsDampingRelaxation(2.3)
         wheel.setWheelsDampingCompression(4.4)
         wheel.setFrictionSlip(1e2)
-        wheel.setRollInfluence(0.0)
+        wheel.setRollInfluence(0.1)
         wheel.setNode(wheel_np.node())
     
     def start_update_server(self):
@@ -339,7 +411,6 @@ class CarSrv(DirectObject):
     def update_task(self, task):
         dt = globalClock.getDt()
         self.update(dt=dt)
-        print(self.vehicle.getCurrentSpeedKmHour())
         return task.cont
     
     def cleanup(self):
