@@ -1,6 +1,7 @@
 import abc
 import os, pickle, time, shutil
 import numpy as np
+import multiprocessing
 from general.algorithm.probcoll_model import ProbcollModel
 from config import params
 
@@ -16,6 +17,7 @@ class Probcoll:
         self._use_dynamics = True
         self._async_on = False
         self._asynchronous = params['probcoll']['asynchronous_training']
+        self._jobs = []
         self._setup()
         self._logger = get_logger(
             self.__class__.__name__,
@@ -173,15 +175,20 @@ class Probcoll:
             if self._asynchronous:
                 self._probcoll_model.recover()
                 if not self._async_on:
-                    if not self._asynch_probcoll_model.sess.graph.finalized:
-                        self._asynch_probcoll_model.sess.graph.finalize()
-                    self._asynch_probcoll_model.async_training()
+                    p = multiprocessing.Process(target=self._async_training)
+                    p.daemon = True
+                    p.start()
+                    self._jobs.append(p)
+    #                    self._asynch_probcoll_model.async_training()
                     self._async_on = True
             else:
                 self._probcoll_model.train(reset=params['model']['reset_every_train'])
-   
+  
     def _run_testing(self, itr):
         pass
+   
+#    def _async_training(self):
+#        pass
 
     def _run_rollout(self, itr):
         T = params['probcoll']['T']

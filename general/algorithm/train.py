@@ -5,12 +5,13 @@ from config import params, load_params
 
 class Train:
 
-    def __init__(self, plot_dir):
+    def __init__(self, plot_dir, asynch=False):
         self._data_dir = os.path.join(params['exp_dir'], params['exp_name'])
         yamls = [fname for fname in os.listdir(self._data_dir) if '.yaml' in fname and '~' not in fname]
         yaml_path = os.path.join(self._data_dir, yamls[0])
         params['yaml_path'] = yaml_path
         self._plot_dir = plot_dir
+        self.asynch = asynch
         self._logger = get_logger(
             self.__class__.__name__,
             params['model']['logger'])
@@ -42,5 +43,8 @@ class Train:
         return files
 
     def run(self):
-        self._probcoll_model.add_data(self._get_files())
-        self._probcoll_model.train()
+        if self.asynch:
+            self._probcoll_model.async_train_func()
+        else:
+            self._probcoll_model.add_data(self._get_files())
+            self._probcoll_model.train()

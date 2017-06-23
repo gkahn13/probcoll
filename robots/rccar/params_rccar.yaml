@@ -2,8 +2,8 @@
 
 dt: 0.25
 random_seed: 0
-config_file: '/home/avillaflor/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
-exp_dir: '/home/avillaflor/probcoll/experiments/rccar'
+config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
+exp_dir: '/home/adam/probcoll/experiments/rccar'
 exp_name: 'bair_car_hallway_async'
 
 ##########################
@@ -17,10 +17,10 @@ probcoll:
   is_training: True
   asynchronous_training: True
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-#  init_data: '/home/avillaflor/gps_quadrotor/experiments/rccar/init_data_real'
+#  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 
   conditions:
-    repeats: 20 # TODO
+    repeats: 40 # TODO
     num_test: 1
     randomize_conds: False
     randomize_reps: True
@@ -44,7 +44,7 @@ probcoll:
     
 model:
   T: 8 # how many timesteps to predict
-  logger: 'debug' # debug/info/fatal what level to log
+  logger: 'info' # debug/info/fatal what level to log
   pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
   control_range:
@@ -59,8 +59,8 @@ model:
   scale_O_im: True
   center_O_im: False 
   # NN training parameters
-  device: 3
-  gpu_fraction: 0.8 #TODO
+  device: 0
+  gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 1.e-3
   beta1: 0.9 # For ADAM
@@ -129,12 +129,12 @@ planning:
   epsilon_greedy:
     endpoints: [[0, 1.0], [50, 1.0], [150, 0.01]]
     #    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
-    outside_value: 0.00
+    outside_value: 0.01
     lower: [20., 8.]
     upper: [80., 8.]
 
   control_noise:
-    type: 'zero' # zero / gaussian / uniform
+    type: 'uniform' # zero / gaussian / uniform
 
     zero: {}
     gaussian:
@@ -144,7 +144,7 @@ planning:
       upper: [5., 0.]
   
   num_dp: 1 # number of dropout passes to average over
-  planner_type: 'random' # random / primitives / cem / random_policy
+  planner_type: 'cem' # random / primitives / cem / random_policy
   # specific to your primitives code
   primitives:
     steers: [30., 40., 50., 60., 70.]
@@ -153,8 +153,8 @@ planning:
 
   # control range for your planning algorithms
   control_range:
-    lower: [20., 4.]
-    upper: [80., 12.]
+    lower: [20., 8.]
+    upper: [80., 8.]
 
   random:
     K: 2048 # number of actions to sample from
@@ -201,7 +201,7 @@ world:
 sim:
   srv: 'sim_env'
   sim_env: 'hallway' # hallway / cory2 / square
-  launch_file: '/home/avillaflor/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
+  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
   dt: 0.25
   steeringClamp: 45.0
   accelClamp: 12.0

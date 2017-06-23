@@ -26,37 +26,38 @@ class PlannerPrimitives(Planner):
 
     def _setup(self):
         with tf.name_scope('primitives_planner'):
-            self.actions_considered = self.primitives
-            self.O_im_input = self.probcoll_model.d_eval['O_im_input']
-            self.O_vec_input = self.probcoll_model.d_eval['O_vec_input']
-            stack_u = tf.concat(0, [self.primitives]*self.params['num_dp'])
-            output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
-                stack_u,
-                O_im_input=self.O_im_input,
-                O_vec_input=self.O_vec_input,
-                reuse=True) 
+            with self.probcoll_model.graph.as_default():
+                self.actions_considered = self.primitives
+                self.O_im_input = self.probcoll_model.d_eval['O_im_input']
+                self.O_vec_input = self.probcoll_model.d_eval['O_vec_input']
+                stack_u = tf.concat(0, [self.primitives]*self.params['num_dp'])
+                output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
+                    stack_u,
+                    O_im_input=self.O_im_input,
+                    O_vec_input=self.O_vec_input,
+                    reuse=True) 
 
-            pred_mean = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], output_pred_mean), axis=0)
+                pred_mean = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_pred_mean), axis=0)
 
-            pred_std = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
+                pred_std = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
 
-            mat_mean = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+                mat_mean = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
 
-            mat_std = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
-            
-            mat_mean = tf.reduce_mean(
-                tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
-            
-            control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
-            coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
-            
-            self.control_costs = control_cost_fn.eval(u_samples)
-            self.coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
+                mat_std = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
+                
+                mat_mean = tf.reduce_mean(
+                    tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+                
+                control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
+                coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
+                
+                self.control_costs = control_cost_fn.eval(u_samples)
+                self.coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
 
-            total_cost = self.control_costs + self.coll_costs
-            index = tf.cast(tf.argmin(total_costs, axis=0), tf.int32)
-            self.action = self.primitives[index, 0]
+                total_cost = self.control_costs + self.coll_costs
+                index = tf.cast(tf.argmin(total_costs, axis=0), tf.int32)
+                self.action = self.primitives[index, 0]

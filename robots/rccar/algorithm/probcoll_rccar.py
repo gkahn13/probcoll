@@ -31,8 +31,6 @@ class ProbcollRCcar(Probcoll):
     def _setup(self):
         rospy.init_node('ProbcollRCcar', anonymous=True)
 
-        self._jobs = []
-        
         if params['world']['sim']:
             p = multiprocessing.Process(target=self._run_simulation)
             p.daemon = True
@@ -54,8 +52,8 @@ class ProbcollRCcar(Probcoll):
         ### load prediction neural net
         self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
 
-        if self._asynchronous:
-            self._asynch_probcoll_model = ProbcollModelRCcar() 
+#        if self._asynchronous:
+#            self._asynch_probcoll_model = ProbcollModelRCcar() 
 
         rccar_topics = params['rccar']['topics']
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
@@ -76,6 +74,13 @@ class ProbcollRCcar(Probcoll):
                     "env:={0}".format(params["sim"]["sim_env"])
                 ]
             subprocess.call(command)
+        except Exception as e:
+            print(e)
+   
+    def _async_training(self):
+        try:
+            subprocess.call(
+                ["python", "main.py", "train", "rccar", "--asynch"])
         except Exception as e:
             print(e)
 

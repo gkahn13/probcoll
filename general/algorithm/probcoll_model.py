@@ -12,7 +12,7 @@ import sys
 import copy
 import rospy
 import string
-import threading
+import multiprocessing
 
 from general.tf import tf_utils
 from general.tf.nn.fc_nn import fcnn
@@ -55,8 +55,19 @@ class ProbcollModel:
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
         self.preprocess_fnames = []
         self.threads = []
+        self._jobs = []
         self.graph = tf.Graph()
-
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
+        config = tf.ConfigProto(
+            gpu_options=gpu_options,
+            log_device_placement=False,
+            allow_soft_placement=True)
+        # config.intra_op_parallelism_threads = 1
+        # config.inter_op_parallelism_threads = 1
+        print('creating session')
+        with self.graph.as_default():
+            self.sess = tf.Session(config=config)
         self._control_width = np.array(self.control_range["upper"]) - \
             np.array(self.control_range["lower"])
         self._control_mean = (np.array(self.control_range["upper"]) + \
@@ -1012,15 +1023,6 @@ class ProbcollModel:
             self._graph_queue_update()
             ### initialize
             self._initializer = [tf.local_variables_initializer(), tf.global_variables_initializer()]
-            os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
-            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
-            config = tf.ConfigProto(
-                gpu_options=gpu_options,
-                log_device_placement=False,
-                allow_soft_placement=True)
-            # config.intra_op_parallelism_threads = 1
-            # config.inter_op_parallelism_threads = 1
-            self.sess = tf.Session(config=config)
             self.coord = tf.train.Coordinator()
             self._graph_init_vars()
 
@@ -1058,6 +1060,8 @@ class ProbcollModel:
                     closed = True
 
     def train(self, reset=False, **kwargs):
+
+        self.graph.as_default()
 
         if reset:
             self._graph_init_vars()
@@ -1155,7 +1159,7 @@ class ProbcollModel:
                 val_values = defaultdict(list)
                 val_nums = defaultdict(float)
                 val_steps = 0
-                self._logger.debug('\tComputing validation...')
+                self._logger.info('\tComputing validation...')
                 while val_steps < self.val_steps:
                     val_cost, val_cross_entropy, \
                     val_err, val_err_coll, val_err_nocoll, \
@@ -1181,7 +1185,7 @@ class ProbcollModel:
                 plotter.add_val('cost', np.mean(val_values['cost']))
                 plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
 
-                self._logger.debug(
+                self._logger.info(
                     'error: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
                         100 * np.mean(val_values['err']),
                         100 * np.mean(val_values['err_coll']),
@@ -1236,7 +1240,7 @@ class ProbcollModel:
                 plotter.add_train('cost', step * self.batch_size, np.mean(train_values['cost']))
                 plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
 
-                self._logger.debug('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
+                self._logger.info('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
                     100 * step / float(self.steps),
                     100 * np.mean(train_values['err']),
                     100 * np.mean(train_values['err_coll']),
@@ -1272,6 +1276,10 @@ class ProbcollModel:
         self.threads.append(t)
         self.coord.register_thread(t)
         t.start()
+#        p = multiprocessing.Process(target=self.async_train_func)
+#        p.daemon = True
+#        self._jobs.append(p)
+#        p.start()
 
     def async_train_func(self):
         self._logger.info("Started asynchronous training!")
@@ -1436,8 +1444,9 @@ class ProbcollModel:
             latest_file = tf.train.latest_checkpoint(
                 self._checkpoints_dir)
             self.load(latest_file)
+            self._logger.info("Found checkpoint file")
         except:
-            self._logger.debug("Could not find checkpoint file")
+            self._logger.info("Could not find checkpoint file")
 
     def load(self, model_file):
         self.saver.restore(self.sess, model_file)
@@ -1452,6 +1461,9 @@ class ProbcollModel:
             assert(hasattr(self, 'threads'))
             self.coord.request_stop()
             self.coord.join(self.threads)
+        for p in self._jobs:
+            os.kill(p.pid, signal.SIGKILL)
+            p.join()
         self.sess.close()
         self.sess = None
 
