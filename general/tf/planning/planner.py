@@ -26,29 +26,30 @@ class Planner(object):
         raise NotImplementedError('Implement in subclass')
 
     def _setup_noise(self):
-        T = self.probcoll_model.T
-        noise_type = self.params['control_noise']['type']
-        if noise_type == 'zero':
-            self.action_noisy = self.action
-        elif noise_type == 'gaussian':
-            noise = GaussianNoise(
-                self.params['control_noise']['gaussian'],
-                dtype=self.dtype) 
-            self.action_noisy = self.action + noise
-        elif noise_type == 'uniform':
-            noise = UniformNoise(
-                self.params['control_noise']['uniform'],
-                dtype=self.dtype) 
-            self.action_noisy = self.action + noise
-        else:
-            raise NotImplementedError(
-                "Noise type {0} is not valid".format(noise_type))
-        # Epsilon greedy 
-        self.eps_schedule = schedules.PiecewiseSchedule(
-            endpoints=self.params['epsilon_greedy']['endpoints'],
-            outside_value=self.params['epsilon_greedy']['outside_value'])
-        self.eps_ph = tf.placeholder(self.dtype, [])
-        self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], eps=self.eps_ph, dtype=self.dtype)
+        with self.probcoll_model.graph.as_default():
+            T = self.probcoll_model.T
+            noise_type = self.params['control_noise']['type']
+            if noise_type == 'zero':
+                self.action_noisy = self.action
+            elif noise_type == 'gaussian':
+                noise = GaussianNoise(
+                    self.params['control_noise']['gaussian'],
+                    dtype=self.dtype) 
+                self.action_noisy = self.action + noise
+            elif noise_type == 'uniform':
+                noise = UniformNoise(
+                    self.params['control_noise']['uniform'],
+                    dtype=self.dtype) 
+                self.action_noisy = self.action + noise
+            else:
+                raise NotImplementedError(
+                    "Noise type {0} is not valid".format(noise_type))
+            # Epsilon greedy 
+            self.eps_schedule = schedules.PiecewiseSchedule(
+                endpoints=self.params['epsilon_greedy']['endpoints'],
+                outside_value=self.params['epsilon_greedy']['outside_value'])
+            self.eps_ph = tf.placeholder(self.dtype, [])
+            self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], eps=self.eps_ph, dtype=self.dtype)
 
     def visualize(
             self,

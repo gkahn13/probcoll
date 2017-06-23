@@ -42,7 +42,6 @@ class ProbcollRCcar(Probcoll):
         probcoll_params = params['probcoll']
         world_params = params['world']
         cond_params = probcoll_params['conditions']
-        self._asynchronous = probcoll_params['asynchronous_training']
         self._max_iter = probcoll_params['max_iter']
         self._dynamics = DynamicsRCcar() # Try to remove dynamics
         self._agent = AgentRCcar(self._dynamics)
@@ -54,6 +53,9 @@ class ProbcollRCcar(Probcoll):
 
         ### load prediction neural net
         self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
+
+        if self._asynchronous:
+            self._asynch_probcoll_model = ProbcollModelRCcar() 
 
         rccar_topics = params['rccar']['topics']
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
@@ -87,24 +89,14 @@ class ProbcollRCcar(Probcoll):
     ### Run methods ###
     ###################
 
-    def _run_training(self, itr):
-        if params['probcoll']['is_training']:
-            if self._asynchronous:
-                self._probcoll_model.recover()
-                if not self._async_on:
-                    self._probcoll_model.async_training()
-                    self._async_on = True
-            else:
-                self._probcoll_model.train(reset=params['model']['reset_every_train'])
-   
     def _run_testing(self, itr):
         if (itr != 0 and (itr == self._max_iter - 1 \
                 or itr % params['world']['testing']['itr_freq'] == 0)): 
             self._logger.info('Itr {0} testing'.format(itr))
             if self._agent.sim:
-#                if self._async_on:
-#                    self._logger.debug('Recovering probcoll model')
-#                    self._probcoll_model.recover()
+                if self._async_on:
+                    self._logger.debug('Recovering probcoll model')
+                    self._probcoll_model.recover()
                 T = params['probcoll']['T']
                 conditions = params['world']['testing']['positions']
                 samples = []

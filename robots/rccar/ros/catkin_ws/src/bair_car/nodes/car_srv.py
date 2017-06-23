@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 import rospy
-import threading
-import Queue
-import os
 import time
 import numpy as np
 import sys
@@ -12,33 +9,23 @@ from ros_utils import ImageROSPublisher
 import std_msgs.msg
 import geometry_msgs.msg
 import abc
-
 from panda3d.core import loadPrcFile
-from pandac.PandaModules import loadPrcFileData
+from panda3d.core import loadPrcFileData
 loadPrcFileData('', 'window-type offscreen')
 from panda3d_camera_sensor import Panda3dCameraSensor
 import direct.directbase.DirectStart
 from direct.showbase.DirectObject import DirectObject
-from direct.showbase.InputStateGlobal import inputState
 from panda3d.core import AmbientLight
 from panda3d.core import DirectionalLight
 from panda3d.core import Vec3
 from panda3d.core import Vec4
 from panda3d.core import Point3
 from panda3d.core import TransformState
-from panda3d.core import BitMask32
-from panda3d.core import RigidBodyCombiner, NodePath
-from panda3d.core import CollisionTraverser
-from panda3d.core import CollisionHandlerEvent
-from panda3d.bullet import BulletGhostNode
-from panda3d.bullet import BulletHelper
 from panda3d.bullet import BulletWorld
-from panda3d.bullet import BulletPlaneShape
 from panda3d.bullet import BulletBoxShape
 from panda3d.bullet import BulletRigidBodyNode
 from panda3d.bullet import BulletVehicle
 from panda3d.bullet import ZUp
-from panda3d.bullet import BulletConvexHullShape
 
 class CarSrv(DirectObject):
 
@@ -52,7 +39,6 @@ class CarSrv(DirectObject):
         self.worldNP = render.attachNewNode('World')
         self.world = BulletWorld()
         self.world.setGravity(Vec3(0, 0, -9.81))
-        
         
         # Light
         alight = AmbientLight('ambientLight')
@@ -86,17 +72,10 @@ class CarSrv(DirectObject):
         self.back_camera_node = self.back_camera_sensor.cam
         self.back_camera_node.setPos(0.0, -1.0, 1.0)
         self.back_camera_node.lookAt(0.0, -6.0, 0.0)
-        
-        # Models
-        self._yugoNP = loader.loadModel('../models/yugo/yugo.egg')
-        self._right_front_np = loader.loadModel('../models/yugo/yugotireR.egg')
-        self._left_front_np = loader.loadModel('../models/yugo/yugotireL.egg')
-        self._right_rear_np = loader.loadModel('../models/yugo/yugotireR.egg')
-        self._left_rear_np = loader.loadModel('../models/yugo/yugotireL.egg')
-
+       
         # Vehicle
         shape = BulletBoxShape(Vec3(0.6, 1.4, 0.5))
-        ts = TransformState.makePos(Point3(0, 0, 0.5))
+        ts = TransformState.makePos(Point3(0., 0., 0.5))
         self.vehicle_node = BulletRigidBodyNode('Vehicle')
         self.vehicle_node.addShape(shape, ts)
         self.mass = self.params['mass']
@@ -116,16 +95,11 @@ class CarSrv(DirectObject):
         self.vehicle = BulletVehicle(self.world, self.vehicle_node)
         self.vehicle.setCoordinateSystem(ZUp)
         self.world.attachVehicle(self.vehicle)
-        self._yugoNP.reparentTo(self.vehicle_pointer)
-        self._right_front_np.reparentTo(self.worldNP)
-        self.addWheel(Point3( 0.70,    1.05, 0.3), True, self._right_front_np)
-        self._left_front_np.reparentTo(self.worldNP)
-        self.addWheel(Point3(-0.70,    1.05, 0.3), True, self._left_front_np)
-        self._right_rear_np.reparentTo(self.worldNP)
-        self.addWheel(Point3( 0.70, -1.05, 0.3), False, self._right_rear_np)
-        self._left_rear_np.reparentTo(self.worldNP)
-        self.addWheel(Point3(-0.70, -1.05, 0.3), False, self._left_rear_np)
-        
+        self.addWheel(Point3( 0.70,    1.05, 0.3), True)
+        self.addWheel(Point3(-0.70,    1.05, 0.3), True)
+        self.addWheel(Point3( 0.70, -1.05, 0.3), False)
+        self.addWheel(Point3(-0.70, -1.05, 0.3), False)
+    
         # Car Simulator
         self.setup()
         self.load_vehicle()
@@ -389,7 +363,7 @@ class CarSrv(DirectObject):
             self.previous_quat = self.vehicle_pointer.getQuat()
         
 
-    def addWheel(self, pos, front, wheel_np):
+    def addWheel(self, pos, front):
         wheel = self.vehicle.createWheel()
         wheel.setChassisConnectionPointCs(pos)
         wheel.setFrontWheel(front)
@@ -402,7 +376,6 @@ class CarSrv(DirectObject):
         wheel.setWheelsDampingCompression(4.4)
         wheel.setFrictionSlip(1e2)
         wheel.setRollInfluence(0.1)
-        wheel.setNode(wheel_np.node())
     
     def start_update_server(self):
         s = rospy.Service('sim_env', bair_car.srv.sim_env, self.get_handler())

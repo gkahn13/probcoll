@@ -11,6 +11,8 @@ import tensorflow as tf
 import sys
 import copy
 import rospy
+import string
+import threading
 
 from general.tf import tf_utils
 from general.tf.nn.fc_nn import fcnn
@@ -44,7 +46,7 @@ class ProbcollModel:
         self.random_seed = params['random_seed']
         for k, v in params['model'].items():
             setattr(self, k, v)
-        
+
         self.dU = len(self.U_idxs())
         self.num_O = params['model'].get('num_O', 1)
         self.dO_im = len(self.O_im_idxs()) * self.num_O
@@ -53,6 +55,7 @@ class ProbcollModel:
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
         self.preprocess_fnames = []
         self.threads = []
+        self.graph = tf.Graph()
 
         self._control_width = np.array(self.control_range["upper"]) - \
             np.array(self.control_range["lower"])
@@ -230,8 +233,8 @@ class ProbcollModel:
         :return: no_coll_data, coll_data 
         """
 
-        no_coll_data = {"U": [], "O_im": [],"O_vec": [], "output": [], "len": []}
-        coll_data = {"U": [], "O_im": [], "O_vec": [],"output": [], "len": []}
+        no_coll_data = {"U": [], "O_im": [],"O_vec": [], "output": []}
+        coll_data = {"U": [], "O_im": [], "O_vec": [],"output": []}
 
         random.shuffle(npz_fnames)
         for npz_fname in npz_fnames:
@@ -246,11 +249,10 @@ class ProbcollModel:
                 for sample in self._modify_sample(og_sample):
                     s_params = sample._meta_data
                     U = sample.get_U()[:, self.U_idxs(p=s_params)]
-                    # O = sample.get_O()[:, self.O_idxs(p=s_params)]
                     O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)] # TODO
-                    O_vec = sample.get_O()[:, self.O_vec_idxs(p=s_params)] # TODO
+                    O_vec = sample.get_O()[:, self.O_vec_idxs(p=s_params)]
                     output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
-                    buffer_len = 1
+                    buffer_len = 0
                     if len(U) < 1 + buffer_len: # used to be self.T, but now we are extending
                         continue
 
@@ -262,7 +264,6 @@ class ProbcollModel:
                         # For collision data extend collision by T-1 (and buffer)
                         extend_u = np.zeros((self.T - 1 - buffer_len, U.shape[1]))
                         U_coll = np.vstack((U[-self.T:], extend_u))
-
                         O_im_coll = np.vstack((O_im[-self.T:], np.tile([O_im[-1]], (self.T - 1 - buffer_len, 1))))
                         O_vec_coll = np.vstack((O_vec[-self.T:], np.tile([O_vec[-1]], (self.T - 1 - buffer_len, 1))))
                         output_coll = np.vstack((output[-self.T:], np.tile([output[-1]], (self.T - 1 - buffer_len, 1))))
@@ -304,13 +305,10 @@ class ProbcollModel:
 
         writer = tf.python_io.TFRecordWriter(tfrecords)
 
-        record_num = 0
         for i, (U, O_im, O_vec, output) in enumerate(zip(U_by_sample, O_im_by_sample, O_vec_by_sample, output_by_sample)):
             assert(len(U) >= self.T)
             for j in range(len(U) - self.T + 1):
-                feature = {
-                    'fname': _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(record_num)),
-                }
+                feature = {}
                 feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
                 # TODO figure out how to keep types properly
                 if j < self.num_O - 1:
@@ -329,14 +327,15 @@ class ProbcollModel:
                 max_value = output_list[index]
                 if max_value == 0:
                     length = self.T
+                    suffix = 'nocoll'
                 else:
                     length = index + 1
+                    suffix = 'coll'
+                feature['fname'] = _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(suffix)),
                 assert(length != 0)
                 feature['len'] = _int64list_feature([length])
                 example = tf.train.Example(features=tf.train.Features(feature=feature))
                 writer.write(example.SerializeToString())
-                record_num += 1
-
         writer.close()
 
     def _get_tfrecords_fnames(self, fname, create=True):
@@ -429,38 +428,40 @@ class ProbcollModel:
             ### create file queues
             filename_queues = (
                     tf.train.string_input_producer(
-                        filename_vars[0],
-                        num_epochs=None,
-                        capacity=10*self.batch_size,
-                        shuffle=True),
+                        filename_vars[0]),
                     tf.train.string_input_producer(
-                        filename_vars[1],
-                        num_epochs=None,
-                        capacity=10*self.batch_size,
-                        shuffle=True)
+                        filename_vars[1])
                 )
 
             ### read and decode
             readers = [tf.TFRecordReader(), tf.TFRecordReader()]
 
-            features = {
-                'fname': tf.FixedLenFeature([], tf.string)
-            }
-
+            features = {}
+            
+            features['fname'] = tf.FixedLenFeature([], tf.string)
             features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
             features['O_im'] = tf.FixedLenFeature([self.dO_im], tf.float32)
             features['O_vec'] = tf.FixedLenFeature([self.dO_vec], tf.float32)
             features['output'] = tf.FixedLenFeature([], tf.string)
             features['len'] = tf.FixedLenFeature([], tf.int64)
-            # Figure out how to do arbitrary split across batchsize
-            inputs = [None, None]
-            for i, fq in enumerate(filename_queues):
-                serialized_examples = [readers[(b+i)%2].read(fq)[1] for b in xrange(self.num_bootstrap)]
+           
+            bootstrap_fnames = []
+            bootstrap_U_inputs = []
+            bootstrap_O_im_inputs = []
+            bootstrap_O_vec_inputs = []
+            bootstrap_outputs = []
+            bootstrap_lens = []
+
+            coll_batch_size = int(self.batch_size * self.pct_coll)
+            no_coll_batch_size = self.batch_size - coll_batch_size
+            batch_sizes = [no_coll_batch_size, coll_batch_size]
+            for fq, reader, batch_size in zip(filename_queues, readers, batch_sizes):
+                serialized_examples = [reader.read(fq)[1] for b in xrange(self.num_bootstrap)]
                 parsed_example = [
                         tf.parse_single_example(serialized_examples[b], features=features)
                         for b in xrange(self.num_bootstrap)
                     ]
-                fname = parsed_example[0]['fname']
+                bootstrap_fname = [parsed_example[b]['fname'] for b in xrange(self.num_bootstrap)]
                 bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_O_im_input = [tf.reshape(parsed_example[b]['O_im'], (self.dO_im,))
@@ -470,24 +471,36 @@ class ProbcollModel:
                 bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
                 bootstrap_len = [tf.reshape(parsed_example[b]['len'], ())
                                  for b in xrange(self.num_bootstrap)]
-                inputs[i] = (fname,) + tuple(bootstrap_U_input + bootstrap_O_im_input + bootstrap_O_vec_input + bootstrap_output + bootstrap_len)
+                inputs = tuple(bootstrap_fname + bootstrap_U_input + bootstrap_O_im_input + bootstrap_O_vec_input + bootstrap_output + bootstrap_len)
 
-            shuffled = tf.train.shuffle_batch_join(
-                inputs,
-                batch_size=self.batch_size,
-                capacity=10*self.batch_size + 3 * self.batch_size,
-                min_after_dequeue=10*self.batch_size,
-                )
+                shuffled = tf.train.shuffle_batch(
+                    inputs,
+                    batch_size=batch_size,
+                    capacity=10*batch_size + 3 * batch_size,
+                    min_after_dequeue=10*batch_size)
 
-            fname_batch = shuffled[0]
-            bootstrap_U_inputs = shuffled[1:1+1*self.num_bootstrap]
-            bootstrap_O_im_inputs = shuffled[1+1*self.num_bootstrap:1+2*self.num_bootstrap]
-            bootstrap_O_vec_inputs = shuffled[1+2*self.num_bootstrap:1+3*self.num_bootstrap]
-            bootstrap_outputs = shuffled[1+3*self.num_bootstrap:1+4*self.num_bootstrap]
-            bootstrap_lens = shuffled[1+4*self.num_bootstrap:1+5*self.num_bootstrap]
+                bootstrap_fnames.append(shuffled[:self.num_bootstrap])
+                bootstrap_U_inputs.append(shuffled[1*self.num_bootstrap:2*self.num_bootstrap])
+                bootstrap_O_im_inputs.append(shuffled[2*self.num_bootstrap:3*self.num_bootstrap])
+                bootstrap_O_vec_inputs.append(shuffled[3*self.num_bootstrap:4*self.num_bootstrap])
+                bootstrap_outputs.append(shuffled[4*self.num_bootstrap:5*self.num_bootstrap])
+                bootstrap_lens.append(shuffled[5*self.num_bootstrap:6*self.num_bootstrap])
+            
+            fnames = []
+            U_inputs = []
+            O_im_inputs = []
+            O_vec_inputs = []
+            outputs = []
+            lens = []
+            for i in range(self.num_bootstrap):
+                fnames.append(tf.concat(0, [bootstrap_fnames[0][i], bootstrap_fnames[1][i]]))
+                U_inputs.append(tf.concat(0, [bootstrap_U_inputs[0][i], bootstrap_U_inputs[1][i]]))
+                O_im_inputs.append(tf.concat(0, [bootstrap_O_im_inputs[0][i], bootstrap_O_im_inputs[1][i]]))
+                O_vec_inputs.append(tf.concat(0, [bootstrap_O_vec_inputs[0][i], bootstrap_O_vec_inputs[1][i]]))
+                outputs.append(tf.concat(0, [bootstrap_outputs[0][i], bootstrap_outputs[1][i]]))
+                lens.append(tf.concat(0, [bootstrap_lens[0][i], bootstrap_lens[1][i]]))
 
-        return fname_batch, bootstrap_U_inputs, bootstrap_O_im_inputs, bootstrap_O_vec_inputs, \
-            bootstrap_outputs, bootstrap_lens, filename_queues, filename_vars
+        return fnames, U_inputs, O_im_inputs, O_vec_inputs, outputs, lens, filename_queues, filename_vars
 
     def _graph_inputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
@@ -507,7 +520,7 @@ class ProbcollModel:
                 "Image graph {0} is not valid".format(obg_type))
 
         obs_batch = observation_im.get_shape()[0].value
-        # TODO if batch size is 1 then clearly not training
+        # If batch size is 1 then clearly not training
         is_training = is_training and obs_batch != 1
         obs_im_float = tf.cast(observation_im, self.dtype)
         if params['model'].get('scale_O_im', False):
@@ -540,7 +553,6 @@ class ProbcollModel:
             is_training=is_training)
         if len(im_output.get_shape()) > 2:
             im_output = tf.contrib.layers.flatten(im_output)
-        # TODO this is where you concatenate other stuff
         output, _ = fcnn(
             tf.concat(1, [im_output, observation_vec]),
             params['model']['observation_graph'],
@@ -548,7 +560,7 @@ class ProbcollModel:
             scope=scope,
             reuse=reuse,
             is_training=is_training)
-        if obs_batch == 1 and batch_size != 1:
+        if obs_batch == 1:
             output = tf.tile(output, [batch_size, 1])
         return output
 
@@ -845,36 +857,40 @@ class ProbcollModel:
             num_errs_on_nocoll = 0
             for b, (output_mat_b, output_b, length_b) in enumerate(zip(bootstrap_output_mats, bootstrap_outputs, bootstrap_lengths)):
 
+                output_b = tf.cast(output_b, self.dtype)
+                output_pred_b = tf.nn.sigmoid(output_mat_b)
+
                 if params["model"]["mask"] == "last":
                     one_mask = tf.one_hot(
                         tf.cast(length_b - 1, tf.int32),
                         self.T)
                     mask = tf.stack([one_mask] * self.doutput, 2)
                 elif params["model"]["mask"] == "all":
-                    one_mask = tf.sequence_mask(
-                        tf.cast(length_b, tf.int32),
-                        maxlen=self.T,
-                        dtype=self.dtype)
-                    mask = tf.stack([one_mask] * self.doutput, 2)
-#                    one_mask = tf.one_hot(
-#                        tf.cast(length_b - 1, tf.int32),
-#                        self.T) * tf.expand_dims(tf.cast(self.T - length_b, self.dtype), axis=1)
-#                    mask = tf.stack([one_mask] * self.doutput, 2) * mask + mask
+                    all_mask = tf.stack(
+                        [tf.sequence_mask(
+                            tf.cast(length_b, tf.int32),
+                            maxlen=self.T,
+                            dtype=self.dtype)] * self.doutput,
+                        2)
+                    factor = tf.reduce_sum(all_mask * output_b) / tf.reduce_sum(tf.cast(tf.reduce_sum(length_b), self.dtype))
+                    coll_weight = (self.coll_weight_pct - self.coll_weight_pct * factor) / (factor - self.coll_weight_pct * factor) 
+                    one_mask = tf.one_hot(
+                        tf.cast(length_b - 1, tf.int32),
+                        self.T) * (coll_weight - 1.)
+                    one_mask_coll = tf.stack([one_mask] * self.doutput, 2) * output_b
+                    mask = all_mask + one_mask_coll
                 else:
                     raise NotImplementedError(
                         "Mask {0} is not valid".format(
                             params["model"]["mask"]))
 
-                output_b = tf.cast(output_b, self.dtype)
-                output_pred_b = tf.nn.sigmoid(output_mat_b)
-
                 ### cost
                 with tf.name_scope('cost_b{0}'.format(b)):
                     cross_entropy_b = tf.nn.sigmoid_cross_entropy_with_logits(output_mat_b, output_b)
                     masked_cross_entropy_b = cross_entropy_b * mask
-#                    costs.append(tf.reduce_sum(masked_cross_entropy_b) /
-#                        tf.cast(tf.reduce_sum(length_b), self.dtype))
-                    costs.append(tf.reduce_mean(masked_cross_entropy_b))
+                    costs.append(tf.reduce_sum(masked_cross_entropy_b) /
+                        tf.cast(tf.reduce_sum(mask), self.dtype))
+#                    costs.append(tf.reduce_mean(masked_cross_entropy_b))
                 ### accuracy
                 with tf.name_scope('err_b{0}'.format(b)):
                     output_geq_b = tf.cast(tf.greater_equal(output_pred_b, 0.5), self.dtype)
@@ -957,64 +973,63 @@ class ProbcollModel:
     def _graph_setup(self):
         """ Only call once """
 
-        tf.reset_default_graph()
+        with self.graph.as_default():
+            self.d_train = dict()
+            self.d_val = dict()
+            self.d_eval = dict()
 
-        self.d_train = dict()
-        self.d_val = dict()
-        self.d_eval = dict()
+            ### prepare for training
+            for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
+                d['fnames'], d['U_inputs'], d['O_im_inputs'], d['O_vec_inputs'], d['outputs'], d['len'], \
+                queues, queue_vars = self._graph_inputs_outputs_from_file(name)
+                d['no_coll_queue'], d['coll_queue'] = queues
+                d['no_coll_dequeue'], d['coll_dequeue'] = self._graph_dequeue(*queues)
+                d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
+                d['output_mats'] = self._graph_inference(
+                    name,
+                    d['U_inputs'],
+                    d['O_im_inputs'],
+                    d['O_vec_inputs'],
+                    reuse=i>0,
+                    tf_debug=self.tf_debug)
+                d['bootstraps_cost'], d['reg_cost'], d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'], d['num_coll'], d['num_nocoll'] = \
+                    self._graph_cost(name, d['output_mats'], d['outputs'], d['len'], reg=self.reg)
+            ### optimizer
+            self.d_train['optimizer'], self.d_train['grads'], self.d_train['optimizer_vars'] = \
+                self._graph_optimize(self.d_train['bootstraps_cost'], self.d_train['reg_cost'])
 
-        ### prepare for training
-        for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
-            d['fnames'], d['U_inputs'], d['O_im_inputs'], d['O_vec_inputs'], d['outputs'], d['len'], \
-            queues, queue_vars = self._graph_inputs_outputs_from_file(name)
-            d['no_coll_queue'], d['coll_queue'] = queues
-            d['no_coll_dequeue'], d['coll_dequeue'] = self._graph_dequeue(*queues)
-            d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
-            d['output_mats'] = self._graph_inference(
-                name,
-                d['U_inputs'],
-                d['O_im_inputs'],
-                d['O_vec_inputs'],
-                reuse=i>0,
-                tf_debug=self.tf_debug)
-            d['bootstraps_cost'], d['reg_cost'], d['cost'], d['cross_entropy'], d['err'], d['err_coll'], d['err_nocoll'], d['num_coll'], d['num_nocoll'] = \
-                self._graph_cost(name, d['output_mats'], d['outputs'], d['len'], reg=self.reg)
-        ### optimizer
-        self.d_train['optimizer'], self.d_train['grads'], self.d_train['optimizer_vars'] = \
-            self._graph_optimize(self.d_train['bootstraps_cost'], self.d_train['reg_cost'])
+            ### prepare for eval
+            self.d_eval['U_inputs'], self.d_eval['O_im_input'], self.d_eval['O_vec_input'] = self._graph_inputs_from_placeholders()
+            self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
+            self.d_eval['output_mat_std'] = \
+                self.graph_eval_inference(
+                    self.d_eval['U_inputs'],
+                    self.d_eval['O_im_input'],
+                    self.d_eval['O_vec_input'],
+                    reuse=True)
 
-        ### prepare for eval
-        self.d_eval['U_inputs'], self.d_eval['O_im_input'], self.d_eval['O_vec_input'] = self._graph_inputs_from_placeholders()
-        self.d_eval['output_pred_mean'], self.d_eval['output_pred_std'], self.d_eval['output_mat_mean'], \
-        self.d_eval['output_mat_std'] = \
-            self.graph_eval_inference(
-                self.d_eval['U_inputs'],
-                self.d_eval['O_im_input'],
-                self.d_eval['O_vec_input'],
-                reuse=True)
+            ### queues
+            self._graph_queue_update()
+            ### initialize
+            self._initializer = [tf.local_variables_initializer(), tf.global_variables_initializer()]
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
+            config = tf.ConfigProto(
+                gpu_options=gpu_options,
+                log_device_placement=False,
+                allow_soft_placement=True)
+            # config.intra_op_parallelism_threads = 1
+            # config.inter_op_parallelism_threads = 1
+            self.sess = tf.Session(config=config)
+            self.coord = tf.train.Coordinator()
+            self._graph_init_vars()
 
-        ### queues
-        self._graph_queue_update()
-        ### initialize
-        self._initializer = [tf.local_variables_initializer(), tf.global_variables_initializer()]
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
-        config = tf.ConfigProto(
-            gpu_options=gpu_options,
-            log_device_placement=False,
-            allow_soft_placement=True)
-        # config.intra_op_parallelism_threads = 1
-        # config.inter_op_parallelism_threads = 1
-        self.sess = tf.Session(config=config)
-        self.coord = tf.train.Coordinator()
-        self._graph_init_vars()
-
-        # Set logs writer into folder /tmp/tensorflow_logs
-        merged = tf.summary.merge_all()
-        writer = tf.summary.FileWriter(
-            os.path.join('/tmp', params['exp_name']),
-            graph=self.sess.graph)
-        self.saver = tf.train.Saver(max_to_keep=None)
+            # Set logs writer into folder /tmp/tensorflow_logs
+            merged = tf.summary.merge_all()
+            writer = tf.summary.FileWriter(
+                os.path.join('/tmp', params['exp_name']),
+                graph=self.sess.graph)
+            self.saver = tf.train.Saver(max_to_keep=None)
 
     ################
     ### Training ###
@@ -1046,8 +1061,6 @@ class ProbcollModel:
 
         if reset:
             self._graph_init_vars()
-        else:
-            self.recover()
 
         num_files = len(self.tfrecords_no_coll_train_fnames)
 
@@ -1071,8 +1084,8 @@ class ProbcollModel:
             self.threads += self._queue_threads
 
         #TODO do you need to flush here
-        self._logger.debug('Flushing queue')
-        self._flush_queue()
+#        self._logger.debug('Flushing queue')
+#        self._flush_queue()
         ### create plotter
         plotter = MLPlotter(
             self.save_dir,
@@ -1134,8 +1147,8 @@ class ProbcollModel:
                         self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
                         self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
                     })
-                self._logger.debug('Flushing queue')
-                self._flush_queue()
+#                self._logger.debug('Flushing queue')
+#                self._flush_queue()
 
             ### validation
             if (step != 0 and (step % int(self.val_freq * self.steps)) == 0):
@@ -1201,8 +1214,9 @@ class ProbcollModel:
                 ])
 
             # Keeps track of how many times files are read
-            for fname in train_fnames:
-                train_fnames_dict[fname] += 1
+            for bootstrap_fname in train_fnames:
+                for fname in bootstrap_fname:
+                    train_fnames_dict[fname] += 1
 
             train_values['cost'].append(train_cost)
             train_values['cross_entropy'].append(train_cross_entropy)
@@ -1243,13 +1257,29 @@ class ProbcollModel:
         # Logs the number of times files were accessed
         fnames_condensed = defaultdict(int)
         for k, v in train_fnames_dict.items():
-            fnames_condensed[k.split(self._hash)[0]] += v
+            fnames_condensed[string.join(k.split(self._hash), "")] += v
         for k, v in sorted(fnames_condensed.items(), key=lambda x: x[1]):
             self._logger.debug('\t\t\t{0} : {1}'.format(k, v))
 
         self.save(new_model_file)
         plotter.save(self._plots_dir, suffix=str(model_num))
         plotter.close()
+
+    def async_training(self):
+        t = threading.Thread(
+            target=self.async_train_func)
+        t.daemon = True
+        self.threads.append(t)
+        self.coord.register_thread(t)
+        t.start()
+
+    def async_train_func(self):
+        self._logger.info("Started asynchronous training!")
+        try:
+            while (True):
+                self.train()
+        finally:
+            self._logger.info("Ending asynchronous training!")
 
 #    ##################
 #    ### Evaluating ###

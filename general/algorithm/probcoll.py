@@ -15,6 +15,7 @@ class Probcoll:
         self._read_only = read_only
         self._use_dynamics = True
         self._async_on = False
+        self._asynchronous = params['probcoll']['asynchronous_training']
         self._setup()
         self._logger = get_logger(
             self.__class__.__name__,
@@ -27,7 +28,7 @@ class Probcoll:
     def _setup(self):
         ### load prediction neural net
         self._probcoll_model = None
-        self._cost_probcoll = None
+        self._asynch_probcoll_model = None
         self._max_iter = None
         self._world = None
         self._dynamics = None
@@ -155,10 +156,6 @@ class Probcoll:
         self._close()
 
     def _run_itr(self, itr):
-#        if self._async_on:
-#            self._logger.debug('Recovering probcoll model')
-#            self._probcoll_model.recover()
-        self._probcoll_model.recover()
         self._logger.info('')
         self._logger.info('=== Itr {0}'.format(itr))
         self._logger.info('')
@@ -172,8 +169,17 @@ class Probcoll:
         self._probcoll_model.close()
 
     def _run_training(self, itr):
-        self._probcoll_model.train(reset=params['model']['reset_every_train'])
-
+        if params['probcoll']['is_training']:
+            if self._asynchronous:
+                self._probcoll_model.recover()
+                if not self._async_on:
+                    if not self._asynch_probcoll_model.sess.graph.finalized:
+                        self._asynch_probcoll_model.sess.graph.finalize()
+                    self._asynch_probcoll_model.async_training()
+                    self._async_on = True
+            else:
+                self._probcoll_model.train(reset=params['model']['reset_every_train'])
+   
     def _run_testing(self, itr):
         pass
 
