@@ -55,7 +55,6 @@ class ProbcollModel:
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
         self.preprocess_fnames = []
         self.threads = []
-        self._jobs = []
         self.graph = tf.Graph()
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
@@ -314,40 +313,41 @@ class ProbcollModel:
         def _bytes_feature(value):
             return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-        writer = tf.python_io.TFRecordWriter(tfrecords)
+        if len(U_by_sample) > 0:
+            writer = tf.python_io.TFRecordWriter(tfrecords)
 
-        for i, (U, O_im, O_vec, output) in enumerate(zip(U_by_sample, O_im_by_sample, O_vec_by_sample, output_by_sample)):
-            assert(len(U) >= self.T)
-            for j in range(len(U) - self.T + 1):
-                feature = {}
-                feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
-                # TODO figure out how to keep types properly
-                if j < self.num_O - 1:
-                    obs_im = O_im[:j].ravel()
-                    obs_im_extended = np.concatenate([np.zeros(self.dO_im - obs_im.shape[0]), obs_im])
-                    feature['O_im'] = _floatlist_feature(obs_im_extended.tolist())
-                    obs_vec = O_vec[:j].ravel()
-                    obs_vec_extended = np.concatenate([np.zeros(self.dO_vec - obs_vec.shape[0]), obs_vec])
-                    feature['O_vec'] = _floatlist_feature(obs_vec_extended.tolist())
-                else:
-                    feature['O_im'] = _floatlist_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tolist())
-                    feature['O_vec'] = _floatlist_feature(np.ravel(O_vec[j-self.num_O+1:j+1]).tolist())
-                output_list = np.ravel(output[j:j+self.T])
-                feature['output'] = _bytes_feature(output_list.tostring())
-                index = np.argmax(output_list)
-                max_value = output_list[index]
-                if max_value == 0:
-                    length = self.T
-                    suffix = 'nocoll'
-                else:
-                    length = index + 1
-                    suffix = 'coll'
-                feature['fname'] = _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(suffix)),
-                assert(length != 0)
-                feature['len'] = _int64list_feature([length])
-                example = tf.train.Example(features=tf.train.Features(feature=feature))
-                writer.write(example.SerializeToString())
-        writer.close()
+            for i, (U, O_im, O_vec, output) in enumerate(zip(U_by_sample, O_im_by_sample, O_vec_by_sample, output_by_sample)):
+                assert(len(U) >= self.T)
+                for j in range(len(U) - self.T + 1):
+                    feature = {}
+                    feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
+                    # TODO figure out how to keep types properly
+                    if j < self.num_O - 1:
+                        obs_im = O_im[:j].ravel()
+                        obs_im_extended = np.concatenate([np.zeros(self.dO_im - obs_im.shape[0]), obs_im])
+                        feature['O_im'] = _floatlist_feature(obs_im_extended.tolist())
+                        obs_vec = O_vec[:j].ravel()
+                        obs_vec_extended = np.concatenate([np.zeros(self.dO_vec - obs_vec.shape[0]), obs_vec])
+                        feature['O_vec'] = _floatlist_feature(obs_vec_extended.tolist())
+                    else:
+                        feature['O_im'] = _floatlist_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tolist())
+                        feature['O_vec'] = _floatlist_feature(np.ravel(O_vec[j-self.num_O+1:j+1]).tolist())
+                    output_list = np.ravel(output[j:j+self.T])
+                    feature['output'] = _bytes_feature(output_list.tostring())
+                    index = np.argmax(output_list)
+                    max_value = output_list[index]
+                    if max_value == 0:
+                        length = self.T
+                        suffix = 'nocoll'
+                    else:
+                        length = index + 1
+                        suffix = 'coll'
+                    feature['fname'] = _bytes_feature(os.path.splitext(os.path.basename(tfrecords))[0] + '_{0}'.format(suffix)),
+                    assert(length != 0)
+                    feature['len'] = _int64list_feature([length])
+                    example = tf.train.Example(features=tf.train.Features(feature=feature))
+                    writer.write(example.SerializeToString())
+            writer.close()
 
     def _get_tfrecords_fnames(self, fname, create=True):
         def _file_creator(coll, val):
@@ -381,7 +381,7 @@ class ProbcollModel:
         tfrecords = self._get_tfrecords_fnames(npz_fnames[-1])
         tfrecords_coll_train, tfrecords_no_coll_train, \
             tfrecords_coll_val, tfrecords_no_coll_val = tfrecords
-        self._logger.info('Saving tfrecords')
+        self._logger.debug('Saving tfrecords')
         no_coll_data, coll_data = self._load_samples(npz_fnames)
         no_coll_len = len(no_coll_data["U"])
         coll_len = len(coll_data["U"])
@@ -901,19 +901,18 @@ class ProbcollModel:
                     masked_cross_entropy_b = cross_entropy_b * mask
                     costs.append(tf.reduce_sum(masked_cross_entropy_b) /
                         tf.cast(tf.reduce_sum(mask), self.dtype))
-#                    costs.append(tf.reduce_mean(masked_cross_entropy_b))
                 ### accuracy
                 with tf.name_scope('err_b{0}'.format(b)):
                     output_geq_b = tf.cast(tf.greater_equal(output_pred_b, 0.5), self.dtype)
                     output_incorrect_b = tf.cast(tf.not_equal(output_geq_b, output_b), self.dtype)
 
                     ### coll err
-                    output_b_coll = output_b * mask
+                    output_b_coll = output_b * all_mask
                     num_coll += tf.reduce_sum(output_b_coll)
                     num_errs_on_coll += tf.reduce_sum(output_b_coll * output_incorrect_b)
 
                     ### nocoll err
-                    output_b_nocoll = (1 - output_b) * mask
+                    output_b_nocoll = (1 - output_b) * all_mask
                     num_nocoll += tf.reduce_sum(output_b_nocoll)
                     num_errs_on_nocoll += tf.reduce_sum(output_b_nocoll * output_incorrect_b)
 
@@ -973,8 +972,8 @@ class ProbcollModel:
 
     def _graph_dequeue(self, no_coll_queue, coll_queue):
         return [
-                no_coll_queue.dequeue_up_to(10*self.batch_size),
-                coll_queue.dequeue_up_to(10*self.batch_size)
+                no_coll_queue.dequeue_up_to(32),
+                coll_queue.dequeue_up_to(32)
             ]
 
     def _graph_init_vars(self):
@@ -1023,7 +1022,6 @@ class ProbcollModel:
             self._graph_queue_update()
             ### initialize
             self._initializer = [tf.local_variables_initializer(), tf.global_variables_initializer()]
-            self.coord = tf.train.Coordinator()
             self._graph_init_vars()
 
             # Set logs writer into folder /tmp/tensorflow_logs
@@ -1043,7 +1041,6 @@ class ProbcollModel:
     def _create_output(self, output):
         return output
 
-    # TODO temporary fix
     def _flush_queue(self):
         for tfrecords_fnames, dequeue in (
                     (self.tfrecords_no_coll_train_fnames, self.d_train['no_coll_dequeue']),
@@ -1051,14 +1048,9 @@ class ProbcollModel:
                     (self.tfrecords_no_coll_val_fnames, self.d_val['no_coll_dequeue']),
                     (self.tfrecords_coll_val_fnames, self.d_val['coll_dequeue'])
                 ):
-            closed = True
-            while closed:
-                try:
+            if len(tfrecords_fnames) > 0:
                     self.sess.run(dequeue)
-                    closed = False
-                except:
-                    closed = True
-
+    
     def train(self, reset=False, **kwargs):
 
         self.graph.as_default()
@@ -1082,14 +1074,14 @@ class ProbcollModel:
                 self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
                 self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
             })
-        if not hasattr(self, '_queue_threads'):
-            self._logger.debug('Starting queue threads')
-            self._queue_threads = tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
-            self.threads += self._queue_threads
+        
+        if not hasattr(self, 'coord'):
+            self.coord = tf.train.Coordinator()
+            self.threads += tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
 
-        #TODO do you need to flush here
-#        self._logger.debug('Flushing queue')
-#        self._flush_queue()
+        self._logger.debug('Flushing queue')
+        self._flush_queue()
+
         ### create plotter
         plotter = MLPlotter(
             self.save_dir,
@@ -1131,7 +1123,6 @@ class ProbcollModel:
 
         step = 0
         epoch_start = save_start = time.time()
-        # TODO using rospy to ensure code ends if stuff crashes
         while step < self.steps and not rospy.is_shutdown():
 
             new_num_files = len(self.tfrecords_no_coll_train_fnames)
@@ -1151,11 +1142,13 @@ class ProbcollModel:
                         self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
                         self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
                     })
-#                self._logger.debug('Flushing queue')
-#                self._flush_queue()
+                self._logger.debug('Flushing queue')
+                self._flush_queue()
 
             ### validation
-            if (step != 0 and (step % int(self.val_freq * self.steps)) == 0):
+            if (step != 0 and len(self.tfrecords_no_coll_val_fnames) > 0 \
+                    and len(self.tfrecords_coll_val_fnames) > 0 and \
+                    (step % int(self.val_freq * self.steps)) == 0):
                 val_values = defaultdict(list)
                 val_nums = defaultdict(float)
                 val_steps = 0
@@ -1269,19 +1262,7 @@ class ProbcollModel:
         plotter.save(self._plots_dir, suffix=str(model_num))
         plotter.close()
 
-    def async_training(self):
-        t = threading.Thread(
-            target=self.async_train_func)
-        t.daemon = True
-        self.threads.append(t)
-        self.coord.register_thread(t)
-        t.start()
-#        p = multiprocessing.Process(target=self.async_train_func)
-#        p.daemon = True
-#        self._jobs.append(p)
-#        p.start()
-
-    def async_train_func(self):
+    def train_loop(self):
         self._logger.info("Started asynchronous training!")
         try:
             while (True):
@@ -1289,152 +1270,6 @@ class ProbcollModel:
         finally:
             self._logger.info("Ending asynchronous training!")
 
-#    ##################
-#    ### Evaluating ###
-#    ##################
-#
-#    def eval(self, X, U, O, num_avg=1, pre_activation=False):
-#        return self.eval_batch([X], [U], [O], num_avg=num_avg, pre_activation=pre_activation)
-#
-#    def eval_batch(self, Xs, Us, Os, num_avg=1, pre_activation=False):
-#        X_inputs, U_inputs, O_inputs = [], [], []
-#        for X, U, O in zip(Xs, Us, Os):
-#            assert(len(X) >= self.T)
-#            assert(len(U) >= self.T)
-#            assert(len(O) >= 1)
-#
-#            X_input, U_input, O_input = self._create_input(X, U, O)
-#            X_input = X_input[:self.T]
-#            U_input = U_input[:self.T]
-#            O_input = O_input[:self.T]
-#            assert(not np.isnan(X_input).any())
-#            assert(not np.isnan(U_input).any())
-#            assert(not np.isnan(O_input).any())
-#            for _ in xrange(num_avg):
-#                X_inputs.append(X_input)
-#                U_inputs.append(U_input)
-#                O_inputs.append(O_input)
-#
-#        feed = {}
-#        for b in xrange(self.num_bootstrap):
-#            feed[self.d_eval['X_inputs'][b]] = X_inputs
-#            feed[self.d_eval['U_inputs'][b]] = U_inputs
-#            feed[self.d_eval['O_inputs'][b]] = O_inputs
-#        # want analysis_dropout for each X/U/O to be the same
-#        # want dropout for each num_avg to be different
-#        # -->
-#        # create num_avg different dropout for each dropout mask
-#        # use same dropout mask for each X/U/O
-#        #
-#        # if num_avg = 3
-#        # 0 1 2 0 1 2 0 1 2
-#        if pre_activation:
-#            output_pred_mean, output_pred_std = self.sess.run(
-#                [self.d_eval['output_mat_mean'],
-#                self.d_eval['output_mat_std']],
-#                feed_dict=feed)
-#        else:
-#            output_pred_mean, output_pred_std = self.sess.run(
-#                [self.d_eval['output_pred_mean'],
-#                self.d_eval['output_pred_std']],
-#                feed_dict=feed)
-#
-#        if num_avg > 1:
-#            mean, std = [], []
-#            for i in xrange(len(Xs)):
-#                mean.append(output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
-#                std.append(output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
-#            output_pred_mean = np.array(mean)
-#            output_pred_std = np.array(std)
-#
-#            assert(len(output_pred_mean) == len(Xs))
-#            assert(len(output_pred_std) == len(Xs))
-#
-#        assert((output_pred_std >= 0).all())
-#
-#        return output_pred_mean, output_pred_std
-#
-#    def eval_sample(self, sample):
-#        X = sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
-#        U = sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
-#        O = sample.get_O()[:self.T, self.O_idxs(sample._meta_data)]
-#
-#        return self.eval(X, U, O)
-#
-#    def eval_sample_batch(self, samples, num_avg=1, pre_activation=False):
-#        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)] for sample in samples]
-#        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)] for sample in samples]
-#        Os = [sample.get_O()[:self.T, self.O_idxs(sample._meta_data)] for sample in samples]
-#
-#        return self.eval_batch(
-#            Xs,
-#            Us,
-#            Os,
-#            num_avg=num_avg,
-#            pre_activation=pre_activation)
-#
-#    def eval_control_batch(self, samples, num_avg=1, pre_activation=False):
-#        Xs = [sample.get_X()[:self.T, self.X_idxs(sample._meta_data)]
-#            for sample in samples]
-#        Us = [sample.get_U()[:self.T, self.U_idxs(sample._meta_data)]
-#            for sample in samples]
-#        O_input = samples[0].get_O()[0, self.O_idxs(sample._meta_data)].reshape(1, -1)
-#        assert(not np.isnan(O_input).any())
-#        X_inputs, U_inputs = [], []
-#        for X, U in zip(Xs, Us):
-#            assert(len(X) == self.T)
-#            assert(len(U) == self.T)
-#
-#            # TODO remove create_input
-#            X_input, U_input, _ = self._create_input(X, U, None)
-#            assert(not np.isnan(X_input).any())
-#            assert(not np.isnan(U_input).any())
-#            for _ in xrange(num_avg):
-#                X_inputs.append(X_input)
-#                U_inputs.append(U_input)
-#        feed = {}
-#        feed[self.d_eval['X_inputs']] = X_inputs
-#        feed[self.d_eval['U_inputs']] = U_inputs
-#        feed[self.d_eval['O_input']] = O_input
-#        # want dropout for each X/U/O to be the same
-#        # want dropout for each num_avg to be different
-#        # -->
-#        # create num_avg different dropout for each dropout mask
-#        # use same dropout mask for each X/U/O
-#        #
-#        # if num_avg = 3
-#        # 0 1 2 0 1 2 0 1 2
-#        if pre_activation:
-#            output_pred_mean, output_pred_std = self.sess.run(
-#                [self.d_eval['output_mat_mean'],
-#                self.d_eval['output_mat_std']],
-#                feed_dict=feed)
-#        else:
-#            output_pred_mean, output_pred_std = self.sess.run(
-#                [self.d_eval['output_pred_mean'],
-#                self.d_eval['output_pred_std']],
-#                feed_dict=feed)
-#
-#        if num_avg > 1:
-#            mean, std = [], []
-#            for i in xrange(len(Xs)):
-#                mean.append(
-#                    output_pred_mean[i*num_avg:(i+1)*num_avg].mean(axis=0))
-#                std.append(
-#                    output_pred_std[i*num_avg:(i+1)*num_avg].mean(axis=0))
-#
-#            output_pred_mean = np.array(mean)
-#            output_pred_std = np.array(std)
-#
-#            assert(len(output_pred_mean) == len(Xs))
-#            assert(len(output_pred_std) == len(Xs))
-#
-#        if not (output_pred_std >= 0).all():
-#            import ipdb; ipdb.set_trace()
-#
-#        assert((output_pred_std >= 0).all())
-#        return output_pred_mean, output_pred_std
-#
     #############################
     ### Load/save/reset/close ###
     #############################
@@ -1446,7 +1281,7 @@ class ProbcollModel:
             self.load(latest_file)
             self._logger.info("Found checkpoint file")
         except:
-            self._logger.info("Could not find checkpoint file")
+            self._logger.warning("Could not find checkpoint file")
 
     def load(self, model_file):
         self.saver.restore(self.sess, model_file)
@@ -1461,9 +1296,6 @@ class ProbcollModel:
             assert(hasattr(self, 'threads'))
             self.coord.request_stop()
             self.coord.join(self.threads)
-        for p in self._jobs:
-            os.kill(p.pid, signal.SIGKILL)
-            p.join()
         self.sess.close()
         self.sess = None
 

@@ -3,25 +3,25 @@
 # all sweep params should have corresponding lists in the sweep fil
 
 dt: 0.25
-random_seed: 'sweep'
-config_file: '/home/avillaflor/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
-exp_dir: '/home/avillaflor/probcoll/experiments/rccar/sweep'
-exp_name: 'bair_car'
+random_seed: 0
+exp_dir: '/home/adam/probcoll/experiments/sweep_post_train/'
+exp_name: 'bair_car_sweep_post_train'
 
 ##########################
 ### Probcoll algorithm ###
 ##########################
 
 probcoll:
-  T: 256 # timesteps per trajectory
-  max_iter: 150
-  asynchronous_training: True
+  T: 24 # timesteps per trajectory
+  max_iter: 10
+  training_start_iter: 0
+  logger: 'debug' # debug/info/fatal what level to log
+  is_training: True
+  asynchronous_training: False
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-#  init_data: '/home/avillaflor/gps_quadrotor/experiments/rccar/init_data_real'
-#  init_epochs: 100
-  logger: 'fatal'
+
   conditions:
-    repeats: 5 # TODO
+    repeats: 40 # TODO
     num_test: 1
     randomize_conds: False
     randomize_reps: True
@@ -45,62 +45,59 @@ probcoll:
     
 model:
   T: 'sweep' # how many timesteps to predict
-  logger: 'fatal'
+  logger: 'info' # debug/info/warning/fatal what level to log
+  pct_coll: 'sweep' # rebalancing trajectories
+  coll_weight_pct: 'sweep' # reweight collision and no collision samples in cost
   control_range:
     lower: [0., -17.]
-    upper: [99.0, 17.]
-  center_O: False 
+    upper: [99., 17.]
   # what to use as input to prediction model
-  X_order: []
   U_order: ['cmd_steer', 'cmd_vel']
-  O_order: ['camera']
+  O_im_order: ['camera'] # / 'back_camera'
+  O_vec_order: []
   output_order: ['collision'] # taken from observations O
-
+  num_O: 'sweep'
+  scale_O_im: True
+  center_O_im: False 
   # NN training parameters
-  device: 0 #TODO
-  gpu_fraction: 0.8 #TODO
+  device: 0
+  gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
-  learning_rate: 'sweep'
-  beta1: 'sweep' # For avillaflor
-  beta2: 'sweep' # For avillaflor
-  batch_size: 16
-  display_batch: 100
-  val_freq: 90 # How often you compute validation
+  learning_rate: 1.e-4
+  beta1: 0.9 # For ADAM
+  beta2: 0.999 # For ADAM
+  batch_size: 64
+  display_steps: 100 
+  val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
-  steps: 1000
-  val_pct: 0.2
+  steps: 100
+  val_pct: 0.1 # Percent of the data stored as validation
 
-  # How to save tfrecords
-  save_type: 'fixedlen' # fixedlen
-  
   dtype: 'float32'
-  reg: 'sweep'
-  num_bootstrap: 'sweep'
-  prob_coll_strictly_increasing: 'sweep' 
+  reg: 1.e-6
+  num_bootstrap: 1
+  prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
 
+  image_graph:
+    graph_type: 'cnn'
+    filters: [32, 64, 64]
+    kernels: [8, 4, 3]
+    strides: [4, 2, 1]
+    padding: 'SAME' 
+    use_batch_norm: True
+    conv_activation: 'relu'
+    output_activation: 'relu' # relu / tanh/ spatial_softmax 
+  
   observation_graph:
-    graph_type: "cnn"
-    filters: [4, 4, 4]
-    kernels: [3, 3, 3]
-    strides: [2, 2, 2]
-    padding: 'SAME'
-    use_batch_norm: True 
-    conv_activation: "relu" 
-#    output_activation: 'tanh'
-
-#  action_graph:
-#    graph_type: 'fc' # fc / rnn
-#    hidden_layers: [16, 16]
-#    output_dim: 24 # Has to be divisible by T
-#    hidden_activation: "relu"
-#    dropout: 0.9
+    hidden_activation: 'tanh' 
+    output_dim: 128 # This is the hidden size of the rnn
   
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
-    dropout: 0.9 # pct keep
+    dropout: #0.8 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
   output_graph: # Must have dropout 1.0
@@ -115,18 +112,20 @@ planning:
     coll_cost:
       cost: square # square
       weight: [0., 10.] # TODO
+      std_weight: 0.0
+      pre_activation: True # wether std is before or after activation (sigmoid)
     
     control_cost:
-      des: [49.5, 16.] # TODO: hard-coded order: steering then speed
+      des: [49.5, 8.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [0., 1.] # [0.0001, 0.2]
-    # TODO uncertainty
-#    pre_activation: True # wether std is before or after activation (sigmoid)
+      weight: [0.001, 1.0]     
   
   epsilon_greedy:
-    epsilon: 'sweep'
+    endpoints: [[0, 1.0], [50, 1.0], [150, 0.01]]
+    #    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
+    outside_value: 0.01
     lower: [20., 8.]
-    upper: [80., 16.]
+    upper: [80., 8.]
 
   control_noise:
     type: 'uniform' # zero / gaussian / uniform
@@ -138,54 +137,77 @@ planning:
       lower: [-5., 0.]
       upper: [5., 0.]
   
-  num_dp: 16 # number of dropout passes to average over
-  planner_type: 'sweep' # random / primitives / cem
+  num_dp: 1 # number of dropout passes to average over
+  planner_type: 'cem' # random / primitives / cem / random_policy
   # specific to your primitives code
   primitives:
     steers: [30., 40., 50., 60., 70.]
     speeds: [16.]
-    num_splits: 4
+    num_splits: 3
 
   # control range for your planning algorithms
   control_range:
     lower: [20., 8.]
-    upper: [80., 16.]
+    upper: [80., 8.]
 
   random:
     K: 2048 # number of actions to sample from
 
   cem:
-    init_M: 512 # number of actions to sample from
-    M: 256
+    init_M: 2048 # number of actions to sample from
+    M: 512
     K: 16 # top actions you select
-    num_iters: 2 # does not include first sample    
+    num_iters: 4 # does not include first sample    
     eps: 0.01 # to ensure covariance is PD
 
+  # TODO: other planning methods here
+  visualize: False
+  topics:
+    debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
+    debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
+  
 #############
 ### World ###
 #############
 
 world:
 #  plot: False
-  logger: 'fatal'
+  logger: 'info' # debug/info/fatal what level to log for world and agent
   randomize: True
   sim: True 
-  do_back_up: True
+  do_back_up: False
+#  do_back_up: True
 
   back_up:
     cmd_steer: [44.5, 54.5]
     cmd_vel: -12
-    duration: 3.
+    duration: 3.0
+
+  testing:
+    itr_freq: 2
+    positions: []
+#    positions: [[0., 0., -0.6, 0.0]] 
+#    positions: [[-95., 0., -0.6], [-80., 60., -0.6], [13., 48., -0.6], [0., -20., -0.6]]
+#    positions: [[40., -35., 0.2], [-40., -35., 0.2], [40., 20., 0.2], [-40., 20., 0.2]]
+#    positions: [[40., -40., 0.2], [40., 20., 0.2]]
+#    positions: [[40., 20., 0.2]]
+#    position_ranges: [[[40., -40., 0.2, 0.0], [40., 40., 0.2, 6.28]]]
+    position_ranges: [[[-4., 0., -0.6, 3.14], [4., 0., -0.6, 3.14]]]
+    num_pos: 30
+    range_type: 'fix_spacing' # fix_spacing / random
 
 sim:
   srv: 'sim_env'
-  sim_env: 'cory2' # hallway / cory2
-  launch_file: '/home/avillaflor/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
+  sim_file: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/hallway.py' # hallway / square
+  config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
   dt: 0.25
   steeringClamp: 45.0
-  engineClamp: 1000.0
+  accelClamp: 12.0
   mass: 800.0
   first_person: True
+  p: 2000.0
+  i: 0.0
+  d: 0.0
 
 ######################################################
 ########### States, controls, observations ###########
@@ -208,26 +230,27 @@ U:
   cmd_vel: {idx: 1, dim: 1, min: 6}
 
 O:
-  use_depth: 'sweep'
+  use_depth: True
 
-  dim: 1153
-  order: ['camera', 'back_camera', 'collision']
+  dim: 4610
+  order: ['camera', 'back_camera', 'vel', 'collision']
 
   camera:
     idx: 0
-    dim: 576
-    height: 32
-    width: 18
+    dim: 2304
+    height: 64
+    width: 36
     num_channels: 1
     noise: 0.01
   back_camera:
-    idx: 576
-    dim: 576
-    height: 32
-    width: 18
+    idx: 2304
+    dim: 2304
+    height: 64
+    width: 36
     num_channels: 1
     noise: 0.01
-  collision: {idx: 1152, dim: 1, buffer: 0.0}
+  vel: {idx: 4608, dim: 1}
+  collision: {idx: 4609, dim: 1, buffer: 0.0}
 
 ##################
 ### ros topics ###
@@ -257,4 +280,3 @@ rccar:
     # and for debugging
     debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
     debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
-

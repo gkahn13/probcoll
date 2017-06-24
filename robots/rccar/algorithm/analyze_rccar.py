@@ -219,6 +219,7 @@ class AnalyzeRCcar(Analyze):
 
     def run(self, plot_single, plot_traj, plot_samples, plot_groundtruth):
         self._plot_statistics()
-        if len(params['world']['testing']['positions']) > 0:
+        try:
             self._plot_statistics(testing=True)
-        rospy.signal_shutdown('')
+        finally:
+            rospy.signal_shutdown('')

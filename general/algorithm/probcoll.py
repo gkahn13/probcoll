@@ -10,7 +10,7 @@ from general.state_info.sample import Sample
 class Probcoll:
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, read_only=False):
+    def __init__(self, read_only=False, save_dir=None):
         self._use_cp_cost = True
         self._planner_type = params['planning']['planner_type']
         self._read_only = read_only
@@ -18,6 +18,10 @@ class Probcoll:
         self._async_on = False
         self._asynchronous = params['probcoll']['asynchronous_training']
         self._jobs = []
+        if save_dir is None:
+            self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
+        else:
+            self._save_dir = save_dir
         self._setup()
         self._logger = get_logger(
             self.__class__.__name__,
@@ -29,8 +33,8 @@ class Probcoll:
     @abc.abstractmethod
     def _setup(self):
         ### load prediction neural net
-        self._probcoll_model = None
-        self._asynch_probcoll_model = None
+        self.probcoll_model = None
+        self._asynchprobcoll_model = None
         self._max_iter = None
         self._world = None
         self._dynamics = None
@@ -66,10 +70,6 @@ class Probcoll:
     ####################
     ### Save methods ###
     ####################
-
-    @property
-    def _save_dir(self):
-        return os.path.join(params['exp_dir'], params['exp_name'])
 
     def _itr_dir(self, itr, create=True):
         assert(type(itr) is int)
@@ -127,35 +127,37 @@ class Probcoll:
             add new data to training data
             train neural network
         """
-        ### find last model file
-        for samples_start_itr in xrange(self._max_iter-1, -1, -1):
-            sample_file = self._itr_samples_file(samples_start_itr, create=False)
-            if os.path.exists(sample_file):
-                samples_start_itr += 1
-                break
-        ### load initial dataset
-        init_data_folder = params['probcoll'].get('init_data', None)
-        if init_data_folder is not None:
-            self._logger.info('Adding initial data')
-            ext = os.path.splitext(self._itr_samples_file(0))[-1]
-            fnames = [fname for fname in os.listdir(init_data_folder) if ext in fname]
-            for fname in fnames:
-                self._logger.info('\t{0}'.format(fname))
-            self._probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
+        try:
+            ### find last model file
+            for samples_start_itr in xrange(self._max_iter-1, -1, -1):
+                sample_file = self._itr_samples_file(samples_start_itr, create=False)
+                if os.path.exists(sample_file):
+                    samples_start_itr += 1
+                    break
+            ### load initial dataset
+            init_data_folder = params['probcoll'].get('init_data', None)
+            if init_data_folder is not None:
+                self._logger.info('Adding initial data')
+                ext = os.path.splitext(self._itr_samples_file(0))[-1]
+                fnames = [fname for fname in os.listdir(init_data_folder) if ext in fname]
+                for fname in fnames:
+                    self._logger.info('\t{0}'.format(fname))
+                self.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
 
-        ### if any data and haven't trained on it already, train on it
-        if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
-            self._run_training(samples_start_itr)
-        start_itr = samples_start_itr
+            ### if any data and haven't trained on it already, train on it
+            if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
+                self._run_training(samples_start_itr)
+            start_itr = samples_start_itr
 
-        ### training loop
-        for itr in xrange(start_itr, self._max_iter):
-            self._run_itr(itr)
-            self._run_training(itr)
-            self._run_testing(itr)
-            if not self._probcoll_model.sess.graph.finalized:
-                self._probcoll_model.sess.graph.finalize()
-        self._close()
+            ### training loop
+            for itr in xrange(start_itr, self._max_iter):
+                self._run_itr(itr)
+                self._run_training(itr)
+                self.run_testing(itr)
+                if not self.probcoll_model.sess.graph.finalized:
+                    self.probcoll_model.sess.graph.finalize()
+        finally:
+            self.close()
 
     def _run_itr(self, itr):
         self._logger.info('')
@@ -164,31 +166,28 @@ class Probcoll:
         self._logger.info('Itr {0} running'.format(itr))
         self._run_rollout(itr)
         self._logger.info('Itr {0} adding data'.format(itr))
-        self._probcoll_model.add_data([self._itr_samples_file(itr)])
+        self.probcoll_model.add_data([self._itr_samples_file(itr)])
         self._logger.info('Itr {0} training probability of collision'.format(itr))
 
-    def _close(self):
-        self._probcoll_model.close()
+    def close(self):
+        self.probcoll_model.close()
 
     def _run_training(self, itr):
-        if params['probcoll']['is_training']:
-            if self._asynchronous:
-                self._probcoll_model.recover()
-                if not self._async_on:
-                    p = multiprocessing.Process(target=self._async_training)
-                    p.daemon = True
-                    p.start()
-                    self._jobs.append(p)
-    #                    self._asynch_probcoll_model.async_training()
-                    self._async_on = True
-            else:
-                self._probcoll_model.train(reset=params['model']['reset_every_train'])
+        if itr >= params['probcoll']['training_start_iter']:
+            if params['probcoll']['is_training']:
+                if self._asynchronous:
+                    self.probcoll_model.recover()
+                    if not self._async_on:
+                        self._async_training()
+                        self._async_on = True
+                else:
+                    self.probcoll_model.train(reset=params['model']['reset_every_train'])
   
-    def _run_testing(self, itr):
+    def run_testing(self, itr):
         pass
    
-#    def _async_training(self):
-#        pass
+    def _async_training(self):
+        pass
 
     def _run_rollout(self, itr):
         T = params['probcoll']['T']

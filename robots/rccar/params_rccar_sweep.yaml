@@ -1,35 +1,12 @@
 # Contains lists to sweep over for every sweep param in the base file
 
-random_seed: [0, 1, 2]
-
 ######################
 ### Probcoll model ###
 ######################
     
 model:
-  T: [8, 12, 16] # how many timesteps to predict
+  T: [4, 8, 12, 16] # how many timesteps to predict
+  pct_coll: [0.25, 0.5, 0.75]
+  coll_weight_pct: [0.25, 0.5, 0.75]
+  num_O: [1, 4] 
 
-  learning_rate: [0.001]
-  beta1: [0.9] # For Adam
-  beta2: [0.999] # For Adam
-
-  reg: [0.0, 0.01]
-  num_bootstrap: [1]
-  prob_coll_strictly_increasing: [True, False] 
-  mask: ['all'] # all / last
-
-#################################################
-### Planning objective and optimizer settings ###
-#################################################
-
-planning:
-  planner_type: ['random', 'cem']
-  epsilon_greedy:
-    epsilon: [0.0, 0.05]
-
-######################################################
-########### States, controls, observations ###########
-######################################################
-
-O:
-  use_depth: [True]

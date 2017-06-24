@@ -261,3 +261,7 @@ class AgentRCcar(Agent):
             self.sim_back_depth = data.back_depth
             self.sim_state = data.pose
             self.sim_vel = data.vel
+
+    def close(self):
+        if self.sim:
+            self.srv(end=True)

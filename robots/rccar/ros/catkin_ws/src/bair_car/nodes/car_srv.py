@@ -9,6 +9,9 @@ from ros_utils import ImageROSPublisher
 import std_msgs.msg
 import geometry_msgs.msg
 import abc
+import argparse
+import yaml
+
 from panda3d.core import loadPrcFile
 from panda3d.core import loadPrcFileData
 loadPrcFileData('', 'window-type offscreen')
@@ -30,9 +33,20 @@ from panda3d.bullet import ZUp
 class CarSrv(DirectObject):
 
     def __init__(self):
-        self.params = rospy.get_param('~sim')
-        self.dt = rospy.get_param('~dt')
-        
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--yaml_path', type=str, default=None)
+        args = parser.parse_args()
+        if args.yaml_path is None:
+            self.dt = rospy.get_param('~dt')
+            self.params = rospy.get_param('~sim')
+            self.prefix = ''
+        else:
+            with open(args.yaml_path) as f:
+                yaml_dict = yaml.load(f)
+            self.dt = yaml_dict['dt']
+            self.params = yaml_dict['sim']
+            self.prefix = yaml_dict['exp_name'] + '/'
+
         base.setBackgroundColor(0.1, 0.1, 0.8, 1)
 
         # World
@@ -83,7 +97,6 @@ class CarSrv(DirectObject):
         self.vehicle_node.setDeactivationEnabled(False)
         self.vehicle_node.setCcdSweptSphereRadius(1.0)
         self.vehicle_node.setCcdMotionThreshold(1e-7)
-        # TODO
         self.vehicle_pointer = self.worldNP.attachNewNode(self.vehicle_node)
         self.camera_node.reparentTo(self.vehicle_pointer)
 
@@ -120,7 +133,7 @@ class CarSrv(DirectObject):
         self.accept('d', self.right)
 
         # ROS
-        self.crash_pub = rospy.Publisher('crash', std_msgs.msg.Empty, queue_size = 1)
+        self.crash_pub = rospy.Publisher(self.prefix + 'crash', std_msgs.msg.Empty, queue_size = 1)
         self.bridge = cv_bridge.CvBridge()
         
         self.steering = 0.0       # degree
@@ -135,10 +148,10 @@ class CarSrv(DirectObject):
         self.curr_time = 0.0
         self.accelClamp = self.params['accelClamp']
         self.engineClamp = self.accelClamp * self.mass
-        self.camera_pub = ImageROSPublisher("image")
-        self.depth_pub = ImageROSPublisher("depth")
-        self.back_camera_pub = ImageROSPublisher("back_image")
-        self.back_depth_pub = ImageROSPublisher("back_depth")
+        self.camera_pub = ImageROSPublisher(self.prefix + "image")
+        self.depth_pub = ImageROSPublisher(self.prefix + "depth")
+        self.back_camera_pub = ImageROSPublisher(self.prefix + "back_image")
+        self.back_depth_pub = ImageROSPublisher(self.prefix + "back_depth")
         
 #        taskMgr.add(self.update_task, 'updateWorld')
         self.start_update_server()
@@ -166,17 +179,14 @@ class CarSrv(DirectObject):
 
     def forward_0(self):
         self.des_vel = 14.4
-#        self.engineForce = 1000.0
         self.brakeForce = 0.0
     
     def forward_1(self):
         self.des_vel = 28.8
-#        self.engineForce = 1000.0
         self.brakeForce = 0.0
     
     def forward_2(self):
         self.des_vel = 48.
-#        self.engineForce = 1000.0
         self.brakeForce = 0.0
    
     def stop(self):
@@ -185,7 +195,6 @@ class CarSrv(DirectObject):
 
     def backward(self):
         self.des_vel = -28.8
-#        self.engineForce = -1000.0
         self.brakeForce = 0.0
     
     def right(self):
@@ -283,6 +292,9 @@ class CarSrv(DirectObject):
    
     def get_handler(self):
         def sim_env_handler(req):
+            end = req.end
+            if end:
+                rospy.signal_shutdown("Service is done")
             start_time = time.time()
             cmd_steer = req.steer
             motor = req.motor
@@ -293,10 +305,6 @@ class CarSrv(DirectObject):
             if motor==0.0:
                 # conversion from m/s to km/h
                 self.des_vel = vel * 3.6
-#                cmd_motor = np.clip(vel * 3 + 49.5, 0., 99.)
-#                self.engineForce = self.engineClamp * \
-#                    ((cmd_motor - 49.5) / 49.5)
-#                self.des_vel = None
             else:
                 cmd_motor = np.clip(motor, 0., 99.)
                 self.engineForce = self.engineClamp * \
@@ -378,7 +386,7 @@ class CarSrv(DirectObject):
         wheel.setRollInfluence(0.1)
     
     def start_update_server(self):
-        s = rospy.Service('sim_env', bair_car.srv.sim_env, self.get_handler())
+        s = rospy.Service(self.prefix + 'sim_env', bair_car.srv.sim_env, self.get_handler())
         rospy.spin()
 
     def update_task(self, task):

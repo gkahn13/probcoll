@@ -4,6 +4,7 @@ float32 motor
 float32 vel
 bool reset
 geometry_msgs/Pose pose
+bool end
 ---
 #response fields
 bool coll

@@ -2,9 +2,8 @@
 
 dt: 0.25
 random_seed: 0
-config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'bair_car_hallway_async'
+exp_name: 'bair_car_hallway_no_async'
 
 ##########################
 ### Probcoll algorithm ###
@@ -12,12 +11,12 @@ exp_name: 'bair_car_hallway_async'
 
 probcoll:
   T: 24 # timesteps per trajectory
-  max_iter: 500
+  max_iter: 10
+  training_start_iter: 0
   logger: 'debug' # debug/info/fatal what level to log
   is_training: True
-  asynchronous_training: True
+  asynchronous_training: False
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-#  init_data: '/home/adam/gps_quadrotor/experiments/rccar/init_data_real'
 
   conditions:
     repeats: 40 # TODO
@@ -44,7 +43,7 @@ probcoll:
     
 model:
   T: 8 # how many timesteps to predict
-  logger: 'info' # debug/info/fatal what level to log
+  logger: 'debug' # debug/info/warning/fatal what level to log
   pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
   control_range:
@@ -62,18 +61,18 @@ model:
   device: 0
   gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
-  learning_rate: 1.e-3
+  learning_rate: 1.e-4
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
-  batch_size: 32
+  batch_size: 64
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
-  steps: 1000
+  steps: 100
   val_pct: 0.1 # Percent of the data stored as validation
 
   dtype: 'float32'
-  reg: 1.e-5
+  reg: 1.e-6
   num_bootstrap: 1
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
@@ -86,15 +85,8 @@ model:
     padding: 'SAME' 
     use_batch_norm: True
     conv_activation: 'relu'
-    output_activation: 'relu' 
-#    output_activation: 'relu'
-#    output_activation: 'spatial_softmax'
-#  action_graph:
-#    graph_type: 'fc' # fc / rnn
-#    hidden_layers: []
-#    output_dim: 48 # Has to be divisible by T
-#    hidden_activation: 'relu'
-#    dropout: 0.9
+    output_activation: 'relu' # relu / tanh/ spatial_softmax 
+  
   observation_graph:
     hidden_activation: 'tanh' 
     output_dim: 128 # This is the hidden size of the rnn
@@ -103,7 +95,7 @@ model:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
     cell_type: 'mulint_rnn' #rnn / mulint_rnn
-#    dropout: 0.8 # pct keep
+    dropout: #0.8 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
   output_graph: # Must have dropout 1.0
@@ -192,16 +184,20 @@ world:
   testing:
     itr_freq: 2
     positions: []
+#    positions: [[0., 0., -0.6, 0.0]] 
 #    positions: [[-95., 0., -0.6], [-80., 60., -0.6], [13., 48., -0.6], [0., -20., -0.6]]
 #    positions: [[40., -35., 0.2], [-40., -35., 0.2], [40., 20., 0.2], [-40., 20., 0.2]]
 #    positions: [[40., -40., 0.2], [40., 20., 0.2]]
 #    positions: [[40., 20., 0.2]]
 #    position_ranges: [[[40., -40., 0.2, 0.0], [40., 40., 0.2, 6.28]]]
+    position_ranges: [[[-4., 0., -0.6, 3.14], [4., 0., -0.6, 3.14]]]
+    num_pos: 5
+    range_type: 'fix_spacing' # fix_spacing / random
 
 sim:
   srv: 'sim_env'
-  sim_env: 'hallway' # hallway / cory2 / square
-  launch_file: '/home/adam/probcoll/robots/rccar/ros/launch/car_srv_sim.launch'
+  sim_file: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/hallway.py' # hallway / square
+  config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
   dt: 0.25
   steeringClamp: 45.0
   accelClamp: 12.0

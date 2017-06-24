@@ -60,6 +60,7 @@ if __name__ == '__main__':
     parser_analyze.add_argument('--plot_groundtruth', action='store_true')
 
     parser_train.add_argument('--plot_dir', type=str, default=None)
+    parser_train.add_argument('--data_dirs', type=str, default=None)
     parser_train.add_argument('--asynch', action='store_true')
     
     args = parser.parse_args()
@@ -116,8 +117,12 @@ if __name__ == '__main__':
         analyze.run(args.plot_single, args.plot_traj, args.plot_samples, args.plot_groundtruth)
 
     elif run == 'train':
+        if args.data_dirs is None:
+            data_dirs = args.data_dirs
+        else:
+            data_dirs = args.data_dirs.split()
         if robot == 'rccar':
-            train = TrainRCcar(plot_dir=args.plot_dir, asynch=args.asynch)
+            train = TrainRCcar(data_dirs=data_dirs, plot_dir=args.plot_dir, asynch=args.asynch)
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 

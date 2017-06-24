@@ -1,12 +1,12 @@
 import os
 import rospy
 import std_msgs
-import multiprocessing
 import subprocess
 import os
 import signal
 import time
 import tf as ros_tf 
+import numpy as np
 
 from robots.rccar.tf.planning.planner_primitives_rccar import PlannerPrimitivesRCcar
 from robots.rccar.tf.planning.planner_random_rccar import PlannerRandomRCcar
@@ -25,17 +25,14 @@ from config import params
 
 class ProbcollRCcar(Probcoll):
 
-    def __init__(self, read_only=False):
-        Probcoll.__init__(self, read_only=read_only)
+    def __init__(self, read_only=False, save_dir=None):
+        Probcoll.__init__(self, read_only=read_only, save_dir=save_dir)
 
     def _setup(self):
         rospy.init_node('ProbcollRCcar', anonymous=True)
 
         if params['world']['sim']:
-            p = multiprocessing.Process(target=self._run_simulation)
-            p.daemon = True
-            self._jobs.append(p)
-            p.start()
+            self._run_simulation() 
         
         probcoll_params = params['probcoll']
         world_params = params['world']
@@ -50,11 +47,7 @@ class ProbcollRCcar(Probcoll):
         assert(self._world.randomize)
 
         ### load prediction neural net
-        self._probcoll_model = ProbcollModelRCcar(read_only=self._read_only)
-
-#        if self._asynchronous:
-#            self._asynch_probcoll_model = ProbcollModelRCcar() 
-
+        self.probcoll_model = ProbcollModelRCcar(read_only=self._read_only, save_dir=self._save_dir)
         rccar_topics = params['rccar']['topics']
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
         self.good_rollout_callback = ros_utils.RosCallbackEmpty(rccar_topics['good_rollout'], std_msgs.msg.Empty)
@@ -67,43 +60,67 @@ class ProbcollRCcar(Probcoll):
     def _run_simulation(self):
         try:
             command = [
-                    "roslaunch",
-                    params["sim"]["launch_file"],
-                    "car_name:={0}".format(params["exp_name"]),
-                    "config:={0}".format(params["config_file"]),
-                    "env:={0}".format(params["sim"]["sim_env"])
+                    "python",
+                    params['sim']['sim_file'],
+                    "--yaml_path",
+                    params['sim']['config_file']
                 ]
-            subprocess.call(command)
+            p = subprocess.Popen(command)
+            self._jobs.append(p)
         except Exception as e:
-            print(e)
+            self._logger.warning('Error starting simulation!')
+            self._logger.warning(e)
    
     def _async_training(self):
         try:
-            subprocess.call(
+            p = subprocess.Popen(
                 ["python", "main.py", "train", "rccar", "--asynch"])
+            self._jobs.append(p)
         except Exception as e:
-            print(e)
+            self._logger.warning('Error starting async training!')
+            self._logger.warning(e)
 
-    def _close(self):
+    def close(self):
+        try:
+            self._agent.close()
+        except rospy.service.ServiceException:
+            self._logger.info("Service Ended")
+        rospy.signal_shutdown("Probcoll is done")
         for p in self._jobs:
-            os.kill(p.pid, signal.SIGKILL)
-            p.join()
-        self._probcoll_model.close()
+            p.kill()
+        self.probcoll_model.close()
     
     ###################
     ### Run methods ###
     ###################
 
-    def _run_testing(self, itr):
+    def run_testing(self, itr):
         if (itr != 0 and (itr == self._max_iter - 1 \
                 or itr % params['world']['testing']['itr_freq'] == 0)): 
             self._logger.info('Itr {0} testing'.format(itr))
             if self._agent.sim:
                 if self._async_on:
                     self._logger.debug('Recovering probcoll model')
-                    self._probcoll_model.recover()
+                    self.probcoll_model.recover()
                 T = params['probcoll']['T']
-                conditions = params['world']['testing']['positions']
+                conditions = []
+                if params['world']['testing'].get('position_ranges', None) is not None:
+                    ranges = params['world']['testing']['position_ranges']
+                    num_pos = params['world']['testing']['num_pos']
+                    if params['world']['testing']['range_type'] == 'random':
+                        for _ in xrange(num_pos):
+                            ran = ranges[np.random.randint(len(ranges))]
+                            conditions.append(np.random.uniform(ran[0], ran[1]))
+                    elif params['world']['testing']['range_type'] == 'fix_spacing':
+                        num_ran = len(ranges)
+                        num_per_ran = num_pos//num_ran
+                        for i in xrange(num_ran):
+                            ran = ranges[i]
+                            low = np.array(ran[0])
+                            diff = np.array(ran[1]) - np.array(ran[0])
+                            for j in xrange(num_per_ran):
+                                val = diff * ((j + 0.0)/num_per_ran) + low
+                                conditions.append(val) 
                 samples = []
                 reset_pos, reset_quat = self._agent.get_sim_state_data() 
                 for cond in xrange(len(conditions)):
@@ -112,7 +129,7 @@ class ProbcollRCcar(Probcoll):
                     pos_ori = conditions[cond]
                     pos = pos_ori[:3]
                     quat = ros_tf.transformations.quaternion_from_euler(pos_ori[3], 0, 0)
-                    self._agent.execute_control(None, reset=True, pos=conditions[cond])
+                    self._agent.execute_control(None, reset=True, pos=pos, quat=quat)
                     x0 = self._conditions.get_cond(0)
                     sample_T = Sample(meta_data=params, T=T)
                     sample_T.set_X(x0, t=0)
@@ -215,17 +232,17 @@ class ProbcollRCcar(Probcoll):
 
     def _create_mpc(self):
         """ Must initialize MPC """
-        self._logger.debug('\t\t\tCreating MPC')
+        self._logger.info('\t\t\tCreating MPC')
         if self._planner_type == 'random_policy':
             mpc_policy = RandomPolicy()
         elif self._planner_type == 'random':
-            planner = PlannerRandomRCcar(self._probcoll_model, params['planning'])
+            planner = PlannerRandomRCcar(self.probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         elif self._planner_type == 'primitives':
-            planner = PlannerPrimitivesRCcar(self._probcoll_model, params['planning'])
+            planner = PlannerPrimitivesRCcar(self.probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         elif self._planner_type == 'cem':
-            planner = PlannerCem(self._probcoll_model, params['planning'])
+            planner = PlannerCem(self.probcoll_model, params['planning'])
             mpc_policy = OpenLoopPolicy(planner)
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))

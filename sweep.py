@@ -88,17 +88,21 @@ def run_exp(args):
             with open(exp_yaml, 'w') as yaml_file:
                 yaml.dump(param, yaml_file, default_flow_style=False)
 
-            # TODO
-            subprocess.call(
-                ["python", "main.py", "probcoll", robot, "-yaml", exp_yaml])
-            subprocess.call(
-                ["python", "main.py", "analyze", robot, "-yaml", exp_yaml])
+            if run == 'probcoll':
+                # TODO
+                subprocess.call(
+                    ["python", "main.py", "probcoll", robot, "-yaml", exp_yaml])
+                subprocess.call(
+                    ["python", "main.py", "analyze", robot, "-yaml", exp_yaml])
+            elif run == 'train':
+                subprocess.call(
+                    ["python", "main.py", "train", robot, "-yaml", exp_yaml, '--plot_dir', args.plot_dir, '--data_dirs', args.data_dirs])
     except KeyboardInterrupt:
         pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    
+    parser.add_argument('run', type=str, choices=('probcoll', 'train')
     parser.add_argument('robot', type=str, choices=('quadrotor', 'pointquad', 'bebop2d', 'rccar', 'point2d', 'point1d'),
                            help='robot type')
     parser.add_argument('-exp_name', type=str, default=None,
@@ -109,6 +113,8 @@ if __name__ == '__main__':
                            help='sweep yaml path relative to robot, defaults to params_<robot>_sweep.yaml')
     parser.add_argument('-gpus', type=list, default=[0],
                            help='list of gpus that are available')
+    parser.add_argument('--plot_dir', type=str, default=None)
+    parseradd_argument('--data_dirs', type=str, default=None)
 
     args = parser.parse_args()
     if args.base_yaml is None:
