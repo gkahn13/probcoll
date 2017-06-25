@@ -76,6 +76,7 @@ def run_exp(args):
         start_index = args[2]
         gpu = args[3]
         robot = args[4]
+        run = args[5]
         for i, (param, exp_name) in enumerate(zip(params, exp_names)):
             param['model']['device'] = gpu
             param['exp_name'] = '{0:04d}_{1}'.format(i + start_index, exp_name)
@@ -85,6 +86,7 @@ def run_exp(args):
             exp_yaml = os.path.join(
                 exp_dir,
                 "params_{0}.yaml".format(robot))
+            param['sim']['config_file'] = exp_yaml
             with open(exp_yaml, 'w') as yaml_file:
                 yaml.dump(param, yaml_file, default_flow_style=False)
 
@@ -96,13 +98,13 @@ def run_exp(args):
                     ["python", "main.py", "analyze", robot, "-yaml", exp_yaml])
             elif run == 'train':
                 subprocess.call(
-                    ["python", "main.py", "train", robot, "-yaml", exp_yaml, '--plot_dir', args.plot_dir, '--data_dirs', args.data_dirs])
+                    ["python", "main.py", "train", robot, "-yaml", exp_yaml, '--plot_dir', exp_dir, '--data_dirs', args[6]])
     except KeyboardInterrupt:
         pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('run', type=str, choices=('probcoll', 'train')
+    parser.add_argument('run', type=str, choices=('probcoll', 'train'))
     parser.add_argument('robot', type=str, choices=('quadrotor', 'pointquad', 'bebop2d', 'rccar', 'point2d', 'point1d'),
                            help='robot type')
     parser.add_argument('-exp_name', type=str, default=None,
@@ -113,8 +115,7 @@ if __name__ == '__main__':
                            help='sweep yaml path relative to robot, defaults to params_<robot>_sweep.yaml')
     parser.add_argument('-gpus', type=list, default=[0],
                            help='list of gpus that are available')
-    parser.add_argument('--plot_dir', type=str, default=None)
-    parseradd_argument('--data_dirs', type=str, default=None)
+    parser.add_argument('--data_dirs', type=str, default=None)
 
     args = parser.parse_args()
     if args.base_yaml is None:
@@ -154,21 +155,25 @@ if __name__ == '__main__':
     params, exp_names = build_experiments(base_params, sweep_params) 
     print("Running experiments {0}".format(str(exp_names)))
     num_gpus = len(args.gpus)
+    num_fit = max(1, int(0.9 / base_params['model']['gpu_fraction']))
     args_lists = []
-    for i in range(num_gpus):
-        args_list = [None, None, None, None, None]
+    num_proc = num_gpus * num_fit
+    for i in range(num_proc):
+        args_list = [None, None, None, None, None, None, None]
         args_list[0] = exp_names[
-            int(i/float(num_gpus)*len(exp_names)):\
-            int((i+1)/float(num_gpus)*len(exp_names))]
+            int(i/float(num_proc)*len(exp_names)):\
+            int((i+1)/float(num_proc)*len(exp_names))]
         args_list[1] = params[
-            int(i/float(num_gpus)*len(params)):\
-            int((i+1)/float(num_gpus)*len(params))]
+            int(i/float(num_proc)*len(params)):\
+            int((i+1)/float(num_proc)*len(params))]
         args_list[2] = int(i/float(num_gpus) * len(params))
-        args_list[3] = args.gpus[i]
+        args_list[3] = args.gpus[i % num_gpus]
         args_list[4] = args.robot
+        args_list[5] = args.run
+        args_list[6] = args.data_dirs
         args_lists.append(args_list)
 
-    p = multiprocessing.Pool(num_gpus)
+    p = multiprocessing.Pool(num_proc)
     p.map(run_exp, args_lists)
     p.close()
     p.join()

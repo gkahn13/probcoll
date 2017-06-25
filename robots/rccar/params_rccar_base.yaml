@@ -57,12 +57,12 @@ model:
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 'sweep'
-  scale_O_im: True
   center_O_im: False 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
+  gpu_fraction: 0.8 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
+  grad_clip: 10.0
   learning_rate: 1.e-4
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
@@ -70,7 +70,7 @@ model:
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
-  steps: 100
+  steps: 10000
   val_pct: 0.1 # Percent of the data stored as validation
 
   dtype: 'float32'
@@ -198,7 +198,8 @@ world:
 
 sim:
   srv: 'sim_env'
-  sim_file: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/hallway.py' # hallway / square
+  sim_path: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/'
+  sim_env: 'hallway' # hallway / square 
   config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
   dt: 0.25
   steeringClamp: 45.0

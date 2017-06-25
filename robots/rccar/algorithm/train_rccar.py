@@ -1,6 +1,7 @@
 from general.algorithm.train import Train
 from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
+from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
 
 class TrainRCcar(Train):
     def _setup(self):
@@ -9,3 +10,4 @@ class TrainRCcar(Train):
         else:
             self._probcoll= ProbcollRCcar(save_dir=self._plot_dir)
             self._probcoll_model = self._probcoll.probcoll_model
+            self._analyze = AnalyzeRCcar()

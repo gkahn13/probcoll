@@ -61,7 +61,7 @@ class ProbcollRCcar(Probcoll):
         try:
             command = [
                     "python",
-                    params['sim']['sim_file'],
+                    '{0}/{1}.py'.format(params['sim']['sim_path'], params['sim']['sim_env']),
                     "--yaml_path",
                     params['sim']['config_file']
                 ]

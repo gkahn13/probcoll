@@ -154,7 +154,7 @@ class Analyze:
     def _load_testing_samples(self):
         samples_itrs = []
 
-        itr = 0
+        itr = params['world']['testing']['itr_freq']
         while True:
             try:
                 sample = self._itr_load_testing_samples(itr)

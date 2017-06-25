@@ -3,7 +3,7 @@
 dt: 0.25
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/rccar'
-exp_name: 'bair_car_hallway_no_async'
+exp_name: 'bair_car_hallway_grad_clip'
 
 ##########################
 ### Probcoll algorithm ###
@@ -15,7 +15,7 @@ probcoll:
   training_start_iter: 0
   logger: 'debug' # debug/info/fatal what level to log
   is_training: True
-  asynchronous_training: False
+  asynchronous_training: True
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 
   conditions:
@@ -54,21 +54,21 @@ model:
   O_im_order: ['camera'] # / 'back_camera'
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
-  num_O: 1
-  scale_O_im: True
+  num_O: 4
   center_O_im: False 
   # NN training parameters
   device: 0
   gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
   learning_rate: 1.e-4
+  grad_clip: 10.0
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
   batch_size: 64
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
-  steps: 100
+  steps: 1000
   val_pct: 0.1 # Percent of the data stored as validation
 
   dtype: 'float32'
@@ -94,7 +94,7 @@ model:
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
-    cell_type: 'mulint_rnn' #rnn / mulint_rnn
+    cell_type: 'mulint_lstm' #rnn / mulint_rnn
     dropout: #0.8 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
@@ -196,7 +196,8 @@ world:
 
 sim:
   srv: 'sim_env'
-  sim_file: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/hallway.py' # hallway / square
+  sim_path: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/' # hallway / square
+  sim_env: 'hallway' # hallway / square
   config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
   dt: 0.25
   steeringClamp: 45.0

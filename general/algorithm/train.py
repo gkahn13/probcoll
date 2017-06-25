@@ -54,5 +54,6 @@ class Train:
                 self._probcoll_model.add_data(self._get_files())
                 self._probcoll_model.train()
                 self._probcoll.run_testing(params['world']['testing']['itr_freq'])
+                self._analyze.run()
             finally:
                 self._probcoll.close()

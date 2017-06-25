@@ -259,7 +259,7 @@ class ProbcollModel:
                 for sample in self._modify_sample(og_sample):
                     s_params = sample._meta_data
                     U = sample.get_U()[:, self.U_idxs(p=s_params)]
-                    O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)] # TODO
+                    O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)].astype(np.uint8) # TODO
                     O_vec = sample.get_O()[:, self.O_vec_idxs(p=s_params)]
                     output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
                     buffer_len = 0
@@ -324,13 +324,15 @@ class ProbcollModel:
                     # TODO figure out how to keep types properly
                     if j < self.num_O - 1:
                         obs_im = O_im[:j].ravel()
-                        obs_im_extended = np.concatenate([np.zeros(self.dO_im - obs_im.shape[0]), obs_im])
-                        feature['O_im'] = _floatlist_feature(obs_im_extended.tolist())
+                        obs_im_extended = np.concatenate([np.zeros(self.dO_im - obs_im.shape[0], dtype=np.uint8), obs_im])
+#                        feature['O_im'] = _floatlist_feature(obs_im_extended.tolist())
+                        feature['O_im'] = _bytes_feature(obs_im_extended.tostring())
                         obs_vec = O_vec[:j].ravel()
                         obs_vec_extended = np.concatenate([np.zeros(self.dO_vec - obs_vec.shape[0]), obs_vec])
                         feature['O_vec'] = _floatlist_feature(obs_vec_extended.tolist())
                     else:
-                        feature['O_im'] = _floatlist_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tolist())
+                        feature['O_im'] = _bytes_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tostring())
+#                        feature['O_im'] = _floatlist_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tolist())
                         feature['O_vec'] = _floatlist_feature(np.ravel(O_vec[j-self.num_O+1:j+1]).tolist())
                     output_list = np.ravel(output[j:j+self.T])
                     feature['output'] = _bytes_feature(output_list.tostring())
@@ -451,7 +453,8 @@ class ProbcollModel:
             
             features['fname'] = tf.FixedLenFeature([], tf.string)
             features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
-            features['O_im'] = tf.FixedLenFeature([self.dO_im], tf.float32)
+            features['O_im'] = tf.FixedLenFeature([], tf.string)
+#            features['O_im'] = tf.FixedLenFeature([self.dO_im], tf.float32)
             features['O_vec'] = tf.FixedLenFeature([self.dO_vec], tf.float32)
             features['output'] = tf.FixedLenFeature([], tf.string)
             features['len'] = tf.FixedLenFeature([], tf.int64)
@@ -475,8 +478,10 @@ class ProbcollModel:
                 bootstrap_fname = [parsed_example[b]['fname'] for b in xrange(self.num_bootstrap)]
                 bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
                                      for b in xrange(self.num_bootstrap)]
-                bootstrap_O_im_input = [tf.reshape(parsed_example[b]['O_im'], (self.dO_im,))
+                bootstrap_O_im_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O_im'], tf.uint8), (self.dO_im,))
                                      for b in xrange(self.num_bootstrap)]
+#                bootstrap_O_im_input = [tf.reshape(parsed_example[b]['O_im'], (self.dO_im,))
+#                                     for b in xrange(self.num_bootstrap)]
                 bootstrap_O_vec_input = [tf.reshape(parsed_example[b]['O_vec'], (self.dO_vec,))
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
@@ -516,7 +521,7 @@ class ProbcollModel:
     def _graph_inputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
             U_inputs = tf.placeholder(self.dtype, [None, self.T, self.dU])
-            O_im_input = tf.placeholder(self.dtype, [1, self.dO_im])
+            O_im_input = tf.placeholder(tf.uint8, [1, self.dO_im])
             O_vec_input = tf.placeholder(self.dtype, [1, self.dO_vec])
         return U_inputs, O_im_input, O_vec_input
 
@@ -534,8 +539,7 @@ class ProbcollModel:
         # If batch size is 1 then clearly not training
         is_training = is_training and obs_batch != 1
         obs_im_float = tf.cast(observation_im, self.dtype)
-        if params['model'].get('scale_O_im', False):
-            obs_im_float = obs_im_float / 255.
+        obs_im_float = obs_im_float / 255.
         if params['model'].get('center_O_im', False):
             obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
         num_devices = len(params['model']['O_im_order'])
@@ -949,9 +953,15 @@ class ProbcollModel:
                 beta2=self.beta2)
             grad = opt.compute_gradients(
                 tf.reduce_sum(bootstrap_costs) + reg_cost)
+#            clipped_grads = [(tf.clip_by_value(g, -1. * self.grad_clip, self.grad_clip), var) for g, var in grad]
+            clipped_grad = []
+            for (g, var) in grad:
+                if g is not None:
+                    clipped_grad.append((tf.clip_by_norm(g, self.grad_clip), var))
             with tf.control_dependencies(update_ops):
-                optimizers.append(opt.apply_gradients(grad))
-            grads += grad
+                optimizers.append(opt.apply_gradients(clipped_grad))
+#            grads += grad
+            grads = clipped_grad
 
         vars_after = tf.global_variables()
         optimizer_vars = list(set(vars_after).difference(set(vars_before)))

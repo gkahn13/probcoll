@@ -12,7 +12,7 @@ from config import params
 class AnalyzeRCcar(Analyze):
 
     def __init__(self, on_replay=False):
-        rospy.init_node('analyze_rccar', anonymous=True)
+#        rospy.init_node('analyze_rccar', anonymous=True)
         Analyze.__init__(self, on_replay=on_replay, parent_exp_dir=None)
 
     #######################
@@ -164,7 +164,7 @@ class AnalyzeRCcar(Analyze):
             f.savefig(self._plot_stats_file)
 
         # TODO add sim specifics
-        if params["sim"]:
+        if params["sim"]: 
             positions_itrs = self._plot_position(samples_itrs, testing=testing)
             pkl_dict['positions'] = positions_itrs
 
@@ -217,9 +217,14 @@ class AnalyzeRCcar(Analyze):
     ### Run ###
     ###########
 
-    def run(self, plot_single, plot_traj, plot_samples, plot_groundtruth):
+    def run(self, plot_single=None, plot_traj=None, plot_samples=None, plot_groundtruth=None):
+#        try:
         self._plot_statistics()
-        try:
-            self._plot_statistics(testing=True)
-        finally:
-            rospy.signal_shutdown('')
+#        except:
+#            pass
+#        try:
+        self._plot_statistics(testing=True)
+#        except:
+#            pass 
+#        finally:
+#            rospy.signal_shutdown('')

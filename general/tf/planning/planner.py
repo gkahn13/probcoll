@@ -70,7 +70,7 @@ class Planner(object):
         o_im_input = np.concatenate(o_im_input).reshape(1, -1)
         o_vec_input = np.concatenate(o_vec_input).reshape(1, -1)
         feed_dict = {
-                self.O_im_input: o_im_input,
+                self.O_im_input: o_im_input.astype(np.uint8),
                 self.O_vec_input: o_vec_input,
                 self.eps_ph: self.eps_schedule.value(rollout_num)
             }
