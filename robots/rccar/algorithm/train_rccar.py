@@ -8,6 +8,9 @@ class TrainRCcar(Train):
         if self.asynch:
             self._probcoll_model = ProbcollModelRCcar(save_dir=self._plot_dir)
         else:
-            self._probcoll= ProbcollRCcar(save_dir=self._plot_dir)
+            if self.add_data:
+                self._probcoll= ProbcollRCcar(save_dir=self._plot_dir)
+            else:
+                self._probcoll= ProbcollRCcar(save_dir=self._plot_dir, data_dir=self._data_dirs[0])
             self._probcoll_model = self._probcoll.probcoll_model
             self._analyze = AnalyzeRCcar()

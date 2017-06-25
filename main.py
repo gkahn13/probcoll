@@ -62,7 +62,8 @@ if __name__ == '__main__':
     parser_train.add_argument('--plot_dir', type=str, default=None)
     parser_train.add_argument('--data_dirs', type=str, default=None)
     parser_train.add_argument('--asynch', action='store_true')
-    
+    parser_train.add_argument('--add_data', action='store_true')
+
     args = parser.parse_args()
     run = args.run
     robot = args.robot
@@ -86,11 +87,6 @@ if __name__ == '__main__':
 
     if run is None:
         run = params['run'].lower()
-
-#    if exp_name is None:
-#        exp_name = params['exp_name']
-#    else:
-#        params['exp_name'] = exp_name
     
     if run == 'probcoll':
         if robot == 'pointquad':
@@ -122,7 +118,7 @@ if __name__ == '__main__':
         else:
             data_dirs = args.data_dirs.split()
         if robot == 'rccar':
-            train = TrainRCcar(data_dirs=data_dirs, plot_dir=args.plot_dir, asynch=args.asynch)
+            train = TrainRCcar(data_dirs=data_dirs, plot_dir=args.plot_dir, add_data=args.add_data, asynch=args.asynch)
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 

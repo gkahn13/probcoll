@@ -31,11 +31,15 @@ class ProbcollModel:
     ### Initializing ###
     ####################
 
-    def __init__(self, save_dir=None, read_only=False, finalize=True):
+    def __init__(self, save_dir=None, data_dir=None, read_only=False, finalize=True):
         if save_dir is None:
             self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
             self.save_dir = save_dir
+        if data_dir is None:
+            self.data_dir = self.save_dir
+        else:
+            self.data_dir = data_dir
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         self._logger = get_logger(
@@ -173,28 +177,28 @@ class ProbcollModel:
 
     @property
     def _no_coll_train_tfrecords_dir(self):
-        dir = os.path.join(self.save_dir, "no_coll_train_tfrecords")
+        dir = os.path.join(self.data_dir, "no_coll_train_tfrecords")
         if not os.path.exists(dir):
             os.makedirs(dir)
         return dir
 
     @property
     def _coll_train_tfrecords_dir(self):
-        dir = os.path.join(self.save_dir, "coll_train_tfrecords")
+        dir = os.path.join(self.data_dir, "coll_train_tfrecords")
         if not os.path.exists(dir):
             os.makedirs(dir)
         return dir
 
     @property
     def _no_coll_val_tfrecords_dir(self):
-        dir = os.path.join(self.save_dir, "no_coll_val_tfrecords")
+        dir = os.path.join(self.data_dir, "no_coll_val_tfrecords")
         if not os.path.exists(dir):
             os.makedirs(dir)
         return dir
 
     @property
     def _coll_val_tfrecords_dir(self):
-        dir = os.path.join(self.save_dir, "coll_val_tfrecords")
+        dir = os.path.join(self.data_dir, "coll_val_tfrecords")
         if not os.path.exists(dir):
             os.makedirs(dir)
         return dir

@@ -10,7 +10,7 @@ from general.state_info.sample import Sample
 class Probcoll:
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, read_only=False, save_dir=None):
+    def __init__(self, read_only=False, save_dir=None, data_dir=None):
         self._use_cp_cost = True
         self._planner_type = params['planning']['planner_type']
         self._read_only = read_only
@@ -22,6 +22,7 @@ class Probcoll:
             self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
             self._save_dir = save_dir
+        self._data_dir = data_dir
         self._setup()
         self._logger = get_logger(
             self.__class__.__name__,

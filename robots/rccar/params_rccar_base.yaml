@@ -4,8 +4,8 @@
 
 dt: 0.25
 random_seed: 0
-exp_dir: '/home/adam/probcoll/experiments/sweep_post_train/'
-exp_name: 'bair_car_sweep_post_train'
+exp_dir: '/home/avillaflor/probcoll/experiments/sweep_post_train/'
+exp_name: ''
 
 ##########################
 ### Probcoll algorithm ###
@@ -15,7 +15,7 @@ probcoll:
   T: 24 # timesteps per trajectory
   max_iter: 10
   training_start_iter: 0
-  logger: 'debug' # debug/info/fatal what level to log
+  logger: 'fatal' # debug/info/fatal what level to log
   is_training: True
   asynchronous_training: False
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -45,7 +45,7 @@ probcoll:
     
 model:
   T: 'sweep' # how many timesteps to predict
-  logger: 'info' # debug/info/warning/fatal what level to log
+  logger: 'fatal' # debug/info/warning/fatal what level to log
   pct_coll: 'sweep' # rebalancing trajectories
   coll_weight_pct: 'sweep' # reweight collision and no collision samples in cost
   control_range:
@@ -60,12 +60,12 @@ model:
   center_O_im: False 
   # NN training parameters
   device: 0
-  gpu_fraction: 0.8 #TODO async both processes use same device and gpu fraction
+  gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
   grad_clip: 10.0
-  learning_rate: 1.e-4
-  beta1: 0.9 # For ADAM
-  beta2: 0.999 # For ADAM
+  learning_rate: 1.e-3
+  beta1: 0.9 # For avillaflor
+  beta2: 0.999 # For avillaflor
   batch_size: 64
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
@@ -172,7 +172,7 @@ planning:
 
 world:
 #  plot: False
-  logger: 'info' # debug/info/fatal what level to log for world and agent
+  logger: 'fatal' # debug/info/fatal what level to log for world and agent
   randomize: True
   sim: True 
   do_back_up: False
@@ -198,9 +198,9 @@ world:
 
 sim:
   srv: 'sim_env'
-  sim_path: '/home/adam/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/'
+  sim_path: '/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/'
   sim_env: 'hallway' # hallway / square 
-  config_file: '/home/adam/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
+  config_file: '/home/avillaflor/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
   dt: 0.25
   steeringClamp: 45.0
   accelClamp: 12.0
