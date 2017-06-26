@@ -4,7 +4,7 @@
 
 dt: 0.25
 random_seed: 0
-exp_dir: '/home/avillaflor/probcoll/experiments/sweep_post_train/'
+exp_dir: '/home/avillaflor/probcoll/experiments/sweep_post_train/round3/'
 exp_name: ''
 
 ##########################
@@ -44,10 +44,10 @@ probcoll:
 ######################
     
 model:
-  T: 'sweep' # how many timesteps to predict
+  T: 12 # how many timesteps to predict
   logger: 'fatal' # debug/info/warning/fatal what level to log
-  pct_coll: 'sweep' # rebalancing trajectories
-  coll_weight_pct: 'sweep' # reweight collision and no collision samples in cost
+  pct_coll: 0.75 # rebalancing trajectories
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
   control_range:
     lower: [0., -17.]
     upper: [99., 17.]
@@ -56,17 +56,17 @@ model:
   O_im_order: ['camera'] # / 'back_camera'
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
-  num_O: 'sweep'
+  num_O: 4
   center_O_im: False 
   # NN training parameters
   device: 0
   gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
   reset_every_train: False # every time train is called, reinitialize weights?
-  grad_clip: 10.0
-  learning_rate: 1.e-3
+  grad_clip: 'sweep'
+  learning_rate: 'sweep'
   beta1: 0.9 # For avillaflor
   beta2: 0.999 # For avillaflor
-  batch_size: 64
+  batch_size: 'sweep'
   display_steps: 100 
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
@@ -74,9 +74,9 @@ model:
   val_pct: 0.1 # Percent of the data stored as validation
 
   dtype: 'float32'
-  reg: 1.e-6
+  reg: 'sweep'
   num_bootstrap: 1
-  prob_coll_strictly_increasing: True # True / False 
+  prob_coll_strictly_increasing: True  # True / False 
   mask: 'all' # all / last
 
   image_graph:
@@ -91,13 +91,13 @@ model:
   
   observation_graph:
     hidden_activation: 'tanh' 
-    output_dim: 128 # This is the hidden size of the rnn
+    output_dim: 256 # This is the hidden size of the rnn
   
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
-    cell_type: 'mulint_rnn' #rnn / mulint_rnn
-    dropout: #0.8 # pct keep
+    cell_type: 'mulint_lstm' #rnn / mulint_rnn
+    dropout: 0.5 #0.8 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
   output_graph: # Must have dropout 1.0
@@ -137,7 +137,7 @@ planning:
       lower: [-5., 0.]
       upper: [5., 0.]
   
-  num_dp: 1 # number of dropout passes to average over
+  num_dp: 32 # number of dropout passes to average over
   planner_type: 'cem' # random / primitives / cem / random_policy
   # specific to your primitives code
   primitives:

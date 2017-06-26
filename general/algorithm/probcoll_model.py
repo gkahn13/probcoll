@@ -57,6 +57,8 @@ class ProbcollModel:
         self.dO_vec = len(self.O_vec_idxs()) * self.num_O
         self.doutput = len(self.output_idxs())
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
+        self._string_input_capcity = 32
+        self._shuffle_batch_capcity = 13 * self.batch_size
         self.preprocess_fnames = []
         self.threads = []
         self.graph = tf.Graph()
@@ -329,14 +331,12 @@ class ProbcollModel:
                     if j < self.num_O - 1:
                         obs_im = O_im[:j].ravel()
                         obs_im_extended = np.concatenate([np.zeros(self.dO_im - obs_im.shape[0], dtype=np.uint8), obs_im])
-#                        feature['O_im'] = _floatlist_feature(obs_im_extended.tolist())
                         feature['O_im'] = _bytes_feature(obs_im_extended.tostring())
                         obs_vec = O_vec[:j].ravel()
                         obs_vec_extended = np.concatenate([np.zeros(self.dO_vec - obs_vec.shape[0]), obs_vec])
                         feature['O_vec'] = _floatlist_feature(obs_vec_extended.tolist())
                     else:
                         feature['O_im'] = _bytes_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tostring())
-#                        feature['O_im'] = _floatlist_feature(np.ravel(O_im[j-self.num_O+1:j+1]).tolist())
                         feature['O_vec'] = _floatlist_feature(np.ravel(O_vec[j-self.num_O+1:j+1]).tolist())
                     output_list = np.ravel(output[j:j+self.T])
                     feature['output'] = _bytes_feature(output_list.tostring())
@@ -445,9 +445,11 @@ class ProbcollModel:
             ### create file queues
             filename_queues = (
                     tf.train.string_input_producer(
-                        filename_vars[0]),
+                        filename_vars[0],
+                        capcity=self._string_input_capcity),
                     tf.train.string_input_producer(
-                        filename_vars[1])
+                        filename_vars[1],
+                        capcity=self._string_input_capcity)
                 )
 
             ### read and decode
@@ -484,8 +486,6 @@ class ProbcollModel:
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_O_im_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O_im'], tf.uint8), (self.dO_im,))
                                      for b in xrange(self.num_bootstrap)]
-#                bootstrap_O_im_input = [tf.reshape(parsed_example[b]['O_im'], (self.dO_im,))
-#                                     for b in xrange(self.num_bootstrap)]
                 bootstrap_O_vec_input = [tf.reshape(parsed_example[b]['O_vec'], (self.dO_vec,))
                                      for b in xrange(self.num_bootstrap)]
                 bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
@@ -496,7 +496,7 @@ class ProbcollModel:
                 shuffled = tf.train.shuffle_batch(
                     inputs,
                     batch_size=batch_size,
-                    capacity=10*batch_size + 3 * batch_size,
+                    capacity=self._shuffle_batch_capcity,
                     min_after_dequeue=10*batch_size)
 
                 bootstrap_fnames.append(shuffled[:self.num_bootstrap])
@@ -929,17 +929,14 @@ class ProbcollModel:
                 weight_decay = reg * tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
                 cost = cross_entropy + weight_decay
                 err = (1. / tf.cast(num_coll + num_nocoll, self.dtype)) * (num_errs_on_coll + num_errs_on_nocoll)
-                # TODO should other value be nan or 0
                 err_on_coll = tf.cond(
                     num_coll > 0,
                     lambda: (1. / tf.cast(num_coll, self.dtype)) * num_errs_on_coll,
                     lambda: tf.constant(np.nan, dtype=self.dtype))
-                   # lambda: tf.constant(0, dtype=self.dtype))
                 err_on_nocoll = tf.cond(
                     num_nocoll > 0,
                     lambda: (1. / tf.cast(num_nocoll, self.dtype)) * num_errs_on_nocoll,
                     lambda: tf.constant(np.nan, dtype=self.dtype))
-                   # lambda: tf.constant(0, dtype=self.dtype))
 
         return costs, weight_decay, cost, cross_entropy, err, err_on_coll, err_on_nocoll, num_coll, num_nocoll
 
@@ -957,15 +954,13 @@ class ProbcollModel:
                 beta2=self.beta2)
             grad = opt.compute_gradients(
                 tf.reduce_sum(bootstrap_costs) + reg_cost)
-#            clipped_grads = [(tf.clip_by_value(g, -1. * self.grad_clip, self.grad_clip), var) for g, var in grad]
             clipped_grad = []
             for (g, var) in grad:
                 if g is not None:
                     clipped_grad.append((tf.clip_by_norm(g, self.grad_clip), var))
             with tf.control_dependencies(update_ops):
                 optimizers.append(opt.apply_gradients(clipped_grad))
-#            grads += grad
-            grads = clipped_grad
+            grads += clipped_grad
 
         vars_after = tf.global_variables()
         optimizer_vars = list(set(vars_after).difference(set(vars_before)))
@@ -986,8 +981,8 @@ class ProbcollModel:
 
     def _graph_dequeue(self, no_coll_queue, coll_queue):
         return [
-                no_coll_queue.dequeue_up_to(32),
-                coll_queue.dequeue_up_to(32)
+                no_coll_queue.dequeue_up_to(self._string_input_capcity),
+                coll_queue.dequeue_up_to(self._string_input_capcity)
             ]
 
     def _graph_init_vars(self):
@@ -1056,6 +1051,7 @@ class ProbcollModel:
         return output
 
     def _flush_queue(self):
+        # Flush file name queues
         for tfrecords_fnames, dequeue in (
                     (self.tfrecords_no_coll_train_fnames, self.d_train['no_coll_dequeue']),
                     (self.tfrecords_coll_train_fnames, self.d_train['coll_dequeue']),
@@ -1064,17 +1060,20 @@ class ProbcollModel:
                 ):
             if len(tfrecords_fnames) > 0:
                     self.sess.run(dequeue)
-    
+        # Flush data queues
+        for _ in xrange(int(self._shuffle_batch_capcity / self.batch_size)):
+            self.sess.run([self.d_train['U_inputs'], self.d_val['U_inputs']])
+
     def train(self, reset=False, **kwargs):
 
         self.graph.as_default()
-
+        num_files = len(self.tfrecords_no_coll_train_fnames)
+        new_model_file, model_num  = self._next_model_file()
+        if self.reset_freq > 0:
+            reset = reset or (model_num % self.reset_freq == 0 and model_num != 0)
         if reset:
             self._graph_init_vars()
 
-        num_files = len(self.tfrecords_no_coll_train_fnames)
-
-        new_model_file, model_num  = self._next_model_file()
         self._logger.debug('Updating queue with train files {0} {1} and val files {2} {3}'.format(
             self.tfrecords_no_coll_train_fnames,
             self.tfrecords_coll_train_fnames,
@@ -1137,7 +1136,11 @@ class ProbcollModel:
 
         step = 0
         epoch_start = save_start = time.time()
-        while step < self.steps and not rospy.is_shutdown():
+        if reset:
+            itr_steps = self.steps
+        else:
+            itr_steps = self.reset_steps
+        while step < itr_steps and not rospy.is_shutdown():
 
             new_num_files = len(self.tfrecords_no_coll_train_fnames)
 
@@ -1167,7 +1170,7 @@ class ProbcollModel:
                 val_nums = defaultdict(float)
                 val_steps = 0
                 self._logger.info('\tComputing validation...')
-                while val_steps < self.val_steps:
+                while val_steps < self.val_steps and not rospy.is_shutdown():
                     val_cost, val_cross_entropy, \
                     val_err, val_err_coll, val_err_nocoll, \
                     val_fnames, val_coll, val_nocoll = \
@@ -1206,7 +1209,8 @@ class ProbcollModel:
                 epoch_start = time.time()
 
                 ### save model
-                self.save(new_model_file)
+                if not reset:
+                    self.save(new_model_file)
 
             ### train
             _, train_cost, train_cross_entropy, \

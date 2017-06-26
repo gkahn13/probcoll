@@ -44,35 +44,45 @@ probcoll:
 model:
   T: 4 # how many timesteps to predict
   logger: 'debug' # debug/info/warning/fatal what level to log
-  pct_coll: 0.5 # rebalancing trajectories
-  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  control_range:
-    lower: [0., -17.]
-    upper: [99., 17.]
+  
   # what to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
   O_im_order: ['camera'] # / 'back_camera'
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 1
+  
+  # Normalize input  
   center_O_im: False 
-  # NN training parameters
+  control_range:
+    lower: [0., -17.]
+    upper: [99., 17.]
+  
+  # Device
   device: 0
   gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
-  reset_every_train: False # every time train is called, reinitialize weights?
+
+  # Optimization
   learning_rate: 1.e-4
   grad_clip: 10.0
   beta1: 0.9 # For avillaflor
   beta2: 0.999 # For avillaflor
   batch_size: 64
+  pct_coll: 0.5 # rebalancing trajectories
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-6
+  
+  # Train schedule
+  steps: 1000
+  reset_steps: 10000
+  reset_freq: 0 # 0 means no resetting
   display_steps: 100 
+  val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation
   val_steps: 10  # How many steps you do on validation 
-  steps: 1000
-  val_pct: 0.1 # Percent of the data stored as validation
 
+  # Model architecture
   dtype: 'float32'
-  reg: 1.e-6
   num_bootstrap: 1
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
@@ -117,26 +127,10 @@ planning:
       des: [49.5, 8.] # TODO: hard-coded order: steering then speed
       cost: square
       weight: [0.001, 1.0]     
-  
-  epsilon_greedy:
-    endpoints: [[0, 1.0], [50, 1.0], [150, 0.01]]
-    #    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
-    outside_value: 0.01
-    lower: [20., 8.]
-    upper: [80., 8.]
 
-  control_noise:
-    type: 'uniform' # zero / gaussian / uniform
-
-    zero: {}
-    gaussian:
-      std: [3.0, 0.3]
-    uniform:
-      lower: [-5., 0.]
-      upper: [5., 0.]
-  
-  num_dp: 1 # number of dropout passes to average over
+  # Planner
   planner_type: 'cem' # random / primitives / cem / random_policy
+  num_dp: 1 # number of dropout passes to average over during planning
   # specific to your primitives code
   primitives:
     steers: [30., 40., 50., 60., 70.]
@@ -158,7 +152,25 @@ planning:
     num_iters: 4 # does not include first sample    
     eps: 0.01 # to ensure covariance is PD
 
-  # TODO: other planning methods here
+  # Noise / exploration
+  epsilon_greedy:
+    endpoints: [[0, 1.0], [50, 1.0], [150, 0.01]]
+    #    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
+    outside_value: 0.01
+    lower: [20., 8.]
+    upper: [80., 8.]
+
+  control_noise:
+    type: 'uniform' # zero / gaussian / uniform
+
+    zero: {}
+    gaussian:
+      std: [3.0, 0.3]
+    uniform:
+      lower: [-5., 0.]
+      upper: [5., 0.]
+  
+  # Visualization
   visualize: False
   topics:
     debug_cost: 'debug_cost' # visualization_msgs/MarkerArray

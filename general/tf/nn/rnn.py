@@ -57,7 +57,7 @@ def rnn(
     with tf.variable_scope(scope, reuse=reuse):
         for i in xrange(num_cells):
             if dropout is not None:
-                assert(type(dropout) is float and 0 < dropout and dropout < 1.0)
+                assert(type(dropout) is float and 0 < dropout and dropout <= 1.0)
                 if dp_masks is not None:
                     dp = dp_masks[i]
                 else:

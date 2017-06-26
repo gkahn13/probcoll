@@ -182,9 +182,9 @@ class AnalyzeRCcar(Analyze):
             positions_x, positions_y, collision = [], [], []
             plt.figure()
             if testing:
-                plt.title('Trajectories for testing itr {0}'.format(itr))
+                plt.title('Trajectories for testing itr {0}\n{1}'.format(itr, params['exp_name']))
             else:
-                plt.title('Trajectories for itr {0}'.format(itr))
+                plt.title('Trajectories for itr {0}\n{1}'.format(itr, params['exp_name']))
             plt.xlabel('X position')
             plt.ylabel('Y position')
             # TODO not make this hard coded

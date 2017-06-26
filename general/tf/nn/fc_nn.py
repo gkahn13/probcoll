@@ -57,7 +57,7 @@ def fcnn(
                 trainable=True)
 
             if dropout is not None:
-                assert(type(dropout) is float and 0 < dropout and dropout < 1.0)
+                assert(type(dropout) is float and 0 < dropout and dropout <= 1.0)
                 if dp_masks is not None:
                     next_layer_input = next_layer_input * dp_masks[i]
                 else:

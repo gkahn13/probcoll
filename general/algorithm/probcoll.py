@@ -182,7 +182,7 @@ class Probcoll:
                         self._async_training()
                         self._async_on = True
                 else:
-                    self.probcoll_model.train(reset=params['model']['reset_every_train'])
+                    self.probcoll_model.train()
   
     def run_testing(self, itr):
         pass

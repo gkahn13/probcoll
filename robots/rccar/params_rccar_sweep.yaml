@@ -1,12 +1,7 @@
 # Contains lists to sweep over for every sweep param in the base file
 
-######################
-### Probcoll model ###
-######################
-    
 model:
-  T: [4, 8, 12, 16] # how many timesteps to predict
-  pct_coll: [0.25, 0.5, 0.75]
-  coll_weight_pct: [0.25, 0.5, 0.75]
-  num_O: [1, 4] 
-
+  grad_clip: [5.0, 10.0]
+  learning_rate: [1.e-3, 5.e-4, 1.e-4, 5.e-5]
+  batch_size: [32, 64]
+  reg: [1.e-5, 1.e-6]

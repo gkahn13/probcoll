@@ -172,7 +172,7 @@ if __name__ == '__main__':
         args_list[1] = params[
             int(i/float(num_proc)*len(params)):\
             int((i+1)/float(num_proc)*len(params))]
-        args_list[2] = int(i/float(num_gpus) * len(params))
+        args_list[2] = int(i/float(num_proc) * len(params))
         args_list[3] = args.gpus[i % num_gpus]
         args_list[4] = args.robot
         args_list[5] = args.run
