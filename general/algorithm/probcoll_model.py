@@ -31,7 +31,7 @@ class ProbcollModel:
     ### Initializing ###
     ####################
 
-    def __init__(self, save_dir=None, data_dir=None, read_only=False, finalize=True):
+    def __init__(self, save_dir=None, data_dir=None):
         if save_dir is None:
             self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
@@ -585,7 +585,7 @@ class ProbcollModel:
 
     def _graph_inference(
             self, name, bootstrap_U_inputs, bootstrap_O_im_inputs, bootstrap_O_vec_inputs,
-            reuse=False, finalize=True, tf_debug={}):
+            reuse=False, tf_debug={}):
         assert(name == 'train' or name == 'val')
         num_bootstrap = params['model']['num_bootstrap']
 
@@ -650,6 +650,10 @@ class ProbcollModel:
                     else:
                         input_layer = tf.concat(1, concat_list)
 
+                    if name == 'val' and not self.val_dropout:
+                        params = copy.deepcopy(params)
+                        params['model']['action_graph']['dropout'] = None
+                    
                     if recurrent:
                         ag_output, _  = action_graph(
                             inputs=input_layer,
@@ -704,7 +708,7 @@ class ProbcollModel:
 
     def graph_eval_inference(
             self, U_input, O_im_input=None, O_vec_input=None, bootstrap_initial_states=None,
-            reuse=False, finalize=True, tf_debug={}):
+            reuse=False, tf_debug={}):
 
         bootstrap_output_mats = []
         bootstrap_output_preds = []

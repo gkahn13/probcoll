@@ -25,8 +25,8 @@ from config import params
 
 class ProbcollRCcar(Probcoll):
 
-    def __init__(self, read_only=False, save_dir=None, data_dir=None):
-        Probcoll.__init__(self, read_only=read_only, save_dir=save_dir, data_dir=data_dir)
+    def __init__(self, save_dir=None, data_dir=None):
+        Probcoll.__init__(self, save_dir=save_dir, data_dir=data_dir)
 
     def _setup(self):
         rospy.init_node('ProbcollRCcar', anonymous=True)
@@ -47,7 +47,7 @@ class ProbcollRCcar(Probcoll):
         assert(self._world.randomize)
 
         ### load prediction neural net
-        self.probcoll_model = ProbcollModelRCcar(read_only=self._read_only, save_dir=self._save_dir, data_dir=self._data_dir)
+        self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
         rccar_topics = params['rccar']['topics']
         self.coll_callback = ros_utils.RosCallbackEmpty(rccar_topics['collision'], std_msgs.msg.Empty)
         self.good_rollout_callback = ros_utils.RosCallbackEmpty(rccar_topics['good_rollout'], std_msgs.msg.Empty)

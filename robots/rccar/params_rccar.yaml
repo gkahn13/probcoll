@@ -15,7 +15,7 @@ probcoll:
   training_start_iter: 0
   logger: 'debug' # debug/info/fatal what level to log
   is_training: True
-  asynchronous_training: True
+  asynchronous_training: False
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 
   conditions:
@@ -42,7 +42,7 @@ probcoll:
 ######################
     
 model:
-  T: 4 # how many timesteps to predict
+  T: 12 # how many timesteps to predict
   logger: 'debug' # debug/info/warning/fatal what level to log
   
   # what to use as input to prediction model
@@ -50,7 +50,7 @@ model:
   O_im_order: ['camera'] # / 'back_camera'
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
-  num_O: 1
+  num_O: 4
   
   # Normalize input  
   center_O_im: False 
@@ -68,21 +68,22 @@ model:
   beta1: 0.9 # For avillaflor
   beta2: 0.999 # For avillaflor
   batch_size: 64
-  pct_coll: 0.5 # rebalancing trajectories
+  pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
   reg: 1.e-6
   
   # Train schedule
   steps: 1000
-  reset_steps: 10000
   reset_freq: 0 # 0 means no resetting
+  reset_steps: 10000
   display_steps: 100 
   val_pct: 0.1 # Percent of the data stored as validation
-  val_freq: 0.1 # How often you compute validation
+  val_freq: 0.1 # How often you compute validation (percentage)
   val_steps: 10  # How many steps you do on validation 
+  val_dropout: False
 
   # Model architecture
-  dtype: 'float32'
+  dtype: 'float32' # only float32 is currently implemented
   num_bootstrap: 1
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
@@ -99,13 +100,13 @@ model:
   
   observation_graph:
     hidden_activation: 'tanh' 
-    output_dim: 128 # This is the hidden size of the rnn
+    output_dim: 256 # This is the hidden size of the rnn
   
   action_graph:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
     cell_type: 'mulint_lstm' #rnn / mulint_rnn
-    dropout: #0.8 # pct keep
+    dropout: 0.5 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
   output_graph: # Must have dropout 1.0
@@ -130,7 +131,7 @@ planning:
 
   # Planner
   planner_type: 'cem' # random / primitives / cem / random_policy
-  num_dp: 1 # number of dropout passes to average over during planning
+  num_dp: 32 # number of dropout passes to average over during planning
   # specific to your primitives code
   primitives:
     steers: [30., 40., 50., 60., 70.]
