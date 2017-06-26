@@ -13,13 +13,16 @@ exp_name: ''
 
 probcoll:
   T: 24 # timesteps per trajectory
-  max_iter: 10
-  training_start_iter: 0
   logger: 'fatal' # debug/info/fatal what level to log
+  max_iter: 10
+  label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+  
+  # Training
+  training_start_iter: 0
   is_training: True
   asynchronous_training: False
-  label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 
+  # Conditions
   conditions:
     repeats: 40 # TODO
     num_test: 1
@@ -46,37 +49,48 @@ probcoll:
 model:
   T: 12 # how many timesteps to predict
   logger: 'fatal' # debug/info/warning/fatal what level to log
-  pct_coll: 0.75 # rebalancing trajectories
-  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  control_range:
-    lower: [0., -17.]
-    upper: [99., 17.]
+  
   # what to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
   O_im_order: ['camera'] # / 'back_camera'
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 4
+  
+  # Normalize input  
   center_O_im: False 
-  # NN training parameters
+  control_range:
+    lower: [0., -17.]
+    upper: [99., 17.]
+  
+  # Device
   device: 0
   gpu_fraction: 0.4 #TODO async both processes use same device and gpu fraction
-  reset_every_train: False # every time train is called, reinitialize weights?
-  grad_clip: 'sweep'
+
+  # Optimization
   learning_rate: 'sweep'
+  grad_clip: 'sweep'
   beta1: 0.9 # For avillaflor
   beta2: 0.999 # For avillaflor
   batch_size: 'sweep'
-  display_steps: 100 
-  val_freq: 0.1 # How often you compute validation
-  val_steps: 10  # How many steps you do on validation 
-  steps: 10000
-  val_pct: 0.1 # Percent of the data stored as validation
-
-  dtype: 'float32'
+  pct_coll: 0.75 # rebalancing trajectories
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
   reg: 'sweep'
+  
+  # Train schedule
+  steps: 10000
+  reset_freq: 0 # 0 means no resetting
+  reset_steps: 10000
+  display_steps: 100 
+  val_pct: 0.1 # Percent of the data stored as validation
+  val_freq: 0.1 # How often you compute validation (percentage)
+  val_steps: 10  # How many steps you do on validation 
+  val_dropout: False
+
+  # Model architecture
+  dtype: 'float32' # only float32 is currently implemented
   num_bootstrap: 1
-  prob_coll_strictly_increasing: True  # True / False 
+  prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
 
   image_graph:
@@ -97,7 +111,7 @@ model:
     graph_type: 'rnn' # fc / rnn
     num_cells: 1
     cell_type: 'mulint_lstm' #rnn / mulint_rnn
-    dropout: 0.5 #0.8 # pct keep
+    dropout: 0.8 # pct keep
 #    cell_args: # If you need to pass variables to cells 
 
   output_graph: # Must have dropout 1.0
@@ -118,8 +132,33 @@ planning:
     control_cost:
       des: [49.5, 8.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [0.001, 1.0]     
-  
+      weight: [0.0, 1.0]     
+
+  # Planner
+  planner_type: 'random' # random / primitives / cem / random_policy
+  num_dp: 8 # number of dropout passes to average over during planning
+  # specific to your primitives code
+  primitives:
+    steers: [30., 40., 50., 60., 70.]
+    speeds: [16.]
+    num_splits: 3
+
+  # control range for your planning algorithms
+  control_range:
+    lower: [20., 8.]
+    upper: [80., 8.]
+
+  random:
+    K: 2048 # number of actions to sample from
+
+  cem:
+    init_M: 1024 # number of actions to sample from
+    M: 256
+    K: 16 # top actions you select
+    num_iters: 4 # does not include first sample    
+    eps: 0.01 # to ensure covariance is PD
+
+  # Noise / exploration
   epsilon_greedy:
     endpoints: [[0, 1.0], [50, 1.0], [150, 0.01]]
     #    endpoints: [[0, 1.0], [25, 1.0], [250, 0.1], [500, 0.01]]
@@ -137,30 +176,7 @@ planning:
       lower: [-5., 0.]
       upper: [5., 0.]
   
-  num_dp: 32 # number of dropout passes to average over
-  planner_type: 'cem' # random / primitives / cem / random_policy
-  # specific to your primitives code
-  primitives:
-    steers: [30., 40., 50., 60., 70.]
-    speeds: [16.]
-    num_splits: 3
-
-  # control range for your planning algorithms
-  control_range:
-    lower: [20., 8.]
-    upper: [80., 8.]
-
-  random:
-    K: 2048 # number of actions to sample from
-
-  cem:
-    init_M: 2048 # number of actions to sample from
-    M: 512
-    K: 16 # top actions you select
-    num_iters: 4 # does not include first sample    
-    eps: 0.01 # to ensure covariance is PD
-
-  # TODO: other planning methods here
+  # Visualization
   visualize: False
   topics:
     debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
@@ -193,13 +209,13 @@ world:
 #    positions: [[40., 20., 0.2]]
 #    position_ranges: [[[40., -40., 0.2, 0.0], [40., 40., 0.2, 6.28]]]
     position_ranges: [[[-4., 0., -0.6, 3.14], [4., 0., -0.6, 3.14]]]
-    num_pos: 30
+    num_pos: 5
     range_type: 'fix_spacing' # fix_spacing / random
 
 sim:
   srv: 'sim_env'
-  sim_path: '/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/'
-  sim_env: 'hallway' # hallway / square 
+  sim_path: '/home/avillaflor/probcoll/robots/rccar/ros/catkin_ws/src/bair_car/nodes/' # hallway / square
+  sim_env: 'hallway' # hallway / square
   config_file: '/home/avillaflor/probcoll/robots/rccar/params_rccar.yaml' # Should just be this file
   dt: 0.25
   steeringClamp: 45.0

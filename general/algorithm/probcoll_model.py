@@ -57,8 +57,8 @@ class ProbcollModel:
         self.dO_vec = len(self.O_vec_idxs()) * self.num_O
         self.doutput = len(self.output_idxs())
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
-        self._string_input_capcity = 32
-        self._shuffle_batch_capcity = 13 * self.batch_size
+        self._string_input_capacity = 32
+        self._shuffle_batch_capacity = 13 * self.batch_size
         self.preprocess_fnames = []
         self.threads = []
         self.graph = tf.Graph()
@@ -446,10 +446,10 @@ class ProbcollModel:
             filename_queues = (
                     tf.train.string_input_producer(
                         filename_vars[0],
-                        capcity=self._string_input_capcity),
+                        capacity=self._string_input_capacity),
                     tf.train.string_input_producer(
                         filename_vars[1],
-                        capcity=self._string_input_capcity)
+                        capacity=self._string_input_capacity)
                 )
 
             ### read and decode
@@ -496,7 +496,7 @@ class ProbcollModel:
                 shuffled = tf.train.shuffle_batch(
                     inputs,
                     batch_size=batch_size,
-                    capacity=self._shuffle_batch_capcity,
+                    capacity=self._shuffle_batch_capacity,
                     min_after_dequeue=10*batch_size)
 
                 bootstrap_fnames.append(shuffled[:self.num_bootstrap])
@@ -651,21 +651,22 @@ class ProbcollModel:
                         input_layer = tf.concat(1, concat_list)
 
                     if name == 'val' and not self.val_dropout:
-                        params = copy.deepcopy(params)
-                        params['model']['action_graph']['dropout'] = None
-                    
+                        act_params = copy.deepcopy(params['model']['action_graph'])
+                        act_params['dropout'] = None
+                    else:
+                        act_params = params['model']['action_graph']
                     if recurrent:
                         ag_output, _  = action_graph(
                             inputs=input_layer,
                             initial_state=initial_state,
-                            params=params["model"]["action_graph"],
+                            params=act_params,
                             dtype=self.dtype,
                             scope="action_graph_b{0}".format(b),
                             reuse=reuse)
                     else:
                         ag_output, _  = action_graph(
                             inputs=input_layer,
-                            params=params["model"]["action_graph"],
+                            params=act_params,
                             dtype=self.dtype,
                             scope="action_graph_b{0}".format(b),
                             reuse=reuse)
@@ -985,8 +986,8 @@ class ProbcollModel:
 
     def _graph_dequeue(self, no_coll_queue, coll_queue):
         return [
-                no_coll_queue.dequeue_up_to(self._string_input_capcity),
-                coll_queue.dequeue_up_to(self._string_input_capcity)
+                no_coll_queue.dequeue_up_to(self._string_input_capacity),
+                coll_queue.dequeue_up_to(self._string_input_capacity)
             ]
 
     def _graph_init_vars(self):
@@ -1065,7 +1066,7 @@ class ProbcollModel:
             if len(tfrecords_fnames) > 0:
                     self.sess.run(dequeue)
         # Flush data queues
-        for _ in xrange(int(self._shuffle_batch_capcity / self.batch_size)):
+        for _ in xrange(int(self._shuffle_batch_capacity / self.batch_size)):
             self.sess.run([self.d_train['U_inputs'], self.d_val['U_inputs']])
 
     def train(self, reset=False, **kwargs):
@@ -1076,6 +1077,7 @@ class ProbcollModel:
         if self.reset_freq > 0:
             reset = reset or (model_num % self.reset_freq == 0 and model_num != 0)
         if reset:
+            self._logger.debug('Resetting model')
             self._graph_init_vars()
 
         self._logger.debug('Updating queue with train files {0} {1} and val files {2} {3}'.format(
@@ -1141,9 +1143,9 @@ class ProbcollModel:
         step = 0
         epoch_start = save_start = time.time()
         if reset:
-            itr_steps = self.steps
-        else:
             itr_steps = self.reset_steps
+        else:
+            itr_steps = self.steps
         while step < itr_steps and not rospy.is_shutdown():
 
             new_num_files = len(self.tfrecords_no_coll_train_fnames)
