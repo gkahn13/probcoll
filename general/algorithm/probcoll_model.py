@@ -1171,7 +1171,7 @@ class ProbcollModel:
             ### validation
             if (step != 0 and len(self.tfrecords_no_coll_val_fnames) > 0 \
                     and len(self.tfrecords_coll_val_fnames) > 0 and \
-                    (step % int(self.val_freq * self.steps)) == 0):
+                    (step % int(self.val_freq * itr_steps)) == 0):
                 val_values = defaultdict(list)
                 val_nums = defaultdict(float)
                 val_steps = 0
@@ -1258,7 +1258,7 @@ class ProbcollModel:
                 plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
 
                 self._logger.info('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
-                    100 * step / float(self.steps),
+                    100 * step / float(itr_steps),
                     100 * np.mean(train_values['err']),
                     100 * np.mean(train_values['err_coll']),
                     100 * np.mean(train_values['err_nocoll']),

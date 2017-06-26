@@ -120,8 +120,11 @@ def spatial_soft_argmax(features, dtype=tf.float32):
     """
     features shape is [N, H, W, C]
     """
-    shape = tf.shape(features)
-    N, H, W, C = shape[0], shape[1], shape[2], shape[3]
+#    shape = tf.shape(features)
+#    N, H, W, C = shape[0], shape[1], shape[2], shape[3]
+    N = tf.shape(features)[0]
+    val_shape = features.get_shape()
+    H, W, C = val_shape[1].value, val_shape[2].value, val_shape[3].value
     features = tf.reshape(
         tf.transpose(features, [0, 3, 1, 2]),
         [-1, H * W])
@@ -130,13 +133,15 @@ def spatial_soft_argmax(features, dtype=tf.float32):
     spatial_softmax_pos = tf.expand_dims(spatial_softmax, -1)
     # TODO shape [H, W, 1, 2]
     # TODO H or W is 1
+    assert(H != 1 and W != 1)
     delta_h = 2. / tf.cast(H - 1, dtype)
     delta_w = 2. / tf.cast(W - 1, dtype)
     ran_h = tf.tile(tf.expand_dims(tf.range(-1., 1. + delta_h, delta_h, dtype=dtype), 1), [1, W])
     ran_w = tf.tile(tf.expand_dims(tf.range(-1., 1 + delta_w, delta_w, dtype=dtype), 0), [H, 1])
     image_pos = tf.expand_dims(tf.stack([ran_h, ran_w], 2), 2)
     spatial_soft_amax = tf.reduce_sum(spatial_softmax_pos * image_pos, axis=[1, 2])
-    return tf.reshape(spatial_soft_amax, [N, C * 2])
+    shaped_ssamax = tf.reshape(spatial_soft_amax, [N, C * 2])
+    return shaped_ssamax
 
 def str_to_dtype(dtype):
     if dtype == "float32":
