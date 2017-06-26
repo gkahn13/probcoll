@@ -28,6 +28,10 @@ def fcnn(
         output_activation = tf.nn.sigmoid
     elif params["output_activation"] == "softmax":
         output_activation = tf.nn.softmax
+    elif params["output_activation"] == "relu":
+        output_activation = tf.nn.relu
+    elif params["output_activation"] == "tanh":
+        output_activation = tf.nn.tanh
     else:
         raise NotImplementedError(
             "Output activation {0} is not valid".format(
@@ -47,10 +51,14 @@ def fcnn(
     next_layer_input = inputs
     with tf.variable_scope(scope, reuse=reuse):
         for i, dim in enumerate(dims):
+            if i == len(dims) - 1:
+                activation = output_activation
+            else:
+                activation = hidden_activation
             next_layer_input = tf.contrib.layers.fully_connected(
                 inputs=next_layer_input,
                 num_outputs=dim,
-                activation_fn=hidden_activation,
+                activation_fn=activation,
                 weights_initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
                 biases_initializer=tf.constant_initializer(0., dtype=dtype),
                 weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),

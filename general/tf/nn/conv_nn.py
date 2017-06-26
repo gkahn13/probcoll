@@ -43,13 +43,17 @@ def convnn(inputs, params, scope="convnn", dtype=tf.float32, reuse=False, is_tra
         normalizer_params = None
     with tf.variable_scope(scope, reuse=reuse):
         for i in xrange(len(kernels)):
+            if i == len(kernels) - 1:
+                activation = output_activation
+            else:
+                activation = conv_activation
             next_layer_input = tf.contrib.layers.conv2d(
                 inputs=next_layer_input,
                 num_outputs=filters[i],
                 kernel_size=kernels[i],
                 stride=strides[i],
                 padding=padding,
-                activation_fn=conv_activation,
+                activation_fn=activation,
                 normalizer_fn=normalizer_fn,
                 normalizer_params=normalizer_params,
                 weights_initializer=tf.contrib.layers.xavier_initializer_conv2d(dtype=dtype),
