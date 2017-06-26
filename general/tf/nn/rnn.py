@@ -14,37 +14,41 @@ def rnn(
     """
     inputs is shape [batch_size x T x features].
     """
-    # TODO adjust state for Mulicell
+    num_cells = params["num_cells"]
     if params["cell_type"] == "rnn":
         cell_type = rnn_cell.DpRNNCell
         if initial_state is not None:
-            num_units = initial_state.get_shape()[1].value
-            inital_state = (initial_state,)
+            initial_state = tf.split(1, num_cells, initial_state) 
+            num_units = initial_state[0].get_shape()[1].value
     elif params["cell_type"] == "mulint_rnn":
         cell_type = rnn_cell.DpMulintRNNCell
         if initial_state is not None:
-            num_units = initial_state.get_shape()[1].value
-            initial_state = (initial_state,)
+            initial_state = tuple(tf.split(1, num_cells, initial_state))
+            num_units = initial_state[0].get_shape()[1].value
     elif params['cell_type'] == 'lstm':
         cell_type = rnn_cell.DpLSTMCell
-        # TODO maybe change
         if initial_state is not None:
-            c, h = tf.split(1, 2, initial_state)
-            num_units = c.get_shape()[1].value
-            initial_state = (tf.nn.rnn_cell.LSTMStateTuple(c, h),)
+            states = tf.split(1, 2 * num_cells, initial_state)
+            num_units = states[0].get_shape()[1].value
+            initial_state = []
+            for i in xrange(num_cells):
+                initial_state.append(tf.nn.rnn_cell.LSTMStateTuple(states[i * 2], states[i * 2 + 1]))
+            initial_state = tuple(initial_state)
     elif params['cell_type'] == 'mulint_lstm':
         cell_type = rnn_cell.DpMulintLSTMCell
         if initial_state is not None:
-            c, h = tf.split(1, 2, initial_state)
-            num_units = c.get_shape()[1].value
-            initial_state = (tf.nn.rnn_cell.LSTMStateTuple(c, h),)
+            states = tf.split(1, 2 * num_cells, initial_state)
+            num_units = states[0].get_shape()[1].value
+            initial_state = []
+            for i in xrange(num_cells):
+                initial_state.append(tf.nn.rnn_cell.LSTMStateTuple(states[i * 2], states[i * 2 + 1]))
+            initial_state = tuple(initial_state)
     else:
         raise NotImplementedError(
             "Cell type {0} is not valid".format(params["cell_type"]))
 
     if initial_state is None:
         num_units = params["num_units"]
-    num_cells = params["num_cells"]
     dropout = params.get("dropout", None)
     cell_args = params.get("cell_args", {})
     if dp_masks is not None or dropout is None:
@@ -69,11 +73,15 @@ def rnn(
             else:
                 dp = None
 
+            if i == 0:
+                num_inputs = inputs.get_shape()[-1]
+            else:
+                num_inputs = num_units
             cell = cell_type(
                 num_units,
                 dropout_mask=dp,
                 dtype=dtype,
-                num_inputs=inputs.get_shape()[-1],
+                num_inputs=num_inputs,
                 weights_scope="{0}_{1}".format(params["cell_type"], i),
                 **cell_args)
             
