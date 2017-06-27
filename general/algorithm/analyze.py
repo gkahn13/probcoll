@@ -12,8 +12,7 @@ class Analyze:
         self.on_replay = on_replay
         self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
 
-        yamls = [fname for fname in os.listdir(self._save_dir) if '.yaml' in fname and '~' not in fname]
-        yaml_path = os.path.join(self._save_dir, yamls[0])
+        yaml_path = self._get_yaml(self._save_dir)
         load_params(yaml_path)
         params['yaml_path'] = yaml_path
 
@@ -26,6 +25,11 @@ class Analyze:
     ### Files ###
     #############
 
+    def _get_yaml(self, dir_name):
+        yamls = [fname for fname in os.listdir(dir_name) if '.yaml' in fname and '~' not in fname]
+        yaml_path = os.path.join(dir_name, yamls[0])
+        return yaml_path
+    
     def _itr_dir(self, itr):
         assert(type(itr) is int)
         dir = os.path.join(self._save_dir, 'itr{0}'.format(itr))

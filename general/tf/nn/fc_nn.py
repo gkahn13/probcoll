@@ -7,39 +7,39 @@ def fcnn(
         params,
         dp_masks=None,
         dtype=tf.float32,
-        scope="fcnn",
+        scope='fcnn',
         reuse=False,
         is_training=True):
     
-    if "hidden_activation" not in params:
+    if 'hidden_activation' not in params:
         hidden_activation = None
-    elif params["hidden_activation"] == "relu":
+    elif params['hidden_activation'] == 'relu':
         hidden_activation = tf.nn.relu
-    elif params["hidden_activation"] == "tanh":
+    elif params['hidden_activation'] == 'tanh':
         hidden_activation = tf.nn.tanh
     else:
         raise NotImplementedError(
-            "Hidden activation {0} is not valid".format(
-                params["hidden_activation"]))
+            'Hidden activation {0} is not valid'.format(
+                params['hidden_activation']))
 
-    if "output_activation" not in params:
+    if 'output_activation' not in params or params['output_activation'] == 'None':
         output_activation = None
-    elif params["output_activation"] == "sigmoid":
+    elif params['output_activation'] == 'sigmoid':
         output_activation = tf.nn.sigmoid
-    elif params["output_activation"] == "softmax":
+    elif params['output_activation'] == 'softmax':
         output_activation = tf.nn.softmax
-    elif params["output_activation"] == "relu":
+    elif params['output_activation'] == 'relu':
         output_activation = tf.nn.relu
-    elif params["output_activation"] == "tanh":
+    elif params['output_activation'] == 'tanh':
         output_activation = tf.nn.tanh
     else:
         raise NotImplementedError(
-            "Output activation {0} is not valid".format(
-                params["output_activation"]))
+            'Output activation {0} is not valid'.format(
+                params['output_activation']))
 
-    hidden_layers = params.get("hidden_layers", [])
-    output_dim = params["output_dim"]
-    dropout = params.get("dropout", None)
+    hidden_layers = params.get('hidden_layers', [])
+    output_dim = params['output_dim']
+    dropout = params.get('dropout', None)
     if dp_masks is not None or dropout is None:
         dp_return_masks = None
     else:

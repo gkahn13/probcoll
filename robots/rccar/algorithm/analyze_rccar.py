@@ -1,5 +1,4 @@
 import os, sys, pickle
-import rospy, rosbag
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -12,13 +11,18 @@ from config import params
 class AnalyzeRCcar(Analyze):
 
     def __init__(self, on_replay=False):
-#        rospy.init_node('analyze_rccar', anonymous=True)
         Analyze.__init__(self, on_replay=on_replay, parent_exp_dir=None)
 
     #######################
     ### Data processing ###
     #######################
 
+    def _success_percentage(self, samples):
+        tot = len(samples)
+        num_suc = 0.0
+        for sample in samples:
+            num_suc += (1. - float(sample.get_O(t=-1, sub_obs='collision')))
+        return num_suc / tot
 
     #############
     ### Files ###
@@ -33,6 +37,7 @@ class AnalyzeRCcar(Analyze):
         else:
             prefix = ''
         return os.path.join(self._save_dir, self._image_folder, '{0}_trajectories_{1}.png'.format(prefix, itr))
+
 
     ################
     ### Plotting ###
@@ -84,8 +89,6 @@ class AnalyzeRCcar(Analyze):
                 times,
                 dur_means,
                 yerr=dur_stds)
-#        else:
-#            axes[0].errorbar([-1]+list(itrs), dur_means*2, yerr=dur_stds*2)
             axes[0].set_title('Time until crash')
             axes[0].set_ylabel('Duration (s)')
             axes[0].set_xlabel('Steps')
@@ -108,8 +111,6 @@ class AnalyzeRCcar(Analyze):
                     crash_speed_stds.append(0)
             if len(itrs) > 1:
                 axes[1].errorbar(itrs, crash_speed_means, crash_speed_stds)
-    #        else:
-    #            axes[1].errorbar([-1]+list(itrs), crash_speed_means*2, crash_speed_stds*2)
             # TODO size issue
             axes[1].set_title('Speed at crash')
             axes[1].set_ylabel('Speed (m/s)')
@@ -221,10 +222,8 @@ class AnalyzeRCcar(Analyze):
         try:
             self._plot_statistics()
         except:
-            pass
+            self._logger.debug('No training trajectories were loaded to analyze')
         try:
             self._plot_statistics(testing=True)
         except:
-            pass 
-#        finally:
-#            rospy.signal_shutdown('')
+            self._logger.debug('No testing trajectoreis were loaded to analyze')

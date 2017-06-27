@@ -1,37 +1,37 @@
 from general.tf import tf_utils
 import tensorflow as tf
 
-def convnn(inputs, params, scope="convnn", dtype=tf.float32, reuse=False, is_training=True):
+def convnn(inputs, params, scope='convnn', dtype=tf.float32, reuse=False, is_training=True):
 
-    if params["conv_activation"] == "relu":
+    if params['conv_activation'] == 'relu':
         conv_activation = tf.nn.relu
     else:
         raise NotImplementedError(
-            "Conv activation {0} is not valid".format(
-                params["conv_activation"]))
+            'Conv activation {0} is not valid'.format(
+                params['conv_activation']))
 
-    if "output_activation" not in params:
+    if 'output_activation' not in params:
         output_activation = None
-    elif params["output_activation"] == "sigmoid":
+    elif params['output_activation'] == 'sigmoid':
         output_activation = tf.nn.sigmoid
-    elif params["output_activation"] == "softmax":
+    elif params['output_activation'] == 'softmax':
         output_activation = tf.nn.softmax
     elif params['output_activation'] == 'spatial_softmax':
         output_activation = lambda x: tf_utils.spatial_soft_argmax(x, dtype) 
-    elif params["output_activation"] == "tanh":
+    elif params['output_activation'] == 'tanh':
         output_activation = tf.nn.tanh
     elif params['output_activation'] == 'relu':
         output_activation = tf.nn.relu
     else:
         raise NotImplementedError(
-            "Output activation {0} is not valid".format(
-                params["output_activation"]))
+            'Output activation {0} is not valid'.format(
+                params['output_activation']))
     
-    kernels = params["kernels"]
-    filters = params["filters"]
-    strides = params["strides"]
+    kernels = params['kernels']
+    filters = params['filters']
+    strides = params['strides']
     # Assuming all paddings will be the same type
-    padding = params["padding"]
+    padding = params['padding']
     next_layer_input = inputs
     if params.get('use_batch_norm', False):
         normalizer_fn = tf.contrib.layers.batch_norm
