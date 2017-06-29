@@ -1,5 +1,4 @@
 import os, sys, pickle
-import rospy, rosbag
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -18,6 +17,12 @@ class AnalyzeRCcar(Analyze):
     ### Data processing ###
     #######################
 
+    def _success_percentage(self, samples):
+        tot = len(samples)
+        num_suc = 0.0
+        for sample in samples:
+            num_suc += (1. - float(sample.get_O(t=-1, sub_obs='collision')))
+        return num_suc / tot
 
     #############
     ### Files ###
@@ -32,6 +37,7 @@ class AnalyzeRCcar(Analyze):
         else:
             prefix = ''
         return os.path.join(self._save_dir, self._image_folder, '{0}_trajectories_{1}.png'.format(prefix, itr))
+
 
     ################
     ### Plotting ###
@@ -216,8 +222,8 @@ class AnalyzeRCcar(Analyze):
         try:
             self._plot_statistics()
         except:
-            pass
+            self._logger.debug('No training trajectories were loaded to analyze')
         try:
             self._plot_statistics(testing=True)
         except:
-            pass 
+            self._logger.debug('No testing trajectoreis were loaded to analyze')

@@ -8,19 +8,19 @@ def rnn(
         initial_state=None,
         dp_masks=None,
         dtype=tf.float32,
-        scope="rnn",
+        scope='rnn',
         reuse=False):
   
     """
     inputs is shape [batch_size x T x features].
     """
-    num_cells = params["num_cells"]
-    if params["cell_type"] == "rnn":
+    num_cells = params['num_cells']
+    if params['cell_type'] == 'rnn':
         cell_type = rnn_cell.DpRNNCell
         if initial_state is not None:
             initial_state = tf.split(initial_state, num_cells, axis=1) 
             num_units = initial_state[0].get_shape()[1].value
-    elif params["cell_type"] == "mulint_rnn":
+    elif params['cell_type'] == 'mulint_rnn':
         cell_type = rnn_cell.DpMulintRNNCell
         if initial_state is not None:
             initial_state = tuple(tf.split(initial_state, num_cells, axis=1))
@@ -45,12 +45,12 @@ def rnn(
             initial_state = tuple(initial_state)
     else:
         raise NotImplementedError(
-            "Cell type {0} is not valid".format(params["cell_type"]))
+            'Cell type {0} is not valid'.format(params['cell_type']))
 
     if initial_state is None:
-        num_units = params["num_units"]
-    dropout = params.get("dropout", None)
-    cell_args = params.get("cell_args", {})
+        num_units = params['num_units']
+    dropout = params.get('dropout', None)
+    cell_args = params.get('cell_args', {})
     if dp_masks is not None or dropout is None:
         dp_return_masks = None
     else:
@@ -82,7 +82,7 @@ def rnn(
                 dropout_mask=dp,
                 dtype=dtype,
                 num_inputs=num_inputs,
-                weights_scope="{0}_{1}".format(params["cell_type"], i),
+                weights_scope='{0}_{1}'.format(params['cell_type'], i),
                 **cell_args)
             
             cells.append(cell)
