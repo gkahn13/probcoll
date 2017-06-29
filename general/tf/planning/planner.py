@@ -15,9 +15,10 @@ class Planner(object):
         self.probcoll_model = probcoll_model
         self.params = params
         self.dtype = self.probcoll_model.dtype
+        self.reset_ops = []
         self._setup()
         self._setup_noise()
-
+        
     @abc.abstractmethod
     def _setup(self):
         """Needs to define the placeholders self.O_input and 
@@ -61,7 +62,8 @@ class Planner(object):
         pass
 
     def plan(self, obs_frame, t, rollout_num, only_noise=False, visualize=False):
-        # TODO figure out general way to handle state
+        if t == 0:
+            self.probcoll_model.sess.run(self.reset_ops)
         o_im_input = []
         o_vec_input = []
         for o in obs_frame:
@@ -69,10 +71,11 @@ class Planner(object):
             o_vec_input.append(o[self.probcoll_model.O_vec_idxs()])
         o_im_input = np.concatenate(o_im_input).reshape(1, -1)
         o_vec_input = np.concatenate(o_vec_input).reshape(1, -1)
+        # TODO add time dependence
         feed_dict = {
                 self.O_im_input: o_im_input.astype(np.uint8),
                 self.O_vec_input: o_vec_input,
-                self.eps_ph: self.eps_schedule.value(rollout_num)
+                self.eps_ph: self.eps_schedule.value(rollout_num),
             }
         if visualize:
             action_noisy, action, actions_considered, \

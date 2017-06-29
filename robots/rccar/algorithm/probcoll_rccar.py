@@ -121,6 +121,8 @@ class ProbcollRCcar(Probcoll):
                             for j in xrange(num_per_ran):
                                 val = diff * ((j + 0.0)/num_per_ran) + low
                                 conditions.append(val) 
+                elif params['world']['testing'].get('positions', None) is not None:
+                    conditions = params['world']['testing']['positions']
                 samples = []
                 reset_pos, reset_quat = self._agent.get_sim_state_data() 
                 for cond in xrange(len(conditions)):

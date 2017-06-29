@@ -12,7 +12,6 @@ import sys
 import copy
 import rospy
 import string
-import multiprocessing
 
 from general.tf import tf_utils
 from general.tf.nn.fc_nn import fcnn
@@ -63,6 +62,8 @@ class ProbcollModel:
         self.threads = []
         self.graph = tf.Graph()
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
+        if params['probcoll']['asynchronous_training']:
+            self.gpu_fraction = self.gpu_fraction / 2.0
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
         config = tf.ConfigProto(
             gpu_options=gpu_options,
@@ -265,7 +266,7 @@ class ProbcollModel:
                 for sample in self._modify_sample(og_sample):
                     s_params = sample._meta_data
                     U = sample.get_U()[:, self.U_idxs(p=s_params)]
-                    O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)].astype(np.uint8) # TODO
+                    O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)].astype(np.uint8)
                     O_vec = sample.get_O()[:, self.O_vec_idxs(p=s_params)]
                     output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
                     buffer_len = 0
@@ -327,7 +328,6 @@ class ProbcollModel:
                 for j in range(len(U) - self.T + 1):
                     feature = {}
                     feature['U'] = _floatlist_feature(np.ravel(U[j:j+self.T]).tolist())
-                    # TODO figure out how to keep types properly
                     if j < self.num_O - 1:
                         obs_im = O_im[:j].ravel()
                         obs_im_extended = np.concatenate([np.zeros(self.dO_im - obs_im.shape[0], dtype=np.uint8), obs_im])
@@ -395,34 +395,35 @@ class ProbcollModel:
         tot_no = sum([len(no_coll_data["output"][i]) - self.T + 1 for i in range(no_coll_len)])
         self._logger.info("Size of no collision data: {0}".format(tot_no))
         self._logger.info("Size of collision data: {0}".format(tot_coll))
-
+        coll_val_index = int(np.max([1, coll_len * self.val_pct]))
+        no_coll_val_index = int(np.max([1, no_coll_len * self.val_pct])) 
         self._save_tfrecords(
             tfrecords_no_coll_train, 
-            no_coll_data["U"][int(no_coll_len * self.val_pct):],
-            no_coll_data["O_im"][int(no_coll_len * self.val_pct):],
-            no_coll_data["O_vec"][int(no_coll_len * self.val_pct):],
-            no_coll_data["output"][int(no_coll_len * self.val_pct):])
+            no_coll_data["U"][no_coll_val_index:],
+            no_coll_data["O_im"][no_coll_val_index:],
+            no_coll_data["O_vec"][no_coll_val_index:],
+            no_coll_data["output"][no_coll_val_index:])
 
         self._save_tfrecords(
             tfrecords_coll_train, 
-            coll_data["U"][int(coll_len * self.val_pct):],
-            coll_data["O_im"][int(coll_len * self.val_pct):],
-            coll_data["O_vec"][int(coll_len * self.val_pct):],
-            coll_data["output"][int(coll_len * self.val_pct):])
+            coll_data["U"][coll_val_index:],
+            coll_data["O_im"][coll_val_index:],
+            coll_data["O_vec"][coll_val_index:],
+            coll_data["output"][coll_val_index:])
 
         self._save_tfrecords(
             tfrecords_no_coll_val, 
-            no_coll_data["U"][:int(no_coll_len * self.val_pct)],
-            no_coll_data["O_im"][:int(no_coll_len * self.val_pct)],
-            no_coll_data["O_vec"][:int(no_coll_len * self.val_pct)],
-            no_coll_data["output"][:int(no_coll_len * self.val_pct)])
+            no_coll_data["U"][:no_coll_val_index],
+            no_coll_data["O_im"][:no_coll_val_index],
+            no_coll_data["O_vec"][:no_coll_val_index],
+            no_coll_data["output"][:no_coll_val_index])
 
         self._save_tfrecords(
             tfrecords_coll_val, 
-            coll_data["U"][:int(coll_len * self.val_pct)],
-            coll_data["O_im"][:int(coll_len * self.val_pct)],
-            coll_data["O_vec"][:int(coll_len * self.val_pct)],
-            coll_data["output"][:int(coll_len * self.val_pct)])
+            coll_data["U"][:coll_val_index],
+            coll_data["O_im"][:coll_val_index],
+            coll_data["O_vec"][:coll_val_index],
+            coll_data["output"][:coll_val_index])
 
     #############
     ### Graph ###
@@ -460,7 +461,6 @@ class ProbcollModel:
             features['fname'] = tf.FixedLenFeature([], tf.string)
             features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
             features['O_im'] = tf.FixedLenFeature([], tf.string)
-#            features['O_im'] = tf.FixedLenFeature([self.dO_im], tf.float32)
             features['O_vec'] = tf.FixedLenFeature([self.dO_vec], tf.float32)
             features['output'] = tf.FixedLenFeature([], tf.string)
             features['len'] = tf.FixedLenFeature([], tf.int64)
@@ -513,12 +513,12 @@ class ProbcollModel:
             outputs = []
             lens = []
             for i in range(self.num_bootstrap):
-                fnames.append(tf.concat(0, [bootstrap_fnames[0][i], bootstrap_fnames[1][i]]))
-                U_inputs.append(tf.concat(0, [bootstrap_U_inputs[0][i], bootstrap_U_inputs[1][i]]))
-                O_im_inputs.append(tf.concat(0, [bootstrap_O_im_inputs[0][i], bootstrap_O_im_inputs[1][i]]))
-                O_vec_inputs.append(tf.concat(0, [bootstrap_O_vec_inputs[0][i], bootstrap_O_vec_inputs[1][i]]))
-                outputs.append(tf.concat(0, [bootstrap_outputs[0][i], bootstrap_outputs[1][i]]))
-                lens.append(tf.concat(0, [bootstrap_lens[0][i], bootstrap_lens[1][i]]))
+                fnames.append(tf.concat([bootstrap_fnames[0][i], bootstrap_fnames[1][i]], axis=0))
+                U_inputs.append(tf.concat([bootstrap_U_inputs[0][i], bootstrap_U_inputs[1][i]], axis=0))
+                O_im_inputs.append(tf.concat([bootstrap_O_im_inputs[0][i], bootstrap_O_im_inputs[1][i]], axis=0))
+                O_vec_inputs.append(tf.concat([bootstrap_O_vec_inputs[0][i], bootstrap_O_vec_inputs[1][i]], axis=0))
+                outputs.append(tf.concat([bootstrap_outputs[0][i], bootstrap_outputs[1][i]], axis=0))
+                lens.append(tf.concat([bootstrap_lens[0][i], bootstrap_lens[1][i]], axis=0))
 
         return fnames, U_inputs, O_im_inputs, O_vec_inputs, outputs, lens, filename_queues, filename_vars
 
@@ -548,10 +548,10 @@ class ProbcollModel:
             obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
         num_devices = len(params['model']['O_im_order'])
         obs_shaped_list = []
-        obs_frames = tf.split(1, self.num_O, obs_im_float)
+        obs_frames = tf.split(obs_im_float, self.num_O, axis=1)
         # TODO do reshaping in better way 
         for obs_t in obs_frames:
-            obss = tf.split(1, num_devices, obs_t)
+            obss = tf.split(obs_t, num_devices, axis=1)
             for obs, device in zip(obss, params['model']['O_im_order']):
                 obs_shaped = tf.reshape(
                     obs,
@@ -564,7 +564,7 @@ class ProbcollModel:
                 obs_shaped_list.append(obs_shaped)
         # TODO dropout
         im_output, _ = observation_graph(
-            tf.concat(3, obs_shaped_list),
+            tf.concat(obs_shaped_list, axis=3),
             params['model']['image_graph'],
             dtype=self.dtype,
             scope=scope,
@@ -573,7 +573,7 @@ class ProbcollModel:
         if len(im_output.get_shape()) > 2:
             im_output = tf.contrib.layers.flatten(im_output)
         output, _ = fcnn(
-            tf.concat(1, [im_output, observation_vec]),
+            tf.concat([im_output, observation_vec], axis=1),
             params['model']['observation_graph'],
             dtype=self.dtype,
             scope=scope,
@@ -646,9 +646,9 @@ class ProbcollModel:
                             concat_list.append(initial_state)
 
                     if recurrent:
-                        input_layer = tf.concat(2, concat_list)
+                        input_layer = tf.concat(concat_list, axis=2)
                     else:
-                        input_layer = tf.concat(1, concat_list)
+                        input_layer = tf.concat(concat_list, axis=1)
 
                     if name == 'val' and not self.val_dropout:
                         act_params = copy.deepcopy(params['model']['action_graph'])
@@ -680,10 +680,10 @@ class ProbcollModel:
                             ag_output,
                             (batch_size * self.T, int(ag_output.get_shape()[-1])/self.T))
 
+                    # Dropout should never be put on outputgraph
+                    # Outputgraph should always have output with self.doutput dimension
                     params["model"]["output_graph"]["output_dim"] = self.doutput
                     params["model"]["output_graph"]["dropout"] = None
-                    # TODO dropout acts only on output of layers
-                    # Therefore, dropout should never be put on outputgraph
                     output_mat_b, _  = fcnn(
                         ag_output,
                         params["model"]["output_graph"],
@@ -782,9 +782,9 @@ class ProbcollModel:
                             concat_list.append(initial_state)
 
                     if recurrent:
-                        input_layer = tf.concat(2, concat_list)
+                        input_layer = tf.concat(concat_list, axis=2)
                     else:
-                        input_layer = tf.concat(1, concat_list)
+                        input_layer = tf.concat(concat_list, axis=1)
 
                     if b > 0:
                         if recurrent:
@@ -834,10 +834,10 @@ class ProbcollModel:
                             ag_output,
                             (batch_size * self.T, int(ag_output.get_shape()[-1])/self.T))
 
+                    # Dropout should never be put on outputgraph
+                    # Outputgraph should always have output with self.doutput dimension
                     params["model"]["output_graph"]["output_dim"] = self.doutput
                     params["model"]["output_graph"]["dropout"] = None
-                    # TODO dropout acts only on output of layers
-                    # Therefore, dropout should never be put on outputgraph
                     output_mat_b, _  = fcnn(
                         ag_output,
                         params["model"]["output_graph"],
@@ -864,11 +864,11 @@ class ProbcollModel:
                 output_pred_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_preds, name='output_pred_mean')
                 std_normalize = (1. / (num_bootstrap - 1)) if num_bootstrap > 1 else 1
                 output_pred_std = tf.sqrt(std_normalize * tf.add_n(
-                    [tf.square(tf.sub(output_pred_b, output_pred_mean)) for output_pred_b in bootstrap_output_preds]))
+                    [tf.square(output_pred_b - output_pred_mean) for output_pred_b in bootstrap_output_preds]))
 
                 output_mat_mean = (1. / num_bootstrap) * tf.add_n(bootstrap_output_mats, name='output_mat_mean')
                 output_mat_std = tf.sqrt(std_normalize * tf.add_n(
-                    [tf.square(tf.sub(output_mat_b, output_mat_mean)) for output_mat_b in bootstrap_output_mats]))
+                    [tf.square(output_mat_b - output_mat_mean) for output_mat_b in bootstrap_output_mats]))
 
         return output_pred_mean, output_pred_std, output_mat_mean, output_mat_std
 
@@ -910,7 +910,8 @@ class ProbcollModel:
 
                 ### cost
                 with tf.name_scope('cost_b{0}'.format(b)):
-                    cross_entropy_b = tf.nn.sigmoid_cross_entropy_with_logits(output_mat_b, output_b)
+                    # TODO can incorporate weights
+                    cross_entropy_b = tf.nn.sigmoid_cross_entropy_with_logits(logits=output_mat_b, labels=output_b)
                     masked_cross_entropy_b = cross_entropy_b * mask
                     costs.append(tf.reduce_sum(masked_cross_entropy_b) /
                         tf.cast(tf.reduce_sum(mask), self.dtype))
@@ -930,7 +931,7 @@ class ProbcollModel:
                     num_errs_on_nocoll += tf.reduce_sum(output_b_nocoll * output_incorrect_b)
 
             with tf.name_scope('total'):
-                cross_entropy = tf.reduce_mean(tf.concat(0, costs))
+                cross_entropy = tf.reduce_mean(tf.concat(costs, axis=0))
                 weight_decay = reg * tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
                 cost = cross_entropy + weight_decay
                 err = (1. / tf.cast(num_coll + num_nocoll, self.dtype)) * (num_errs_on_coll + num_errs_on_nocoll)
@@ -990,7 +991,7 @@ class ProbcollModel:
                 coll_queue.dequeue_up_to(self._string_input_capacity)
             ]
 
-    def _graph_init_vars(self):
+    def graph_init_vars(self):
         self.sess.run(
             self._initializer)
 
@@ -1036,7 +1037,7 @@ class ProbcollModel:
             self._graph_queue_update()
             ### initialize
             self._initializer = [tf.local_variables_initializer(), tf.global_variables_initializer()]
-            self._graph_init_vars()
+            self.graph_init_vars()
 
             # Set logs writer into folder /tmp/tensorflow_logs
             merged = tf.summary.merge_all()
@@ -1055,6 +1056,36 @@ class ProbcollModel:
     def _create_output(self, output):
         return output
 
+    def _update_file_queue(self):
+        if len(self.tfrecords_no_coll_val_fnames) > 0 and len(self.tfrecords_coll_val_fnames) > 0:
+            self._logger.debug('Updating queues with train files {0} {1} and val files {2} {3}'.format(
+                self.tfrecords_no_coll_train_fnames,
+                self.tfrecords_coll_train_fnames,
+                self.tfrecords_no_coll_val_fnames,
+                self.tfrecords_coll_val_fnames))
+            self.sess.run(
+                self._queue_update,
+                {
+                    self._no_coll_train_fnames_ph : self.tfrecords_no_coll_train_fnames,
+                    self._coll_train_fnames_ph : self.tfrecords_coll_train_fnames,
+                    self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
+                    self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
+                })
+        else:
+            self._logger.debug('Updating queues with train files {0} {1} '.format(
+                self.tfrecords_no_coll_train_fnames,
+                self.tfrecords_coll_train_fnames))
+            self._logger.info('Skipping validation due to lack of data')
+            self.sess.run(
+                self._queue_update,
+                {
+                    self._no_coll_train_fnames_ph : self.tfrecords_no_coll_train_fnames,
+                    self._coll_train_fnames_ph : self.tfrecords_coll_train_fnames,
+                    self._no_coll_val_fnames_ph : self.tfrecords_no_coll_train_fnames,
+                    self._coll_val_fnames_ph : self.tfrecords_coll_train_fnames
+                })
+
+
     def _flush_queue(self):
         # Flush file name queues
         for tfrecords_fnames, dequeue in (
@@ -1070,221 +1101,199 @@ class ProbcollModel:
             self.sess.run([self.d_train['U_inputs'], self.d_val['U_inputs']])
 
     def train(self, reset=False, **kwargs):
-
-        self.graph.as_default()
-        num_files = len(self.tfrecords_no_coll_train_fnames)
-        new_model_file, model_num  = self._next_model_file()
-        if self.reset_freq > 0:
-            reset = reset or (model_num % self.reset_freq == 0 and model_num != 0)
-        if reset:
-            self._logger.debug('Resetting model')
-            self._graph_init_vars()
-
-        self._logger.debug('Updating queue with train files {0} {1} and val files {2} {3}'.format(
-            self.tfrecords_no_coll_train_fnames,
-            self.tfrecords_coll_train_fnames,
-            self.tfrecords_no_coll_val_fnames,
-            self.tfrecords_coll_val_fnames))
-        self.sess.run(
-            self._queue_update,
-            {
-                self._no_coll_train_fnames_ph : self.tfrecords_no_coll_train_fnames,
-                self._coll_train_fnames_ph : self.tfrecords_coll_train_fnames,
-                self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
-                self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
-            })
-        
-        if not hasattr(self, 'coord'):
-            self.coord = tf.train.Coordinator()
-            self.threads += tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
-
-        self._logger.debug('Flushing queue')
-        self._flush_queue()
-
-        ### create plotter
-        plotter = MLPlotter(
-            self.save_dir,
-            {
-                'err': {
-                    'title': 'Error',
-                    'subplot': 0,
-                    'color': 'k',
-                    'ylabel': 'Percentage'
-                },
-                'err_coll': {
-                    'title': 'Error Collision',
-                    'subplot': 1,
-                    'color': 'r',
-                    'ylabel': 'Percentage'
-                },
-                'err_nocoll': {
-                    'title': 'Error no collision',
-                    'subplot': 2,
-                    'color': 'g',
-                    'ylabel': 'Percentage'
-                },
-                'cost': {
-                    'title': 'Cost',
-                    'subplot': 3,
-                    'color': 'k',
-                    'ylabel': 'cost'
-                },
-                'cross_entropy': {
-                    'subplot': 3,
-                    'color': 'm'
-                }
-            })
-
-        ### train
-        train_values = defaultdict(list)
-        train_nums = defaultdict(float)
-        train_fnames_dict = defaultdict(int)
-
-        step = 0
-        epoch_start = save_start = time.time()
-        if reset:
-            itr_steps = self.reset_steps
+        if len(self.tfrecords_no_coll_train_fnames) == 0 and len(self.tfrecords_coll_train_fnames) == 0:
+            self._logger.info('Training skipped due to lack of data')
         else:
-            itr_steps = self.steps
-        while step < itr_steps and not rospy.is_shutdown():
+            self.graph.as_default()
+            num_files = len(self.tfrecords_no_coll_train_fnames)
+            new_model_file, model_num  = self._next_model_file()
+            if self.reset_freq > 0:
+                reset = reset or (model_num % self.reset_freq == 0 and model_num != 0)
+            if reset:
+                self._logger.debug('Resetting model')
+                self.graph_init_vars()
 
-            new_num_files = len(self.tfrecords_no_coll_train_fnames)
+            self._update_file_queue()
 
-            if new_num_files > num_files:
-                num_files = new_num_files
-                self._logger.debug('Updating queue with train files {0} {1} and val files {2} {3}'.format(
-                    self.tfrecords_no_coll_train_fnames,
-                    self.tfrecords_coll_train_fnames,
-                    self.tfrecords_no_coll_val_fnames,
-                    self.tfrecords_coll_val_fnames))
-                self.sess.run(
-                    self._queue_update,
-                    {
-                        self._no_coll_train_fnames_ph : self.tfrecords_no_coll_train_fnames,
-                        self._coll_train_fnames_ph : self.tfrecords_coll_train_fnames,
-                        self._no_coll_val_fnames_ph : self.tfrecords_no_coll_val_fnames,
-                        self._coll_val_fnames_ph : self.tfrecords_coll_val_fnames
-                    })
-                self._logger.debug('Flushing queue')
-                self._flush_queue()
+            if not hasattr(self, 'coord'):
+                self.coord = tf.train.Coordinator()
+                self.threads += tf.train.start_queue_runners(sess=self.sess, coord=self.coord)
 
-            ### validation
-            if (step != 0 and len(self.tfrecords_no_coll_val_fnames) > 0 \
-                    and len(self.tfrecords_coll_val_fnames) > 0 and \
-                    (step % int(self.val_freq * itr_steps)) == 0):
-                val_values = defaultdict(list)
-                val_nums = defaultdict(float)
-                val_steps = 0
-                self._logger.info('\tComputing validation...')
-                while val_steps < self.val_steps and not rospy.is_shutdown():
-                    val_cost, val_cross_entropy, \
-                    val_err, val_err_coll, val_err_nocoll, \
-                    val_fnames, val_coll, val_nocoll = \
-                        self.sess.run(
-                            [self.d_val['cost'], self.d_val['cross_entropy'],
-                            self.d_val['err'], self.d_val['err_coll'], self.d_val['err_nocoll'],
-                            self.d_val['fnames'], self.d_val['num_coll'], self.d_val['num_nocoll']])
+            self._logger.debug('Flushing queue')
+            self._flush_queue()
 
-                    val_values['cost'].append(val_cost)
-                    val_values['cross_entropy'].append(val_cross_entropy)
-                    val_values['err'].append(val_err)
-                    if not np.isnan(val_err_coll): val_values['err_coll'].append(val_err_coll)
-                    if not np.isnan(val_err_nocoll): val_values['err_nocoll'].append(val_err_nocoll)
-                    val_nums['coll'] += val_coll
-                    val_nums['nocoll'] += val_nocoll
-
-                    val_steps += 1
-
-                plotter.add_val('err', np.mean(val_values['err']))
-                plotter.add_val('err_coll', np.mean(val_values['err_coll']))
-                plotter.add_val('err_nocoll', np.mean(val_values['err_nocoll']))
-                plotter.add_val('cost', np.mean(val_values['cost']))
-                plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
-
-                self._logger.info(
-                    'error: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
-                        100 * np.mean(val_values['err']),
-                        100 * np.mean(val_values['err_coll']),
-                        100 * np.mean(val_values['err_nocoll']),
-                        100 * val_nums['coll'] / (val_nums['coll'] + val_nums['nocoll']),
-                        np.mean(val_values['cost']),
-                        np.mean(val_values['cross_entropy']),
-                        time.time() - epoch_start,
-                        int(self.val_freq * self.batch_size)))
-
-                epoch_start = time.time()
-
-                ### save model
-                if not reset:
-                    self.save(new_model_file)
+            ### create plotter
+            plotter = MLPlotter(
+                self.save_dir,
+                {
+                    'err': {
+                        'title': 'Error',
+                        'subplot': 0,
+                        'color': 'k',
+                        'ylabel': 'Percentage'
+                    },
+                    'err_coll': {
+                        'title': 'Error Collision',
+                        'subplot': 1,
+                        'color': 'r',
+                        'ylabel': 'Percentage'
+                    },
+                    'err_nocoll': {
+                        'title': 'Error no collision',
+                        'subplot': 2,
+                        'color': 'g',
+                        'ylabel': 'Percentage'
+                    },
+                    'cost': {
+                        'title': 'Cost',
+                        'subplot': 3,
+                        'color': 'k',
+                        'ylabel': 'cost'
+                    },
+                    'cross_entropy': {
+                        'subplot': 3,
+                        'color': 'm'
+                    }
+                })
 
             ### train
-            _, train_cost, train_cross_entropy, \
-            train_err, train_err_coll, train_err_nocoll, \
-            train_fnames, train_coll, train_nocoll = self.sess.run(
-                [
-                    self.d_train['optimizer'],
-                    self.d_train['cost'],
-                    self.d_train['cross_entropy'],
-                    self.d_train['err'],
-                    self.d_train['err_coll'],
-                    self.d_train['err_nocoll'],
-                    self.d_train['fnames'],
-                    self.d_train['num_coll'],
-                    self.d_train['num_nocoll']
-                ])
+            train_values = defaultdict(list)
+            train_nums = defaultdict(float)
+            train_fnames_dict = defaultdict(int)
 
-            # Keeps track of how many times files are read
-            for bootstrap_fname in train_fnames:
-                for fname in bootstrap_fname:
-                    train_fnames_dict[fname] += 1
+            step = 0
+            epoch_start = save_start = time.time()
+            if reset:
+                itr_steps = self.reset_steps
+            else:
+                itr_steps = self.steps
+            while step < itr_steps and not rospy.is_shutdown():
 
-            train_values['cost'].append(train_cost)
-            train_values['cross_entropy'].append(train_cross_entropy)
-            train_values['err'].append(train_err)
-            if not np.isnan(train_err_coll): train_values['err_coll'].append(train_err_coll)
-            if not np.isnan(train_err_nocoll): train_values['err_nocoll'].append(train_err_nocoll)
-            train_nums['coll'] += train_coll
-            train_nums['nocoll'] += train_nocoll
+                new_num_files = len(self.tfrecords_no_coll_train_fnames)
 
-            # Print an overview fairly often.
-            if step % self.display_steps == 0 and step > 0:
-                plotter.add_train('err', step * self.batch_size, np.mean(train_values['err']))
-                if len(train_values['err_coll']) > 0:
-                    plotter.add_train('err_coll', step * self.batch_size, np.mean(train_values['err_coll']))
-                if len(train_values['err_nocoll']) > 0:
-                    plotter.add_train('err_nocoll', step * self.batch_size, np.mean(train_values['err_nocoll']))
-                plotter.add_train('cost', step * self.batch_size, np.mean(train_values['cost']))
-                plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
+                if new_num_files > num_files:
+                    num_files = new_num_files
+                    self._update_file_queue()
+                    self._logger.debug('Flushing queue')
+                    self._flush_queue()
 
-                self._logger.info('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
-                    100 * step / float(itr_steps),
-                    100 * np.mean(train_values['err']),
-                    100 * np.mean(train_values['err_coll']),
-                    100 * np.mean(train_values['err_nocoll']),
-                    100 * train_nums['coll'] / (train_nums['coll'] + train_nums['nocoll']),
-                    np.mean(train_values['cost']),
-                    np.mean(train_values['cross_entropy'])))
+                ### validation
+                if (step != 0 and len(self.tfrecords_no_coll_val_fnames) > 0 \
+                        and len(self.tfrecords_coll_val_fnames) > 0 and \
+                        (step % int(self.val_freq * itr_steps)) == 0):
+                    val_values = defaultdict(list)
+                    val_nums = defaultdict(float)
+                    val_steps = 0
+                    self._logger.info('\tComputing validation...')
+                    while val_steps < self.val_steps and not rospy.is_shutdown():
+                        val_cost, val_cross_entropy, \
+                        val_err, val_err_coll, val_err_nocoll, \
+                        val_fnames, val_coll, val_nocoll = \
+                            self.sess.run(
+                                [self.d_val['cost'], self.d_val['cross_entropy'],
+                                self.d_val['err'], self.d_val['err_coll'], self.d_val['err_nocoll'],
+                                self.d_val['fnames'], self.d_val['num_coll'], self.d_val['num_nocoll']])
 
-                train_values = defaultdict(list)
-                train_nums = defaultdict(float)
+                        val_values['cost'].append(val_cost)
+                        val_values['cross_entropy'].append(val_cross_entropy)
+                        val_values['err'].append(val_err)
+                        if not np.isnan(val_err_coll): val_values['err_coll'].append(val_err_coll)
+                        if not np.isnan(val_err_nocoll): val_values['err_nocoll'].append(val_err_nocoll)
+                        val_nums['coll'] += val_coll
+                        val_nums['nocoll'] += val_nocoll
 
-            if time.time() - save_start > 60.:
-                plotter.save(self._plots_dir, suffix=str(model_num))
-                save_start = time.time()
+                        val_steps += 1
 
-            step += 1
+                    plotter.add_val('err', np.mean(val_values['err']))
+                    plotter.add_val('err_coll', np.mean(val_values['err_coll']))
+                    plotter.add_val('err_nocoll', np.mean(val_values['err_nocoll']))
+                    plotter.add_val('cost', np.mean(val_values['cost']))
+                    plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
 
-        # Logs the number of times files were accessed
-        fnames_condensed = defaultdict(int)
-        for k, v in train_fnames_dict.items():
-            fnames_condensed[string.join(k.split(self._hash), "")] += v
-        for k, v in sorted(fnames_condensed.items(), key=lambda x: x[1]):
-            self._logger.debug('\t\t\t{0} : {1}'.format(k, v))
+                    self._logger.info(
+                        'error: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
+                            100 * np.mean(val_values['err']),
+                            100 * np.mean(val_values['err_coll']),
+                            100 * np.mean(val_values['err_nocoll']),
+                            100 * val_nums['coll'] / (val_nums['coll'] + val_nums['nocoll']),
+                            np.mean(val_values['cost']),
+                            np.mean(val_values['cross_entropy']),
+                            time.time() - epoch_start,
+                            int(self.val_freq * self.batch_size)))
 
-        self.save(new_model_file)
-        plotter.save(self._plots_dir, suffix=str(model_num))
-        plotter.close()
+                    epoch_start = time.time()
+
+                    ### save model
+                    if not reset:
+                        self.save(new_model_file)
+
+                ### train
+                _, train_cost, train_cross_entropy, \
+                train_err, train_err_coll, train_err_nocoll, \
+                train_fnames, train_coll, train_nocoll = self.sess.run(
+                    [
+                        self.d_train['optimizer'],
+                        self.d_train['cost'],
+                        self.d_train['cross_entropy'],
+                        self.d_train['err'],
+                        self.d_train['err_coll'],
+                        self.d_train['err_nocoll'],
+                        self.d_train['fnames'],
+                        self.d_train['num_coll'],
+                        self.d_train['num_nocoll']
+                    ])
+
+                # Keeps track of how many times files are read
+                for bootstrap_fname in train_fnames:
+                    for fname in bootstrap_fname:
+                        train_fnames_dict[fname] += 1
+
+                train_values['cost'].append(train_cost)
+                train_values['cross_entropy'].append(train_cross_entropy)
+                train_values['err'].append(train_err)
+                if not np.isnan(train_err_coll): train_values['err_coll'].append(train_err_coll)
+                if not np.isnan(train_err_nocoll): train_values['err_nocoll'].append(train_err_nocoll)
+                train_nums['coll'] += train_coll
+                train_nums['nocoll'] += train_nocoll
+
+                # Print an overview fairly often.
+                if step % self.display_steps == 0 and step > 0:
+                    plotter.add_train('err', step * self.batch_size, np.mean(train_values['err']))
+                    if len(train_values['err_coll']) > 0:
+                        plotter.add_train('err_coll', step * self.batch_size, np.mean(train_values['err_coll']))
+                    if len(train_values['err_nocoll']) > 0:
+                        plotter.add_train('err_nocoll', step * self.batch_size, np.mean(train_values['err_nocoll']))
+                    plotter.add_train('cost', step * self.batch_size, np.mean(train_values['cost']))
+                    plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
+
+                    self._logger.info('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
+                        100 * step / float(itr_steps),
+                        100 * np.mean(train_values['err']),
+                        100 * np.mean(train_values['err_coll']),
+                        100 * np.mean(train_values['err_nocoll']),
+                        100 * train_nums['coll'] / (train_nums['coll'] + train_nums['nocoll']),
+                        np.mean(train_values['cost']),
+                        np.mean(train_values['cross_entropy'])))
+
+                    train_values = defaultdict(list)
+                    train_nums = defaultdict(float)
+
+                if time.time() - save_start > 60.:
+                    plotter.save(self._plots_dir, suffix=str(model_num))
+                    save_start = time.time()
+
+                step += 1
+
+            # Logs the number of times files were accessed
+            fnames_condensed = defaultdict(int)
+            for k, v in train_fnames_dict.items():
+                fnames_condensed[string.join(k.split(self._hash), "")] += v
+            for k, v in sorted(fnames_condensed.items(), key=lambda x: x[1]):
+                self._logger.debug('\t\t\t{0} : {1}'.format(k, v))
+
+            self.save(new_model_file)
+            plotter.save(self._plots_dir, suffix=str(model_num))
+            plotter.close()
 
     def train_loop(self):
         self._logger.info("Started asynchronous training!")

@@ -9,12 +9,11 @@ def cumulative_increasing_sum(x, dtype=tf.float32):
     """
     # TODO 
     T = tf.shape(x)[1]
-    mask1 = tf.concat(0, [
-            tf.ones((1,), dtype=dtype), tf.zeros((T - 1,), dtype=dtype)
-        ])
-    mask2 = tf.concat(0, [
-            tf.zeros((1,), dtype=dtype), tf.ones((T - 1,), dtype=dtype)
-        ])
+    mask1 = tf.concat(
+        [tf.ones((1,), dtype=dtype), tf.zeros((T - 1,), dtype=dtype)],
+        axis= 0)
+    mask2 = tf.concat([tf.zeros((1,), dtype=dtype), tf.ones((T - 1,), dtype=dtype)],
+        axis=0)
     masked = x * mask1 + tf.nn.relu(x) * mask2
     upper_triangle = tf.matrix_band_part(
         tf.ones((T, T), dtype=dtype),
@@ -27,7 +26,7 @@ def linear(args, output_size, dtype=tf.float32, scope=None):
     with tf.variable_scope(scope or "linear"):
         if isinstance(args, list) or isinstance(args, tuple):
             if len(args) != 1:
-                inputs = tf.concat(1, args)
+                inputs = tf.concat(args, axis=1)
             else:
                 inputs = args[0]
         else:
@@ -94,14 +93,17 @@ def multiplicative_integration(
                     stddev=0.1,
                     dtype=dtype))
 
-            beta1, beta2 = tf.split(0, 2, tf.get_variable(
-                'mulint_params_betas',
-                [output_size * 2],
-                dtype=dtype,
-                initializer=tf.truncated_normal_initializer(
-                    mean=0.5,
-                    stddev=0.1,
-                    dtype=dtype)))
+            beta1, beta2 = tf.split(
+                tf.get_variable(
+                    'mulint_params_betas',
+                    [output_size * 2],
+                    dtype=dtype,
+                    initializer=tf.truncated_normal_initializer(
+                        mean=0.5,
+                        stddev=0.1,
+                        dtype=dtype)),
+                2,
+                axis=0)
 
             original_bias = tf.get_variable(
                 'mulint_original_bias',
@@ -120,8 +122,6 @@ def spatial_soft_argmax(features, dtype=tf.float32):
     """
     features shape is [N, H, W, C]
     """
-#    shape = tf.shape(features)
-#    N, H, W, C = shape[0], shape[1], shape[2], shape[3]
     N = tf.shape(features)[0]
     val_shape = features.get_shape()
     H, W, C = val_shape[1].value, val_shape[2].value, val_shape[3].value

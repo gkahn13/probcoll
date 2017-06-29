@@ -17,28 +17,29 @@ class PlannerPrimitivesRCcar(PlannerPrimitives):
             queue_size=10)
     
     def _create_primitives(self):
-        steers = self.params['primitives']['steers']
-        speeds = self.params['primitives']['speeds']
-        num_splits = self.params['primitives']['num_splits']        
-        controls = []
-        s_len = len(steers)
-        m_len = len(speeds)
-        for n in xrange((s_len * m_len)**num_splits):
-            s_val = n
-            m_val = n // (s_len ** num_splits)
-            control = []
-            horizon_left = self.probcoll_model.T
-            for i in xrange(num_splits):
-                s_index = s_val % s_len
-                s_val = s_val // s_len
-                m_index = m_val % m_len
-                m_val = m_val // m_len
-                cur_len = horizon_left // (num_splits - i)
-                control += [[steers[s_index], speeds[m_index]]] * cur_len
-                horizon_left -= cur_len
-            controls.append(np.array(control))
-        controls = np.array(controls)
-        self.primitives = tf.constant(controls, dtype=self.probcoll_model.dtype)
+        with self.probcoll_model.graph.as_default():
+            steers = self.params['primitives']['steers']
+            speeds = self.params['primitives']['speeds']
+            num_splits = self.params['primitives']['num_splits']        
+            controls = []
+            s_len = len(steers)
+            m_len = len(speeds)
+            for n in xrange((s_len * m_len)**num_splits):
+                s_val = n
+                m_val = n // (s_len ** num_splits)
+                control = []
+                horizon_left = self.probcoll_model.T
+                for i in xrange(num_splits):
+                    s_index = s_val % s_len
+                    s_val = s_val // s_len
+                    m_index = m_val % m_len
+                    m_val = m_val // m_len
+                    cur_len = horizon_left // (num_splits - i)
+                    control += [[steers[s_index], speeds[m_index]]] * cur_len
+                    horizon_left -= cur_len
+                controls.append(np.array(control))
+            controls = np.array(controls)
+            self.primitives = tf.constant(controls, dtype=self.probcoll_model.dtype)
 
     def visualize(
             self,
@@ -49,9 +50,6 @@ class PlannerPrimitivesRCcar(PlannerPrimitives):
             control_costs):
         marker_array = vm.MarkerArray()
 
-#        for i, (sample, cost) in enumerate(zip(samples, costs)):
-#            if sample is None:
-#                continue
         T = actions_considered.shape[1]
         for i, (one_action, cost) in enumerate(zip(actions_considered, coll_costs)):
             
@@ -65,8 +63,6 @@ class PlannerPrimitivesRCcar(PlannerPrimitives):
                 marker.action = marker.ADD
 
                 speed, steer = one_action[t][1] / T, one_action[t][0]
-#                speed = sample.get_U(t=t, sub_control='cmd_vel')[0] / 5.
-#                steer = sample.get_U(t=t, sub_control='cmd_steer')[0]
                 angle += (steer - 50.) / 100. * (np.pi / 2)
                 new_origin = origin + [speed * np.cos(angle), speed * np.sin(angle), 0.]
                 marker.points = [
@@ -81,7 +77,6 @@ class PlannerPrimitivesRCcar(PlannerPrimitives):
                 marker.scale.z = 0.1
 
                 if cost == min(coll_costs):
-#                if cost == min(costs):
                     rgba = (0., 1., 0., 1.)
                     marker.scale.x *= 2
                     marker.scale.y *= 2
@@ -93,9 +88,4 @@ class PlannerPrimitivesRCcar(PlannerPrimitives):
 
                 marker_array.markers.append(marker)
 
-        # for id in xrange(marker.id+1, int(1e4)):
-        #     marker_array.markers.append(vm.Marker(id=id, action=marker.DELETE))
-
         self.debug_cost_probcoll_pub.publish(marker_array)
-
-        # print('probs in [{0:.2f}, {1:.2f}]'.format(min(costs), max(costs)))

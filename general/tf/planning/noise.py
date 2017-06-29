@@ -11,6 +11,6 @@ def UniformNoise(params, shape=(), dtype=tf.float32):
 
 def GaussianNoise(params, shape=(), dtype=tf.float32):
     distribution = tf.contrib.distributions.MultivariateNormalDiag(
-       tf.zeros_like(params['std'], dtype=dtype),
-       tf.constant(params['std'], dtype=dtype))
+       loc=tf.zeros_like(params['std'], dtype=dtype),
+       scale_diag=tf.constant(params['std'], dtype=dtype))
     return tf.cast(distribution.sample(sample_shape=shape), dtype=dtype)

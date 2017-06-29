@@ -47,8 +47,6 @@ class AgentRCcar(Agent):
             self.sim_back_depth = data.back_depth
             self.sim_state = data.pose
             self.sim_vel = data.vel
-#            self.sim_vel = 0.0
-#            self.sim_steer = 0.0
             self.sim_reset = False
             self.sim_last_coll = False
 
@@ -66,7 +64,7 @@ class AgentRCcar(Agent):
 
         self.cv_bridge = cv_bridge.CvBridge()
 
-    def sample_policy(self, x0, policy, rollout_num, T=None, use_noise=True, only_noise=False, **policy_args):
+    def sample_policy(self, x0, policy, rollout_num, T=None, time_step=0, use_noise=True, only_noise=False, **policy_args):
         if T is None:
             T = policy._T
         rate = rospy.Rate(1. / params['dt'])
@@ -83,7 +81,7 @@ class AgentRCcar(Agent):
             if self.sim:
                 x_t = self._get_sim_state(x_t) 
             start = time.time()
-            u_t, u_t_no_noise = policy.act(self.last_n_obs, t, rollout_num, only_noise=only_noise, visualize=visualize)
+            u_t, u_t_no_noise = policy.act(self.last_n_obs, time_step + t, rollout_num, only_noise=only_noise, visualize=visualize)
             self._logger.debug(time.time() - start)
             # only execute control if no collision
             # TODO is this necessary

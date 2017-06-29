@@ -21,8 +21,8 @@ except:
 
 try:
     from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-    from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
-    from robots.rccar.algorithm.train_rccar import TrainRCcar
+    from robots.rccar.analysis.analyze_rccar import AnalyzeRCcar
+    from robots.rccar.analysis.train_rccar import TrainRCcar
 except:
     print('main.py: not importing RC car')
 

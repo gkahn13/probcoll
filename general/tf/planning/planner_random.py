@@ -17,7 +17,7 @@ class PlannerRandom(Planner):
                 self.actions_considered = u_samples
                 self.O_im_input = self.probcoll_model.d_eval['O_im_input']
                 self.O_vec_input = self.probcoll_model.d_eval['O_vec_input']
-                stack_u = tf.concat(0, [u_samples]*self.params['num_dp'])
+                stack_u = tf.concat([u_samples]*self.params['num_dp'], axis=0)
                 # TODO incorporate std later
                 output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
                     stack_u,
@@ -26,19 +26,19 @@ class PlannerRandom(Planner):
                     reuse=True) 
 
                 pred_mean = tf.reduce_mean(
-                    tf.split(0, self.params['num_dp'], output_pred_mean), axis=0)
+                    tf.split(output_pred_mean, self.params['num_dp'], axis=0), axis=0)
 
                 pred_std = tf.reduce_mean(
-                    tf.split(0, self.params['num_dp'], output_pred_std), axis=0)
+                    tf.split(output_pred_std, self.params['num_dp'], axis=0), axis=0)
 
                 mat_mean = tf.reduce_mean(
-                    tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+                    tf.split(output_mat_mean, self.params['num_dp'], axis=0), axis=0)
 
                 mat_std = tf.reduce_mean(
-                    tf.split(0, self.params['num_dp'], output_mat_std), axis=0)
+                    tf.split(output_mat_std, self.params['num_dp'], axis=0), axis=0)
                 
                 mat_mean = tf.reduce_mean(
-                    tf.split(0, self.params['num_dp'], output_mat_mean), axis=0)
+                    tf.split(output_mat_mean, self.params['num_dp'], axis=0), axis=0)
                 
                 control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
                 coll_cost_fn = CostColl(self.params['cost']['coll_cost'])

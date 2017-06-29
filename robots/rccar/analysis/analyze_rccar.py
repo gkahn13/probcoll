@@ -5,14 +5,13 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib
 
-from general.algorithm.analyze import Analyze
+from general.analysis.analyze import Analyze
 
 from config import params
 
 class AnalyzeRCcar(Analyze):
 
     def __init__(self, on_replay=False):
-#        rospy.init_node('analyze_rccar', anonymous=True)
         Analyze.__init__(self, on_replay=on_replay, parent_exp_dir=None)
 
     #######################
@@ -84,8 +83,6 @@ class AnalyzeRCcar(Analyze):
                 times,
                 dur_means,
                 yerr=dur_stds)
-#        else:
-#            axes[0].errorbar([-1]+list(itrs), dur_means*2, yerr=dur_stds*2)
             axes[0].set_title('Time until crash')
             axes[0].set_ylabel('Duration (s)')
             axes[0].set_xlabel('Steps')
@@ -108,8 +105,6 @@ class AnalyzeRCcar(Analyze):
                     crash_speed_stds.append(0)
             if len(itrs) > 1:
                 axes[1].errorbar(itrs, crash_speed_means, crash_speed_stds)
-    #        else:
-    #            axes[1].errorbar([-1]+list(itrs), crash_speed_means*2, crash_speed_stds*2)
             # TODO size issue
             axes[1].set_title('Speed at crash')
             axes[1].set_ylabel('Speed (m/s)')
@@ -226,5 +221,3 @@ class AnalyzeRCcar(Analyze):
             self._plot_statistics(testing=True)
         except:
             pass 
-#        finally:
-#            rospy.signal_shutdown('')

@@ -33,7 +33,7 @@ class DpRNNCell(tf.nn.rnn_cell.BasicRNNCell):
         """Most basic RNN: output = new_state = tanh(W * input + U * state + B). With same dropout at every time step."""
         with tf.variable_scope(scope or type(self).__name__):  # "BasicRNNCell"
             
-            ins = tf.concat(1, [inputs, state])
+            ins = tf.concat([inputs, state], axis=1)
             output = self._activation(tf.matmul(ins, self._weights))
 
             if self._dropout_mask is not None:
@@ -129,10 +129,10 @@ class DpLSTMCell(tf.nn.rnn_cell.BasicLSTMCell):
         with tf.variable_scope(scope or type(self).__name__):  # "BasicRNNCell"
             
             c, h = state
-            ins = tf.concat(1, [inputs, h])
+            ins = tf.concat([inputs, h], axis=1)
             output = self._activation(tf.matmul(ins, self._weights))
 
-            i, j, f, o = tf.split(1, 4, output)
+            i, j, f, o = tf.split(output, 4, axis=1)
             
             forget = c * tf.nn.sigmoid(f + self._forget_bias)
             new = tf.nn.sigmoid(i) * self._activation(j)
@@ -200,7 +200,7 @@ class DpMulintLSTMCell(DpLSTMCell):
                     dtype=self._dtype,
                     weights_already_calculated=True))
             
-            i, j, f, o = tf.split(1, 4, output)
+            i, j, f, o = tf.split(output, 4, axis=1)
             
             forget = c * tf.nn.sigmoid(f + self._forget_bias)
             new = tf.nn.sigmoid(i) * self._activation(j)

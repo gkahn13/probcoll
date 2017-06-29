@@ -18,17 +18,17 @@ def rnn(
     if params["cell_type"] == "rnn":
         cell_type = rnn_cell.DpRNNCell
         if initial_state is not None:
-            initial_state = tf.split(1, num_cells, initial_state) 
+            initial_state = tf.split(initial_state, num_cells, axis=1) 
             num_units = initial_state[0].get_shape()[1].value
     elif params["cell_type"] == "mulint_rnn":
         cell_type = rnn_cell.DpMulintRNNCell
         if initial_state is not None:
-            initial_state = tuple(tf.split(1, num_cells, initial_state))
+            initial_state = tuple(tf.split(initial_state, num_cells, axis=1))
             num_units = initial_state[0].get_shape()[1].value
     elif params['cell_type'] == 'lstm':
         cell_type = rnn_cell.DpLSTMCell
         if initial_state is not None:
-            states = tf.split(1, 2 * num_cells, initial_state)
+            states = tf.split(initial_state, 2 * num_cells, axis=1)
             num_units = states[0].get_shape()[1].value
             initial_state = []
             for i in xrange(num_cells):
@@ -37,7 +37,7 @@ def rnn(
     elif params['cell_type'] == 'mulint_lstm':
         cell_type = rnn_cell.DpMulintLSTMCell
         if initial_state is not None:
-            states = tf.split(1, 2 * num_cells, initial_state)
+            states = tf.split(initial_state, 2 * num_cells, axis=1)
             num_units = states[0].get_shape()[1].value
             initial_state = []
             for i in xrange(num_cells):

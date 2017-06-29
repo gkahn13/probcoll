@@ -1,7 +1,7 @@
-from general.algorithm.train import Train
+from general.analysis.train import Train
 from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
 from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
-from robots.rccar.algorithm.analyze_rccar import AnalyzeRCcar
+from robots.rccar.analysis.analyze_rccar import AnalyzeRCcar
 
 class TrainRCcar(Train):
     def _setup(self):
