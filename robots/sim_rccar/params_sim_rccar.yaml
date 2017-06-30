@@ -1,0 +1,224 @@
+# contains all needed parameters for all files
+
+random_seed: 0
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
+exp_name: 'new_env'
+
+##########################
+### Probcoll algorithm ###
+##########################
+
+probcoll:
+  dt: 0.25
+  T: 256 # timesteps per trajectory
+  logger: 'debug' # debug/info/fatal what level to log
+  max_iter: 10
+  label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+  
+  # Training
+  training_start_iter: 0
+  is_training: True
+  asynchronous_training: False
+
+  # Conditions
+  num_rollouts: 40
+
+######################
+### Probcoll model ###
+######################
+    
+model:
+  T: 8 # how many timesteps to predict
+  logger: 'fatal' # debug/info/warning/fatal what level to log
+  
+  # What to use as input to prediction model
+  U_order: ['cmd_steer', 'cmd_vel']
+  O_im_order: ['camera'] # / 'back_camera'
+  O_vec_order: []
+  output_order: ['collision'] # taken from observations O
+  num_O: 4
+  
+  # Normalize input  
+  center_O_im: False 
+  control_range:
+    lower: [-90., -8.]
+    upper: [90., 8.]
+  
+  # Device
+  device: 0
+  gpu_fraction: 0.8
+
+  # Optimization
+  learning_rate: 5.e-4
+  grad_clip: 5.0
+  beta1: 0.9 # For adam
+  beta2: 0.999 # For adam
+  batch_size: 64
+  pct_coll: 0.75 # rebalancing trajectories
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-5
+  
+  # Train schedule
+  steps: 500
+  reset_freq: 0 # 0 means no resetting
+  reset_steps: 5000
+  display_steps: 50 
+  val_pct: 0.1 # Percent of the data stored as validation
+  val_freq: 0.1 # How often you compute validation (percentage)
+  val_steps: 5  # How many steps you do on validation 
+  val_dropout: True
+
+  # Model architecture
+  dtype: 'float32' # only float32 is currently implemented
+  num_bootstrap: 1 # EXPERIMENTAL
+  prob_coll_strictly_increasing: True # True / False 
+  mask: 'all' # all / last
+
+  image_graph:
+    graph_type: 'cnn'
+    filters: [32, 64, 64]
+    kernels: [8, 4, 3]
+    strides: [4, 2, 1]
+    padding: 'SAME' 
+    use_batch_norm: False
+    conv_activation: 'relu'
+    output_activation: 'relu' # relu / tanh/ spatial_softmax 
+  
+  observation_graph:
+    output_activation: 'tanh'
+    output_dim: 128 # This is the hidden size of the rnn
+  
+  action_graph:
+    graph_type: 'rnn' # fc / rnn
+    num_cells: 1
+    cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
+#    dropout: 1.0 # pct keep
+#    cell_args: # If you need to pass variables to cells 
+
+  output_graph: 
+    graph_type: 'fc'
+ 
+#################################################
+### Planning objective and optimizer settings ###
+#################################################
+
+planning:
+  cost:
+    coll_cost:
+      cost: square # square
+      weight: [0., 10.] 
+      std_weight: 0.0 # EXPERIMENTAL
+      pre_activation: True # EXPERIMENTAL wether std is before or after activation (sigmoid)
+    
+    control_cost:
+      des: [0., 8.] # TODO: hard-coded order: steering then speed
+      cost: square # square
+      weight: [0.0, 1.0]     
+
+  # Planner
+  planner_type: 'cem' # random / cem / random_policy
+  num_dp: 1 # number of dropout passes to average over during planning
+  # control range for your planning algorithms
+  control_range:
+    lower: [-20., 8.]
+    upper: [20., 8.]
+
+  random:
+    K: 1024 # number of actions to sample from
+
+  cem:
+    init_M: 2048 # number of actions to sample from
+    M: 256
+    K: 16 # top actions you select
+    num_iters: 3 # does not include first sample    
+    eps: 0.01 # to ensure covariance is PD
+
+  # Noise / exploration
+  epsilon_greedy:
+    endpoints: [[0, 1.0], [40, 1.0], [200, 0.1], [500, 0.01]]
+    outside_value: 0.01
+    lower: [-20., 8.]
+    upper: [20., 8.]
+
+  control_noise:
+    type: 'gaussian' # zero / gaussian / uniform
+
+    zero: {}
+    gaussian:
+      std: [3.0, 0.3]
+    uniform:
+      lower: [-5., 0.]
+      upper: [5., 0.]
+  
+  # Visualization
+  visualize: False
+  topics:
+    debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
+    debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
+  
+#############
+### World ###
+#############
+
+world:
+  logger: 'info' # debug/info/fatal what level to log for world and agent
+  sim:
+    sim_env: 'square' # square
+    visualize: False
+    use_vel: True
+    accelClamp: 12.0
+    mass: 800.0
+    p: 2000.0
+    i: 0.0
+    d: 90.0
+
+  do_back_up: False
+  back_up:
+    cmd_steer: [-5., 5.]
+    cmd_vel: -8.
+    duration: 3.0
+
+  testing:
+    itr_freq: 2
+    positions: [[40., -35., 0.2, 3.14], [-40., -35., 0.2, 3.14], [40., 20., 0.2, 3.14], [-40., 20., 0.2, 3.14]]
+    num_pos: 10
+    range_type: 'fix_spacing' # fix_spacing / random
+
+######################################################
+########### States, controls, observations ###########
+######################################################
+
+X:
+  dim: 6
+  order: ['position', 'orientation']
+
+  position: {idx: 0, dim: 3}
+  orientation: {idx: 3, dim: 3}
+
+U:
+  dim: 2
+  order: ['cmd_steer', 'cmd_vel']
+
+  cmd_steer: {idx: 0, dim: 1}
+  cmd_vel: {idx: 1, dim: 1}
+
+O:
+  use_depth: True
+
+  dim: 4610
+  order: ['camera', 'back_camera', 'vel', 'collision']
+
+  camera:
+    idx: 0
+    dim: 2304
+    height: 64
+    width: 36
+    num_channels: 1
+  back_camera:
+    idx: 2304
+    dim: 2304
+    height: 64
+    width: 36
+    num_channels: 1
+  vel: {idx: 4608, dim: 1}
+  collision: {idx: 4609, dim: 1, buffer: 0.0}

@@ -10,7 +10,6 @@ import numpy as np
 import tensorflow as tf
 import sys
 import copy
-import rospy
 import string
 
 from general.tf import tf_utils
@@ -93,10 +92,9 @@ class ProbcollModel:
     ### Files ###
     #############
 
-    @abc.abstractproperty
     @property
     def _this_file(self):
-        raise NotImplementedError('Implement in subclass')
+        return os.path.abspath(__file__.replace('.pyc', '.py'))
 
     @property
     def tfrecords_no_coll_train_fnames(self):
@@ -1167,7 +1165,8 @@ class ProbcollModel:
                 itr_steps = self.reset_steps
             else:
                 itr_steps = self.steps
-            while step < itr_steps and not rospy.is_shutdown():
+            # TODO add check for early stopping
+            while step < itr_steps:
 
                 new_num_files = len(self.tfrecords_no_coll_train_fnames)
 
@@ -1185,7 +1184,7 @@ class ProbcollModel:
                     val_nums = defaultdict(float)
                     val_steps = 0
                     self._logger.info('\tComputing validation...')
-                    while val_steps < self.val_steps and not rospy.is_shutdown():
+                    while val_steps < self.val_steps:
                         val_cost, val_cross_entropy, \
                         val_err, val_err_coll, val_err_nocoll, \
                         val_fnames, val_coll, val_nocoll = \
