@@ -19,11 +19,11 @@ class WorldSimRCcar(World):
                 sample.set_U([self.wp['back_up']['cmd_vel']], t=0, sub_control='cmd_vel')
                 u = sample.get_U(t=0)
                 self._logger.info('Backing the car up')
-                for _ in xrange(int(self.wp['back_up']['duration'] / params['dt'])): 
+                for _ in xrange(int(self.wp['back_up']['duration'] / params['probcoll']['dt'])): 
                     self._agent.act(u)
                     if self._agent.coll:
                         break
-                for _ in xrange(int(1.0 / params['dt'])):
+                for _ in xrange(int(1.0 / params['probcoll']['dt'])):
                     self._agent.act()
         else:
             self._agent.reset()

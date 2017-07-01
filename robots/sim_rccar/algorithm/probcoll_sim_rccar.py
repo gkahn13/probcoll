@@ -58,6 +58,8 @@ class ProbcollSimRCcar(Probcoll):
     ###################
 
     def _run_rollout(self, itr):
+        if itr == 0:
+            self._agent.reset()
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
 

@@ -34,11 +34,11 @@ class AgentSimRCcar(Agent):
             self.last_n_obs.append(o_t)
             u_t, u_t_no_noise = policy.act(self.last_n_obs, time_step + t, rollout_num, only_noise=only_noise, visualize=visualize)
             # Only execute control if no collision
-#            if self.coll:
-            if use_noise:
-                self.act(u_t)
-            else:
-                self.act(u_t_no_noise)
+            if not self.coll:
+                if use_noise:
+                    self.act(u_t)
+                else:
+                    self.act(u_t_no_noise)
 
             # Record
             policy_sample.set_X(x_t, t=t)

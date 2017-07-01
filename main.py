@@ -119,7 +119,7 @@ if __name__ == '__main__':
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 
-        analyze.run(args.plot_single, args.plot_traj, args.plot_samples, args.plot_groundtruth)
+        analyze.run()
 
     elif run == 'train':
         if args.data_dirs is None:

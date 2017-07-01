@@ -12,13 +12,13 @@ probcoll:
   dt: 0.25
   T: 256 # timesteps per trajectory
   logger: 'debug' # debug/info/fatal what level to log
-  max_iter: 10
+  max_iter: 40
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
   training_start_iter: 0
-  is_training: True
-  asynchronous_training: False
+  is_training: True # EXPERIMENTAL
+  asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
   num_rollouts: 40
@@ -172,11 +172,11 @@ world:
     i: 0.0
     d: 90.0
 
-  do_back_up: False
+  do_back_up: True
   back_up:
     cmd_steer: [-5., 5.]
     cmd_vel: -8.
-    duration: 3.0
+    duration: 1.0
 
   testing:
     itr_freq: 2

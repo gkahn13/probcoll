@@ -232,7 +232,6 @@ class CarEnv(DirectObject):
                     break
         else:
             self._curr_time += dt
-            print('error')
             if self._curr_time > 0.05:
                 if self._des_vel is not None:
                     vel = self._vehicle.getCurrentSpeedKmHour()
@@ -260,7 +259,6 @@ class CarEnv(DirectObject):
             hpr = self._default_hpr()
         self._steering = 0.0
         self._engineForce = 0.0
-        
         self._vehicle.setSteeringValue(0.0, 0)
         self._vehicle.setSteeringValue(0.0, 1)
         self._vehicle.setBrake(1000.0, 2)

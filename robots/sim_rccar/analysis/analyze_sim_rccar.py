@@ -67,11 +67,15 @@ class AnalyzeSimRCcar(Analyze):
 
     def _plot_position(self, samples_itrs, testing=False):
         positions_itrs = [] 
+        blue_line = matplotlib.lines.Line2D([], [], color='b', label='collision')
+        red_line = matplotlib.lines.Line2D([], [], color='r', label='no collision')
         for itr, samples in enumerate(samples_itrs):
             positions_x, positions_y, collision = [], [], []
             plt.figure()
             if testing:
-                plt.title('Trajectories for testing itr {0}\n{1}'.format(itr, params['exp_name']))
+                plt.title('Trajectories for testing itr {0}\n{1}'.format(
+                    itr * params['world']['testing']['itr_freq'],
+                    params['exp_name']))
             else:
                 plt.title('Trajectories for itr {0}\n{1}'.format(itr, params['exp_name']))
             plt.xlabel('X position')
@@ -80,6 +84,7 @@ class AnalyzeSimRCcar(Analyze):
             if params['world']['sim']['sim_env'] == 'square':
                 plt.ylim([-60, 60])
                 plt.xlim([-60, 60])
+                plt.legend(handles=[blue_line, red_line], loc='center')
             for s in samples:
                 pos = s.get_X(sub_state='position')
                 is_coll = s.get_O(t=-1, sub_obs='collision')
@@ -104,8 +109,8 @@ class AnalyzeSimRCcar(Analyze):
         try:
             self._plot_statistics()
         except:
-            self._logger.debug('No training trajectories were loaded to analyze')
+            self._logger.info('No training trajectories were loaded to analyze')
         try:
             self._plot_statistics(testing=True)
         except:
-            self._logger.debug('No testing trajectoreis were loaded to analyze')
+            self._logger.info('No testing trajectoreis were loaded to analyze')
