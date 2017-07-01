@@ -12,7 +12,7 @@ probcoll:
   dt: 0.25
   T: 256 # timesteps per trajectory
   logger: 'debug' # debug/info/fatal what level to log
-  max_iter: 40
+  max_iter: 11
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -33,7 +33,7 @@ model:
   
   # What to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
-  O_im_order: ['camera'] # / 'back_camera'
+  O_im_order: ['camera'] # 'camera' / 'back_camera'
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 4
@@ -50,13 +50,13 @@ model:
 
   # Optimization
   learning_rate: 5.e-4
-  grad_clip: 5.0
+  grad_clip: 5.0 # Norm gradient clip
   beta1: 0.9 # For adam
   beta2: 0.999 # For adam
   batch_size: 64
   pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-5
+  reg: 1.e-5 # L2 regularization
   
   # Train schedule
   steps: 500
@@ -66,7 +66,7 @@ model:
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
   val_steps: 5  # How many steps you do on validation 
-  val_dropout: True
+  val_dropout: True # Whether you use dropout during validation
 
   # Model architecture
   dtype: 'float32' # only float32 is currently implemented
@@ -89,7 +89,7 @@ model:
     output_dim: 128 # This is the hidden size of the rnn
   
   action_graph:
-    graph_type: 'rnn' # fc / rnn
+    graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 1.0 # pct keep
@@ -151,7 +151,7 @@ planning:
       upper: [5., 0.]
   
   # Visualization
-  visualize: False
+  visualize: False # EXPERIMENTAL
   topics:
     debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
     debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
