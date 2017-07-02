@@ -69,12 +69,12 @@ class AnalyzeSimRCcar(Analyze):
         positions_itrs = [] 
         blue_line = matplotlib.lines.Line2D([], [], color='b', label='collision')
         red_line = matplotlib.lines.Line2D([], [], color='r', label='no collision')
-        for itr, samples in enumerate(samples_itrs):
+        for itr, samples in samples_itrs:
             positions_x, positions_y, collision = [], [], []
             plt.figure()
             if testing:
                 plt.title('Trajectories for testing itr {0}\n{1}'.format(
-                    itr * params['world']['testing']['itr_freq'],
+                    itr,
                     params['exp_name']))
             else:
                 plt.title('Trajectories for itr {0}\n{1}'.format(itr, params['exp_name']))
