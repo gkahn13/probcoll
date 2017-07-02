@@ -122,48 +122,25 @@ class Analyze:
 
     def _load_samples(self):
         samples_itrs = []
-
         itr = 0
         while True:
             try:
-                samples_itrs.append(self._itr_load_samples(itr))
+                samples_itrs.append((itr, self._itr_load_samples(itr)))
                 itr += 1
             except:
                 break
 
         self._logger.info('Loaded {0} iterations of samples'.format(len(samples_itrs)))
-
-        ### load initial dataset
-        init_data_folder = params['probcoll'].get('init_data', None)
-        if init_data_folder is not None:
-            if itr == 0:
-                samples_itrs.append([])
-            num_init_samples = 0
-
-            fnames = [os.path.join(init_data_folder, fname) for fname in os.listdir(init_data_folder)]
-            for fname in fnames:
-                try:
-                    samples = Sample.load(fname)
-                except:
-                    continue
-
-                self._logger.debug('Loaded samples from {0}'.format(fname))
-                samples_itrs[0] += samples
-                num_init_samples += len(samples)
-
-            self._logger.info('Loaded initial dataset of {0} samples'.format(num_init_samples))
-
         return samples_itrs
 
     def _load_testing_samples(self):
         samples_itrs = []
-
-        itr = params['world']['testing']['itr_freq']
+        itr = 0
         while True:
             try:
                 sample = self._itr_load_testing_samples(itr)
                 if sample is not None:
-                    samples_itrs.append(sample)
+                    samples_itrs.append((itr, sample))
                 itr += 1
             except:
                 break
@@ -173,7 +150,6 @@ class Analyze:
 
     def _load_mpcs(self):
         mpcs_itrs = []
-
         itr = 0
         while True:
             try:
