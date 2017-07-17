@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'new_env'
+exp_name: 'env_tex'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,9 +10,9 @@ exp_name: 'new_env'
 
 probcoll:
   dt: 0.25
-  T: 256 # timesteps per trajectory
+  T: 48 # timesteps per trajectory
   logger: 'debug' # debug/info/fatal what level to log
-  max_iter: 11
+  max_iter: 200
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -23,13 +23,17 @@ probcoll:
   # Conditions
   num_rollouts: 40
 
+  testing:
+    num_rollout: 20
+    itr_freq: 2
+
 ######################
 ### Probcoll model ###
 ######################
     
 model:
   T: 8 # how many timesteps to predict
-  logger: 'fatal' # debug/info/warning/fatal what level to log
+  logger: 'info' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
@@ -81,6 +85,7 @@ model:
     strides: [4, 2, 1]
     padding: 'SAME' 
     use_batch_norm: False
+    batch_norm_decay: 0.5
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax 
   
@@ -111,34 +116,39 @@ planning:
       pre_activation: True # EXPERIMENTAL wether std is before or after activation (sigmoid)
     
     control_cost:
-      des: [0., 8.] # TODO: hard-coded order: steering then speed
+      des: [0., 2.] # TODO: hard-coded order: steering then speed
       cost: square # square
       weight: [0.0, 1.0]     
 
   # Planner
-  planner_type: 'cem' # random / cem / random_policy
+  planner_type: 'random' # random / cem / random_policy
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-20., 8.]
-    upper: [20., 8.]
+    lower: [-30., 1.]
+    upper: [30., 1.]
 
   random:
-    K: 1024 # number of actions to sample from
+    K: 2048 # number of actions to sample from
 
   cem:
     init_M: 2048 # number of actions to sample from
     M: 256
     K: 16 # top actions you select
-    num_iters: 3 # does not include first sample    
+    num_additional_iters: 3 # does not include first sample    
+    warm_start:
+      init_M: 1024 # number of actions to sample from
+      M: 256
+      K: 16 # top actions you select
+      num_additional_iters: 1 # does not include first sample    
     eps: 0.01 # to ensure covariance is PD
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [40, 1.0], [200, 0.1], [500, 0.01]]
+    endpoints: [[0, 1.0], [40, 1.0], [4000, 0.1], [20000, 0.01]]
     outside_value: 0.01
-    lower: [-20., 8.]
-    upper: [20., 8.]
+    lower: [-30., 1.]
+    upper: [30., 1.]
 
   control_noise:
     type: 'gaussian' # zero / gaussian / uniform
@@ -156,45 +166,38 @@ planning:
     debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
     debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
   
-#############
-### World ###
-#############
+###################
+### Environment ###
+###################
 
-world:
-  logger: 'info' # debug/info/fatal what level to log for world and agent
-  sim:
-    sim_env: 'square' # square
-    visualize: False
-    use_vel: True
-    accelClamp: 12.0
-    mass: 800.0
-    p: 2000.0
-    i: 0.0
-    d: 90.0
+sim:
+  sim_env: 'cylinder' # square / cylinder
+  visualize: True
+  use_vel: True
+  use_back_cam: True
+  use_depth: True
+  accelClamp: 2.0
+  mass: 10.0
+  p: 1.25
+  d: 0.0
 
-  do_back_up: True
+  do_back_up: False
   back_up:
-    cmd_steer: [-5., 5.]
-    cmd_vel: -8.
-    duration: 1.0
-
-  testing:
-    itr_freq: 2
-    positions: [[40., -35., 0.2, 3.14], [-40., -35., 0.2, 3.14], [40., 20., 0.2, 3.14], [-40., 20., 0.2, 3.14]]
-    num_pos: 10
-    range_type: 'fix_spacing' # fix_spacing / random
+    steer: [-5., 5.]
+    vel: -1.
+    duration: 3.0
 
 ######################################################
 ########### States, controls, observations ###########
 ######################################################
 
 X:
-  dim: 6
-  order: ['position', 'orientation']
+  dim: 7
+  order: ['position', 'orientation', 'velocity']
 
   position: {idx: 0, dim: 3}
   orientation: {idx: 3, dim: 3}
-
+  velocity: {idx: 6, dim: 1}
 U:
   dim: 2
   order: ['cmd_steer', 'cmd_vel']
@@ -203,10 +206,8 @@ U:
   cmd_vel: {idx: 1, dim: 1}
 
 O:
-  use_depth: True
-
-  dim: 4610
-  order: ['camera', 'back_camera', 'vel', 'collision']
+  dim: 4609
+  order: ['camera', 'back_camera', 'collision']
 
   camera:
     idx: 0
@@ -220,5 +221,4 @@ O:
     height: 64
     width: 36
     num_channels: 1
-  vel: {idx: 4608, dim: 1}
-  collision: {idx: 4609, dim: 1, buffer: 0.0}
+  collision: {idx: 4608, dim: 1, buffer: 0.0}

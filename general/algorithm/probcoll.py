@@ -11,9 +11,7 @@ class Probcoll:
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, save_dir=None, data_dir=None):
-        self._use_cp_cost = True
         self._planner_type = params['planning']['planner_type']
-        self._use_dynamics = True
         self._async_on = False
         self._asynchronous = params['probcoll']['asynchronous_training']
         self._jobs = []
@@ -36,27 +34,7 @@ class Probcoll:
         self.probcoll_model = None
         self._asynchprobcoll_model = None
         self._max_iter = None
-        self._world = None
-        self._dynamics = None
         self._agent = None
-        self._conditions = None
-
-        raise NotImplementedError('Implement in subclass')
-
-    #####################
-    ### World methods ###
-    #####################
-
-    @abc.abstractmethod
-    def _reset_world(self, itr, cond, rep):
-        raise NotImplementedError('Implement in subclass')
-
-    @abc.abstractmethod
-    def _update_world(self, sample, t):
-        raise NotImplementedError('Implement in subclass')
-
-    @abc.abstractmethod
-    def _is_good_rollout(self, sample, t):
         raise NotImplementedError('Implement in subclass')
 
     #########################
@@ -84,36 +62,8 @@ class Probcoll:
         return os.path.join(self._itr_dir(itr, create=create),
                             '{0}samples_itr_{1}.npz'.format(prefix, itr))
 
-    def _itr_stats_file(self, itr, create=True):
-        return os.path.join(self._itr_dir(itr, create=create),
-                            'stats_itr_{0}.pkl'.format(itr))
-
-    def _itr_save_worlds(self, itr, world_infos):
-        fname = os.path.join(self._itr_dir(itr), 'worlds_itr_{0}.pkl'.format(itr))
-        with open(fname, 'w') as f:
-            pickle.dump(world_infos, f)
-
-    def _itr_save_mpcs(self, itr, mpc_infos):
-        fname = os.path.join(self._itr_dir(itr), 'mpcs_itr_{0}.pkl'.format(itr))
-        with open(fname, 'w') as f:
-            pickle.dump(mpc_infos, f)
-
     def _itr_save_samples(self, itr, samples, prefix=''):
         Sample.save(self._itr_samples_file(itr, prefix=prefix), samples)
-
-    @property
-    def _img_dir(self):
-        dir = os.path.join(self._save_dir, 'images')
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        return dir
-
-    def _img_file(self, itr, cond, rep):
-        return os.path.join(self._img_dir, 'itr{0:03d}_cond{1:03d}_rep{2:03d}.png'.format(itr, cond, rep))
-
-    @abc.abstractmethod
-    def _get_world_info(self):
-        raise NotImplementedError('Implement in subclass')
 
     ###################
     ### Run methods ###
@@ -170,8 +120,11 @@ class Probcoll:
         self._logger.info('Itr {0} training probability of collision'.format(itr))
 
     def close(self):
+        for p in self._jobs:
+            p.kill()
+        self._agent.close()
         self.probcoll_model.close()
-
+    
     def _run_training(self, itr):
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
@@ -181,92 +134,73 @@ class Probcoll:
                         self._async_training()
                         self._async_on = True
                 else:
+                    start = time.time()
                     self.probcoll_model.train()
-  
+
     def run_testing(self, itr):
-        pass
-   
+        if (itr == self._max_iter - 1 \
+                or itr % params['probcoll']['testing']['itr_freq'] == 0): 
+            self._logger.info('Itr {0} testing'.format(itr))
+            if self._async_on:
+                self._logger.debug('Recovering probcoll model')
+                self.probcoll_model.recover()
+            T = params['probcoll']['T']
+            samples = []
+            reset_pos, reset_ori = self._agent.get_pos_ori() 
+            for cond in xrange(params['probcoll']['testing']['num_rollout']):
+                self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
+                start = time.time()
+                self._agent.reset(hard_reset=True)
+                sample_noise, sample_no_noise, t = self._agent.sample_policy(
+                    self._mpc_policy,
+                    T=T,
+                    rollout_num=self._rollout_num,
+                    is_testing=True)
+
+                if t + 1 < T:
+                    self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
+                else:
+                    self._logger.info('\t\t\tLasted for t={0}'.format(t))
+
+                samples.append(sample_no_noise.match(slice(0, t + 1)))
+                assert(samples[-1].isfinite())
+                elapsed = time.time() - start
+                self._logger.info('\t\t\tFinished cond {0} of testing ({1:.1f}s, {2:.3f}x real-time)'.format(
+                    cond,
+                    elapsed,
+                    t*params['probcoll']['dt']/elapsed))
+            self._itr_save_samples(itr, samples, prefix='testing_')
+            self._agent.reset(pos=reset_pos, ori=reset_ori)
+
     def _async_training(self):
         pass
 
     def _run_rollout(self, itr):
+        if itr == 0:
+            self._agent.reset()
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
 
         samples = []
-        world_infos = []
-        mpc_infos = []
-        rollout_num = itr * (self._conditions.length * self._conditions.repeats)
-        self._conditions.reset()
-        for cond in xrange(self._conditions.length):
-            rep = 0
-            while rep < self._conditions.repeats:
-                self._logger.info('\t\tStarting cond {0} rep {1} itr {2}'.format(cond, rep, itr))
-                start = time.time()
-                if (cond == 0 and rep == 0) or self._world.randomize:
-                    self._reset_world(itr, cond, rep)
+        for cond in xrange(self._num_rollouts):
+            self._agent.reset()
+            self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
+            start = time.time()
+            sample_noise, sample_no_noise, t = self._agent.sample_policy(self._mpc_policy, T=T, rollout_num=self._rollout_num, only_noise=label_with_noise)
+            if t + 1 < T:
+                self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
+            else:
+                self._logger.info('\t\t\tLasted for t={0}'.format(t))
 
-                x0 = self._conditions.get_cond(cond, rep=rep)
-                sample_T = Sample(meta_data=params, T=T)
-                sample_T.set_X(x0, t=0)
-                
-                for t in xrange(T):
-                    self._update_world(sample_T, t)
-
-                    x0 = sample_T.get_X(t=t)
-
-                    rollout, rollout_no_noise = self._agent.sample_policy(x0, self._mpc_policy, rollout_num, T=1, time_step=t, only_noise=label_with_noise)
-                    
-                    o = rollout.get_O(t=0)
-                    if label_with_noise:
-                        u = rollout.get_U(t=0)
-                    else:
-                        u = rollout_no_noise.get_U(t=0)
-
-                    sample_T.set_U(u, t=t)
-                    sample_T.set_O(o, t=t)
-                    
-                    if not self._use_dynamics:
-                        sample_T.set_X(rollout.get_X(t=0), t=t)
-                    
-                    if self._world.is_collision(sample_T, t=t):
-                        self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
-                        break
-
-                    if self._use_dynamics:
-                        if t < T-1:
-                            x_tp1 = self._dynamics.evolve(x0, u)
-                            sample_T.set_X(x_tp1, t=t+1)
-
-                    if hasattr(self._mpc_policy, '_curr_traj'):
-                        self._world.update_visualization(sample_T, self._mpc_policy._curr_traj, t)
-
-                else:
-                    self._logger.info('\t\t\tLasted for t={0}'.format(t))
-
-                sample = sample_T.match(slice(0, t + 1))
-                world_info = self._get_world_info()
-                mpc_info = self._mpc_policy.get_info()
-
-                if not self._is_good_rollout(sample, t):
-                    self._logger.warning('\t\t\tNot good rollout. Repeating rollout.'.format(t))
-                    continue
-
-                samples.append(sample)
-                world_infos.append(world_info)
-                mpc_infos.append(mpc_info)
-
-                assert(samples[-1].isfinite())
-                elapsed = time.time() - start
-                self._logger.info('\t\t\tFinished cond {0} rep {1} ({2:.1f}s, {3:.3f}x real-time)'.format(cond,
-                                                                                                         rep,
-                                                                                                         elapsed,
-                                                                                                         t*params['dt']/elapsed))
-                rep += 1
-                rollout_num += 1
-
+            if label_with_noise:
+                samples.append(sample_noise.match(slice(0, t + 1)))
+            else:
+                samples.append(sample_no_noise.match(slice(0, t + 1)))
+            assert(samples[-1].isfinite())
+            elapsed = time.time() - start
+            self._logger.info('\t\t\tFinished cond {0} ({1:.1f}s, {2:.3f}x real-time)'.format(
+                cond,
+                elapsed,
+                t*params['probcoll']['dt']/elapsed))
+            self._rollout_num += 1 
         self._itr_save_samples(itr, samples)
-        self._itr_save_worlds(itr, world_infos)
-        self._itr_save_mpcs(itr, mpc_infos)
-
-        self._reset_world(itr, 0, 0) # leave the world as it was

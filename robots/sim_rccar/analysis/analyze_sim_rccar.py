@@ -81,9 +81,13 @@ class AnalyzeSimRCcar(Analyze):
             plt.xlabel('X position')
             plt.ylabel('Y position')
             # TODO not make this hard coded
-            if params['world']['sim']['sim_env'] == 'square':
-                plt.ylim([-60, 60])
-                plt.xlim([-60, 60])
+            if params['sim']['sim_env'] == 'square':
+                plt.ylim([-22.5, 22.5])
+                plt.xlim([-22.5, 22.5])
+                plt.legend(handles=[blue_line, red_line], loc='center')
+            elif params['sim']['sim_env'] == 'cylinder':
+                plt.ylim([-7.5, 7.5])
+                plt.xlim([-4.5, 4.5])
                 plt.legend(handles=[blue_line, red_line], loc='center')
             for s in samples:
                 pos = s.get_X(sub_state='position')

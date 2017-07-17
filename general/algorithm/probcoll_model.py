@@ -267,7 +267,7 @@ class ProbcollModel:
                     O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)].astype(np.uint8)
                     O_vec = sample.get_O()[:, self.O_vec_idxs(p=s_params)]
                     output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
-                    buffer_len = 0
+                    buffer_len = 1
                     if len(U) < 1 + buffer_len: # used to be self.T, but now we are extending
                         continue
 
@@ -393,8 +393,12 @@ class ProbcollModel:
         tot_no = sum([len(no_coll_data["output"][i]) - self.T + 1 for i in range(no_coll_len)])
         self._logger.info("Size of no collision data: {0}".format(tot_no))
         self._logger.info("Size of collision data: {0}".format(tot_coll))
-        coll_val_index = int(np.max([1, coll_len * self.val_pct]))
-        no_coll_val_index = int(np.max([1, no_coll_len * self.val_pct])) 
+        coll_val_index = int(coll_len * self.val_pct)
+        if coll_len > 1:
+            coll_val_index = max(coll_val_index, 1)
+        no_coll_val_index = int(no_coll_len * self.val_pct)
+        if no_coll_len > 1:
+            no_coll_val_index = max(no_coll_val_index, 1)
         self._save_tfrecords(
             tfrecords_no_coll_train, 
             no_coll_data["U"][no_coll_val_index:],
@@ -428,95 +432,96 @@ class ProbcollModel:
     #############
 
     def _graph_inputs_outputs_from_file(self, name):
-        with tf.name_scope(name + '_file_input'):
-            filename_vars = (
-                    tf.get_variable(
-                        name + '_no_coll_fnames',
-                        initializer=tf.constant([], dtype=tf.string),
-                        validate_shape=False,
-                        trainable=False),
-                    tf.get_variable(
-                        name + '_coll_fnames',
-                        initializer=tf.constant([], dtype=tf.string),
-                        validate_shape=False,
-                        trainable=False)
-                )
-            ### create file queues
-            filename_queues = (
-                    tf.train.string_input_producer(
-                        filename_vars[0],
-                        capacity=self._string_input_capacity),
-                    tf.train.string_input_producer(
-                        filename_vars[1],
-                        capacity=self._string_input_capacity)
-                )
+        with tf.device('/cpu:0'):
+            with tf.name_scope(name + '_file_input'):
+                filename_vars = (
+                        tf.get_variable(
+                            name + '_no_coll_fnames',
+                            initializer=tf.constant([], dtype=tf.string),
+                            validate_shape=False,
+                            trainable=False),
+                        tf.get_variable(
+                            name + '_coll_fnames',
+                            initializer=tf.constant([], dtype=tf.string),
+                            validate_shape=False,
+                            trainable=False)
+                    )
+                ### create file queues
+                filename_queues = (
+                        tf.train.string_input_producer(
+                            filename_vars[0],
+                            capacity=self._string_input_capacity),
+                        tf.train.string_input_producer(
+                            filename_vars[1],
+                            capacity=self._string_input_capacity)
+                    )
 
-            ### read and decode
-            readers = [tf.TFRecordReader(), tf.TFRecordReader()]
+                ### read and decode
+                readers = [tf.TFRecordReader(), tf.TFRecordReader()]
 
-            features = {}
-            
-            features['fname'] = tf.FixedLenFeature([], tf.string)
-            features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
-            features['O_im'] = tf.FixedLenFeature([], tf.string)
-            features['O_vec'] = tf.FixedLenFeature([self.dO_vec], tf.float32)
-            features['output'] = tf.FixedLenFeature([], tf.string)
-            features['len'] = tf.FixedLenFeature([], tf.int64)
-           
-            bootstrap_fnames = []
-            bootstrap_U_inputs = []
-            bootstrap_O_im_inputs = []
-            bootstrap_O_vec_inputs = []
-            bootstrap_outputs = []
-            bootstrap_lens = []
+                features = {}
+                
+                features['fname'] = tf.FixedLenFeature([], tf.string)
+                features['U'] = tf.FixedLenFeature([self.dU * self.T], tf.float32)
+                features['O_im'] = tf.FixedLenFeature([], tf.string)
+                features['O_vec'] = tf.FixedLenFeature([self.dO_vec], tf.float32)
+                features['output'] = tf.FixedLenFeature([], tf.string)
+                features['len'] = tf.FixedLenFeature([], tf.int64)
+               
+                bootstrap_fnames = []
+                bootstrap_U_inputs = []
+                bootstrap_O_im_inputs = []
+                bootstrap_O_vec_inputs = []
+                bootstrap_outputs = []
+                bootstrap_lens = []
 
-            coll_batch_size = int(self.batch_size * self.pct_coll)
-            no_coll_batch_size = self.batch_size - coll_batch_size
-            batch_sizes = [no_coll_batch_size, coll_batch_size]
-            for fq, reader, batch_size in zip(filename_queues, readers, batch_sizes):
-                serialized_examples = [reader.read(fq)[1] for b in xrange(self.num_bootstrap)]
-                parsed_example = [
-                        tf.parse_single_example(serialized_examples[b], features=features)
-                        for b in xrange(self.num_bootstrap)
-                    ]
-                bootstrap_fname = [parsed_example[b]['fname'] for b in xrange(self.num_bootstrap)]
-                bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
+                coll_batch_size = int(self.batch_size * self.pct_coll)
+                no_coll_batch_size = self.batch_size - coll_batch_size
+                batch_sizes = [no_coll_batch_size, coll_batch_size]
+                for fq, reader, batch_size in zip(filename_queues, readers, batch_sizes):
+                    serialized_examples = [reader.read(fq)[1] for b in xrange(self.num_bootstrap)]
+                    parsed_example = [
+                            tf.parse_single_example(serialized_examples[b], features=features)
+                            for b in xrange(self.num_bootstrap)
+                        ]
+                    bootstrap_fname = [parsed_example[b]['fname'] for b in xrange(self.num_bootstrap)]
+                    bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
+                                         for b in xrange(self.num_bootstrap)]
+                    bootstrap_O_im_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O_im'], tf.uint8), (self.dO_im,))
+                                         for b in xrange(self.num_bootstrap)]
+                    bootstrap_O_vec_input = [tf.reshape(parsed_example[b]['O_vec'], (self.dO_vec,))
+                                         for b in xrange(self.num_bootstrap)]
+                    bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
+                    bootstrap_len = [tf.reshape(parsed_example[b]['len'], ())
                                      for b in xrange(self.num_bootstrap)]
-                bootstrap_O_im_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O_im'], tf.uint8), (self.dO_im,))
-                                     for b in xrange(self.num_bootstrap)]
-                bootstrap_O_vec_input = [tf.reshape(parsed_example[b]['O_vec'], (self.dO_vec,))
-                                     for b in xrange(self.num_bootstrap)]
-                bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
-                bootstrap_len = [tf.reshape(parsed_example[b]['len'], ())
-                                 for b in xrange(self.num_bootstrap)]
-                inputs = tuple(bootstrap_fname + bootstrap_U_input + bootstrap_O_im_input + bootstrap_O_vec_input + bootstrap_output + bootstrap_len)
+                    inputs = tuple(bootstrap_fname + bootstrap_U_input + bootstrap_O_im_input + bootstrap_O_vec_input + bootstrap_output + bootstrap_len)
 
-                shuffled = tf.train.shuffle_batch(
-                    inputs,
-                    batch_size=batch_size,
-                    capacity=self._shuffle_batch_capacity,
-                    min_after_dequeue=10*batch_size)
+                    shuffled = tf.train.shuffle_batch(
+                        inputs,
+                        batch_size=batch_size,
+                        capacity=self._shuffle_batch_capacity,
+                        min_after_dequeue=10*batch_size)
 
-                bootstrap_fnames.append(shuffled[:self.num_bootstrap])
-                bootstrap_U_inputs.append(shuffled[1*self.num_bootstrap:2*self.num_bootstrap])
-                bootstrap_O_im_inputs.append(shuffled[2*self.num_bootstrap:3*self.num_bootstrap])
-                bootstrap_O_vec_inputs.append(shuffled[3*self.num_bootstrap:4*self.num_bootstrap])
-                bootstrap_outputs.append(shuffled[4*self.num_bootstrap:5*self.num_bootstrap])
-                bootstrap_lens.append(shuffled[5*self.num_bootstrap:6*self.num_bootstrap])
-            
-            fnames = []
-            U_inputs = []
-            O_im_inputs = []
-            O_vec_inputs = []
-            outputs = []
-            lens = []
-            for i in range(self.num_bootstrap):
-                fnames.append(tf.concat([bootstrap_fnames[0][i], bootstrap_fnames[1][i]], axis=0))
-                U_inputs.append(tf.concat([bootstrap_U_inputs[0][i], bootstrap_U_inputs[1][i]], axis=0))
-                O_im_inputs.append(tf.concat([bootstrap_O_im_inputs[0][i], bootstrap_O_im_inputs[1][i]], axis=0))
-                O_vec_inputs.append(tf.concat([bootstrap_O_vec_inputs[0][i], bootstrap_O_vec_inputs[1][i]], axis=0))
-                outputs.append(tf.concat([bootstrap_outputs[0][i], bootstrap_outputs[1][i]], axis=0))
-                lens.append(tf.concat([bootstrap_lens[0][i], bootstrap_lens[1][i]], axis=0))
+                    bootstrap_fnames.append(shuffled[:self.num_bootstrap])
+                    bootstrap_U_inputs.append(shuffled[1*self.num_bootstrap:2*self.num_bootstrap])
+                    bootstrap_O_im_inputs.append(shuffled[2*self.num_bootstrap:3*self.num_bootstrap])
+                    bootstrap_O_vec_inputs.append(shuffled[3*self.num_bootstrap:4*self.num_bootstrap])
+                    bootstrap_outputs.append(shuffled[4*self.num_bootstrap:5*self.num_bootstrap])
+                    bootstrap_lens.append(shuffled[5*self.num_bootstrap:6*self.num_bootstrap])
+                
+                fnames = []
+                U_inputs = []
+                O_im_inputs = []
+                O_vec_inputs = []
+                outputs = []
+                lens = []
+                for i in range(self.num_bootstrap):
+                    fnames.append(tf.concat([bootstrap_fnames[0][i], bootstrap_fnames[1][i]], axis=0))
+                    U_inputs.append(tf.concat([bootstrap_U_inputs[0][i], bootstrap_U_inputs[1][i]], axis=0))
+                    O_im_inputs.append(tf.concat([bootstrap_O_im_inputs[0][i], bootstrap_O_im_inputs[1][i]], axis=0))
+                    O_vec_inputs.append(tf.concat([bootstrap_O_vec_inputs[0][i], bootstrap_O_vec_inputs[1][i]], axis=0))
+                    outputs.append(tf.concat([bootstrap_outputs[0][i], bootstrap_outputs[1][i]], axis=0))
+                    lens.append(tf.concat([bootstrap_lens[0][i], bootstrap_lens[1][i]], axis=0))
 
         return fnames, U_inputs, O_im_inputs, O_vec_inputs, outputs, lens, filename_queues, filename_vars
 
@@ -956,14 +961,15 @@ class ProbcollModel:
                 learning_rate=self.learning_rate,
                 beta1=self.beta1,
                 beta2=self.beta2)
-            grad = opt.compute_gradients(
-                tf.reduce_sum(bootstrap_costs) + reg_cost)
+            with tf.control_dependencies(update_ops):
+                grad = opt.compute_gradients(
+                    tf.reduce_sum(bootstrap_costs) + reg_cost)
             clipped_grad = []
             for (g, var) in grad:
                 if g is not None:
                     clipped_grad.append((tf.clip_by_norm(g, self.grad_clip), var))
-            with tf.control_dependencies(update_ops):
-                optimizers.append(opt.apply_gradients(clipped_grad))
+#            with tf.control_dependencies(update_ops):
+            optimizers.append(opt.apply_gradients(clipped_grad))
             grads += clipped_grad
 
         vars_after = tf.global_variables()

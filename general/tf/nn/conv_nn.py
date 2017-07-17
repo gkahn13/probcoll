@@ -37,6 +37,9 @@ def convnn(inputs, params, scope='convnn', dtype=tf.float32, reuse=False, is_tra
         normalizer_fn = tf.contrib.layers.batch_norm
         normalizer_params = {
                 'is_training': is_training,
+                'fused': True,
+                'decay': params.get('batch_norm_decay', 0.999),
+                'zero_debias_moving_mean': True
             }
     else:
         normalizer_fn = None

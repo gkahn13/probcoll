@@ -77,6 +77,8 @@ class Planner(object):
                 self.O_vec_input: o_vec_input,
                 self.eps_ph: self.eps_schedule.value(rollout_num),
             }
+        if hasattr(self, '_t'):
+            feed_dict[self._t] = t
         if visualize:
             action_noisy, action, actions_considered, \
                 coll_costs, control_costs  = self.probcoll_model.sess.run(
