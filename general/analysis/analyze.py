@@ -102,7 +102,7 @@ class Analyze:
         elif not os.path.exists(self._itr_dir(itr)):
             raise Exception()
         else:
-            return None
+            return None, None
 
     def _itr_load_mpcs(self, itr):
         fname = os.path.join(self._itr_dir(itr), 'mpcs_itr_{0}.pkl'.format(itr))
@@ -122,31 +122,36 @@ class Analyze:
 
     def _load_samples(self):
         samples_itrs = []
+        times = []
         itr = 0
         while True:
             try:
-                samples_itrs.append((itr, self._itr_load_samples(itr)))
+                samples, time = self._itr_load_samples(itr)
+                samples_itrs.append((itr, samples))
+                times.append(time)
                 itr += 1
             except:
                 break
 
         self._logger.info('Loaded {0} iterations of samples'.format(len(samples_itrs)))
-        return samples_itrs
+        return samples_itrs, times
 
     def _load_testing_samples(self):
         samples_itrs = []
+        times = []
         itr = 0
         while True:
             try:
-                sample = self._itr_load_testing_samples(itr)
-                if sample is not None:
-                    samples_itrs.append((itr, sample))
+                samples, time = self._itr_load_testing_samples(itr)
+                if samples is not None:
+                    samples_itrs.append((itr, samples))
+                    times.append(time)
                 itr += 1
             except:
                 break
 
         self._logger.info('Loaded {0} testing iterations of samples'.format(len(samples_itrs)))
-        return samples_itrs
+        return samples_itrs, times
 
     def _load_mpcs(self):
         mpcs_itrs = []

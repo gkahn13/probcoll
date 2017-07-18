@@ -40,12 +40,16 @@ class AnalyzeSimRCcar(Analyze):
     ### Plotting ###
     ################
 
-    def _plot_statistics(self, testing=False):
+    def _plot_statistics(self, testing=False, times=None):
         ### get samples
         if testing:
-            samples_itrs = self._load_testing_samples()
+            samples_itrs, sample_times = self._load_testing_samples()
         else:
-            samples_itrs = self._load_samples()
+            samples_itrs, sample_times = self._load_samples()
+        
+        if times is None:
+            times = sample_times
+
         pkl_dict = {}
         if testing:
             if not os.path.exists(os.path.dirname(self._plot_testing_stats_file)):
@@ -54,8 +58,7 @@ class AnalyzeSimRCcar(Analyze):
             if not os.path.exists(os.path.dirname(self._plot_stats_file)):
                 os.makedirs(os.path.dirname(self._plot_stats_file))
         
-        positions_itrs = self._plot_position(samples_itrs, testing=testing)
-        pkl_dict['positions'] = positions_itrs
+        pkl_dict['positions'] = self._plot_position(samples_itrs, times, testing=testing)
 
         if testing:
             stats_f = self._plot_testing_stats_file_pkl
@@ -65,22 +68,29 @@ class AnalyzeSimRCcar(Analyze):
         with open(stats_f, 'w') as f:
             pickle.dump(pkl_dict, f)
 
-    def _plot_position(self, samples_itrs, testing=False):
+        return times
+
+    def _plot_position(self, samples_itrs, times, testing=False):
         positions_itrs = [] 
         blue_line = matplotlib.lines.Line2D([], [], color='b', label='collision')
         red_line = matplotlib.lines.Line2D([], [], color='r', label='no collision')
-        for itr, samples in samples_itrs:
+        total_time = 0
+        for ((itr, samples), time) in zip(samples_itrs, times):
+            total_time += time
             positions_x, positions_y, collision = [], [], []
             plt.figure()
             if testing:
-                plt.title('Trajectories for testing itr {0}\n{1}'.format(
+                plt.title('Trajectories for testing itr {0}\n{1} runtime : {2:.2f} min'.format(
                     itr,
-                    params['exp_name']))
+                    params['exp_name'],
+                    total_time / 60.))
             else:
-                plt.title('Trajectories for itr {0}\n{1}'.format(itr, params['exp_name']))
+                plt.title('Trajectories for itr {0}\n{1} runtime : {2:.2f} min'.format(
+                    itr,
+                    params['exp_name'],
+                    total_time / 60.))
             plt.xlabel('X position')
             plt.ylabel('Y position')
-            # TODO not make this hard coded
             if params['sim']['sim_env'] == 'square':
                 plt.ylim([-22.5, 22.5])
                 plt.xlim([-22.5, 22.5])
@@ -111,10 +121,10 @@ class AnalyzeSimRCcar(Analyze):
 
     def run(self):
         try:
-            self._plot_statistics()
+            times = self._plot_statistics()
         except:
             self._logger.info('No training trajectories were loaded to analyze')
         try:
-            self._plot_statistics(testing=True)
+            self._plot_statistics(times=times, testing=True)
         except:
             self._logger.info('No testing trajectoreis were loaded to analyze')

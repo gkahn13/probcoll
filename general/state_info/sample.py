@@ -1,6 +1,5 @@
 import os.path
 import numpy as np
-import IPython
 from general.utility.utils import posquats_to_poses
 
 from config import params as meta_data
@@ -218,12 +217,13 @@ class Sample(object):
     def load(fname):
         assert(os.path.exists(fname))
         samples = []
-
+        tot_T = 0
         assert (os.path.splitext(fname)[-1] == '.npz')
         d = np.load(fname)
         for meta_data, X, U, O in zip(d['meta_datas'], d['Xs'], d['Us'], d['Os']):
             T = len(X)
+            tot_T += T
             s = Sample(meta_data=meta_data, T=T, X=X, U=U, O=O)
             samples.append(s)
 
-        return samples
+        return samples, tot_T

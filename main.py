@@ -28,6 +28,7 @@ except:
 try:
     from robots.sim_rccar.algorithm.probcoll_sim_rccar import ProbcollSimRCcar
     from robots.sim_rccar.analysis.analyze_sim_rccar import AnalyzeSimRCcar
+    from robots.sim_rccar.analysis.train_sim_rccar import TrainSimRCcar
 except:
     print('main.py: not import sim RC car')
 
@@ -128,6 +129,8 @@ if __name__ == '__main__':
             data_dirs = args.data_dirs.split()
         if robot == 'rccar':
             train = TrainRCcar(data_dirs=data_dirs, plot_dir=args.plot_dir, add_data=args.add_data, asynch=args.asynch)
+        elif robot == 'sim_rccar':
+            train = TrainSimRCcar(data_dirs=data_dirs, plot_dir=args.plot_dir, add_data=args.add_data, asynch=args.asynch)
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 
