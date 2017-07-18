@@ -83,12 +83,12 @@ class AnalyzeSimRCcar(Analyze):
                 plt.title('Trajectories for testing itr {0}\n{1} runtime : {2:.2f} min'.format(
                     itr,
                     params['exp_name'],
-                    total_time / 60.))
+                    total_time * params['probcoll']['dt'] / 60.))
             else:
                 plt.title('Trajectories for itr {0}\n{1} runtime : {2:.2f} min'.format(
                     itr,
                     params['exp_name'],
-                    total_time / 60.))
+                    total_time * params['probcoll']['dt'] / 60.))
             plt.xlabel('X position')
             plt.ylabel('Y position')
             if params['sim']['sim_env'] == 'square':
