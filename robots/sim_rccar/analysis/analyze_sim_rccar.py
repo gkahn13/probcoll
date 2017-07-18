@@ -75,8 +75,8 @@ class AnalyzeSimRCcar(Analyze):
         blue_line = matplotlib.lines.Line2D([], [], color='b', label='collision')
         red_line = matplotlib.lines.Line2D([], [], color='r', label='no collision')
         total_time = 0
-        for ((itr, samples), time) in zip(samples_itrs, times):
-            total_time += time
+        for itr, samples in samples_itrs:
+            total_time = sum([times[i] for i in xrange(itr + 1)])
             positions_x, positions_y, collision = [], [], []
             plt.figure()
             if testing:
