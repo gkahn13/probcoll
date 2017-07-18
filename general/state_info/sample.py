@@ -217,6 +217,19 @@ class Sample(object):
     def load(fname):
         assert(os.path.exists(fname))
         samples = []
+        assert (os.path.splitext(fname)[-1] == '.npz')
+        d = np.load(fname)
+        for meta_data, X, U, O in zip(d['meta_datas'], d['Xs'], d['Us'], d['Os']):
+            T = len(X)
+            s = Sample(meta_data=meta_data, T=T, X=X, U=U, O=O)
+            samples.append(s)
+
+        return samples
+
+    @staticmethod
+    def load_with_time(fname):
+        assert(os.path.exists(fname))
+        samples = []
         tot_T = 0
         assert (os.path.splitext(fname)[-1] == '.npz')
         d = np.load(fname)

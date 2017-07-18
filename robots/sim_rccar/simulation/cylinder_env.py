@@ -21,5 +21,5 @@ class CylinderEnv(CarEnv):
         return restart_pos
 
 if __name__ == '__main__':
-    params = {'visualize': True, 'run_as_task': True, 'model_path': 'models/cylinder.egg'}
+    params = {'visualize': True, 'run_as_task': True, 'model_path': 'models/cylinder.egg', 'use_depth': True}
     env = CylinderEnv(params)

@@ -93,12 +93,12 @@ class Analyze:
 
     def _itr_load_samples(self, itr):
         fname = os.path.join(self._itr_dir(itr), 'samples_itr_{0}.npz'.format(itr))
-        return Sample.load(fname)
+        return Sample.load_with_time(fname)
 
     def _itr_load_testing_samples(self, itr):
         fname = os.path.join(self._itr_dir(itr), 'testing_samples_itr_{0}.npz'.format(itr))
         if os.path.exists(fname):
-            return Sample.load(fname)
+            return Sample.load_with_time(fname)
         elif not os.path.exists(self._itr_dir(itr)):
             raise Exception()
         else:

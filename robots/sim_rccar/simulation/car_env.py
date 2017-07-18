@@ -84,7 +84,7 @@ class CarEnv(DirectObject):
             near_far=near_far,
             title='front cam')
         self._camera_node = self._camera_sensor.cam
-        self._camera_node.setPos(0.0, 0.25, 0.5)
+        self._camera_node.setPos(0.0, 0.5, 0.375)
         self._camera_node.lookAt(0.0, 6.0, 0.0)
         self._camera_node.reparentTo(self._vehicle_pointer)
 
@@ -99,7 +99,7 @@ class CarEnv(DirectObject):
                 title='back cam')
 
             self._back_camera_node = self._back_camera_sensor.cam
-            self._back_camera_node.setPos(0.0, -0.25, 0.5)
+            self._back_camera_node.setPos(0.0, -0.5, 0.375)
             self._back_camera_node.lookAt(0.0, -6.0, 0.0)
             self._back_camera_node.reparentTo(self._vehicle_pointer)
         
@@ -182,7 +182,7 @@ class CarEnv(DirectObject):
         from matplotlib import pyplot as plt
         image = self._camera_sensor.observe()[0]
         if self._use_depth:
-            plt.imshow(image, cmap='gray')
+            plt.imshow(image[:,:,0], cmap='gray')
         else:
             plt.imshow(image)
         plt.show()
