@@ -1,10 +1,10 @@
 import tensorflow as tf
 import numpy as np
-from general.tf.planning.planner import Planner
-from general.tf.planning.cost.cost_desired import CostDesired
-from general.tf.planning.cost.cost_coll import CostColl
+from general.policy.policy import Policy
+from general.policy.cost.cost_desired import CostDesired
+from general.policy.cost.cost_coll import CostColl
 
-class PlannerCem(Planner):
+class PolicyCem(Policy):
     def _dist_eval(self, distribution, embeddings, control_cost_fn, coll_cost_fn, m, T, dU):
         flat_u_samples_preclip = distribution.sample((m,))
         flat_u_samples = tf.clip_by_value(
@@ -39,7 +39,7 @@ class PlannerCem(Planner):
         coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
 
         total_cost = control_costs + coll_costs
-        return u_samples, total_cost 
+        return u_samples, total_cost, control_costs, coll_costs 
 
     def _cem_fn(self, params, init_distribution, embeddings, control_cost_fn, coll_cost_fn, control_range, eps):
         def _cem():
@@ -49,7 +49,7 @@ class PlannerCem(Planner):
             num_iters = params['num_additional_iters']
             dU = len(control_range['lower'])
             T = self.probcoll_model.T
-            u_samples, total_cost = self._dist_eval(
+            u_samples, total_cost, control_costs, coll_costs = self._dist_eval(
                 init_distribution,
                 embeddings,
                 control_cost_fn,
@@ -72,7 +72,7 @@ class PlannerCem(Planner):
                 distribution = tf.contrib.distributions.MultivariateNormalFullCovariance(
                     loc=top_mean,
                     covariance_matrix=sigma)
-                u_samples, total_cost = self._dist_eval(
+                u_samples, total_cost, control_costs, coll_costs = self._dist_eval(
                     distribution,
                     embeddings,
                     control_cost_fn,
@@ -83,19 +83,18 @@ class PlannerCem(Planner):
 
             index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
             action_seq = u_samples[index]
-            return action_seq
+            return action_seq, u_samples, control_costs, coll_costs
         return _cem
 
-    def _setup(self):
+    def _setup_action(self):
         with tf.name_scope('cem_planner'):
             with self.probcoll_model.graph.as_default():
-                self._t = tf.placeholder(tf.int32, [])
-                self.O_im_input = self.probcoll_model.d_eval['O_im_input']
-                self.O_vec_input = self.probcoll_model.d_eval['O_vec_input']
+                O_im_input = self.probcoll_model.d_eval['O_im_input']
+                O_vec_input = self.probcoll_model.d_eval['O_vec_input']
                 embeddings = [
                         self.probcoll_model.get_embedding(
-                            self.O_im_input,
-                            self.O_vec_input,
+                            O_im_input,
+                            O_vec_input,
                             batch_size=1,
                             reuse=True,
                             scope="observation_graph_b{0}".format(b)) for b in xrange(self.probcoll_model.num_bootstrap)
@@ -111,7 +110,9 @@ class PlannerCem(Planner):
                 control_upper = np.array(control_range['upper'] * T, dtype=np.float32)
                 control_std = np.square(control_upper - control_lower) / 12.0
 
-                mu = tf.get_variable('mu', [dU * T], trainable=False)
+                reuse = hasattr(self, 'action')
+                with tf.variable_scope('cem_warm_start', reuse=reuse):
+                    mu = tf.get_variable('mu', [dU * T], trainable=False)
                 self.reset_ops.append(mu.initializer)
 
                 init_distribution = tf.contrib.distributions.Uniform(
@@ -121,7 +122,7 @@ class PlannerCem(Planner):
                     loc=mu,
                     scale_diag=control_std)
 
-                action_seq = tf.cond(
+                action_seq, u_samples, control_costs, coll_costs = tf.cond(
                     tf.greater(self._t, 0),
                     self._cem_fn(
                         self.params['cem']['warm_start'],
@@ -144,4 +145,5 @@ class PlannerCem(Planner):
                 next_mean = tf.concat([flat_end_action_seq, flat_end_action_seq[-dU:]], axis=0)
                 update_mean = tf.assign(mu, next_mean)
                 with tf.control_dependencies([update_mean]):
-                    self.action = action_seq[0]
+                    action = action_seq[0]
+                return action, u_samples, O_im_input, O_vec_input, control_costs, coll_costs 

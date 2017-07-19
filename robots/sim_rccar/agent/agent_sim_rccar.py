@@ -44,6 +44,7 @@ class AgentSimRCcar(Agent):
                     t,
                     rollout_num,
                     only_noise=only_noise,
+                    only_no_noise=is_testing,
                     visualize=visualize)
                 self.act(u_t_no_noise)
             else:

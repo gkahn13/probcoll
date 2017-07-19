@@ -1,5 +1,5 @@
 import tensorflow as tf
-from general.tf.planning.cost.cost import Cost
+from general.policy.cost.cost import Cost
 
 class CostDesired(Cost):
     """Cost for deviating from desired value.

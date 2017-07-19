@@ -1189,7 +1189,7 @@ class ProbcollModel:
                     val_values = defaultdict(list)
                     val_nums = defaultdict(float)
                     val_steps = 0
-                    self._logger.info('\tComputing validation...')
+                    self._logger.info('Computing validation...')
                     while val_steps < self.val_steps:
                         val_cost, val_cross_entropy, \
                         val_err, val_err_coll, val_err_nocoll, \
@@ -1216,7 +1216,7 @@ class ProbcollModel:
                     plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
 
                     self._logger.info(
-                        'error: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
+                        '\terror: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
                             100 * np.mean(val_values['err']),
                             100 * np.mean(val_values['err_coll']),
                             100 * np.mean(val_values['err_nocoll']),
@@ -1224,7 +1224,7 @@ class ProbcollModel:
                             np.mean(val_values['cost']),
                             np.mean(val_values['cross_entropy']),
                             time.time() - epoch_start,
-                            int(self.val_freq * self.batch_size)))
+                            int((self.val_freq * itr_steps + self.val_steps ) * self.batch_size)))
 
                     epoch_start = time.time()
 
@@ -1271,8 +1271,8 @@ class ProbcollModel:
                     plotter.add_train('cost', step * self.batch_size, np.mean(train_values['cost']))
                     plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
 
-                    self._logger.info('\tstep pct: {0:.1f}%,  error: {1:5.2f}%,  error coll: {2:5.2f}%,  error nocoll: {3:5.2f}%,  pct coll: {4:4.1f}%,  cost: {5:4.2f}, ce: {6:4.2f}'.format(
-                        100 * step / float(itr_steps),
+                    self._logger.info('Training step pct: {0:.1f}'.format(100 * step / float(itr_steps)))
+                    self._logger.info('\terror: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f}'.format(
                         100 * np.mean(train_values['err']),
                         100 * np.mean(train_values['err_coll']),
                         100 * np.mean(train_values['err_nocoll']),

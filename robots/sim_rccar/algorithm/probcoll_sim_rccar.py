@@ -4,13 +4,12 @@ import signal
 import time
 import numpy as np
 
-from general.tf.planning.planner_cem import PlannerCem
 from general.algorithm.probcoll import Probcoll
 from general.algorithm.probcoll_model import ProbcollModel
-from general.policy.open_loop_policy import OpenLoopPolicy
-from general.policy.random_policy import RandomPolicy
 from general.state_info.sample import Sample
-from robots.sim_rccar.tf.planning.planner_random_sim_rccar import PlannerRandomSimRCcar
+from general.policy.random_policy import RandomPolicy
+from general.policy.policy_cem import PolicyCem
+from robots.sim_rccar.policy.policy_random_planning_sim_rccar import PolicyRandomPlanningSimRCcar
 from robots.sim_rccar.agent.agent_sim_rccar import AgentSimRCcar
 
 from config import params
@@ -53,11 +52,13 @@ class ProbcollSimRCcar(Probcoll):
         if self._planner_type == 'random_policy':
             mpc_policy = RandomPolicy()
         elif self._planner_type == 'random':
-            planner = PlannerRandomSimRCcar(self.probcoll_model, params['planning'])
-            mpc_policy = OpenLoopPolicy(planner)
+            mpc_policy = PolicyRandomPlanningSimRCcar(self.probcoll_model, params['planning'])
+#            planner = PlannerRandomSimRCcar(self.probcoll_model, params['planning'])
+#            mpc_policy = OpenLoopPolicy(planner)
         elif self._planner_type == 'cem':
-            planner = PlannerCem(self.probcoll_model, params['planning'])
-            mpc_policy = OpenLoopPolicy(planner)
+            mpc_policy = PolicyCem(self.probcoll_model, params['planning'])
+#            planner = PlannerCem(self.probcoll_model, params['planning'])
+#            mpc_policy = OpenLoopPolicy(planner)
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))
 

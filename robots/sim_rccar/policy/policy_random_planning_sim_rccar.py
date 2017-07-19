@@ -1,4 +1,4 @@
-from general.tf.planning.planner_random import PlannerRandom
+from general.policy.policy_random_planning import PolicyRandomPlanning
 import numpy as np
 import tensorflow as tf
 import matplotlib.cm as cm
@@ -11,9 +11,9 @@ try:
 except:
     use_ros = False
 
-class PlannerRandomSimRCcar(PlannerRandom):
+class PolicyRandomPlanningSimRCcar(PolicyRandomPlanning):
     def __init__(self, probcoll_model, params, dtype=tf.float32):
-        super(PlannerRandomSimRCcar, self).__init__(probcoll_model, params, dtype=dtype)
+        PolicyRandomPlanning.__init__(self, probcoll_model, params, dtype=dtype)
         if use_ros and params['visualize']:
             topics = params['topics']
             self.debug_cost_probcoll_pub = ros_utils.Publisher(

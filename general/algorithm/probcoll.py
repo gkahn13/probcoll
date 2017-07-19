@@ -151,7 +151,7 @@ class Probcoll:
                 self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
                 start = time.time()
                 self._agent.reset(hard_reset=True)
-                sample_noise, sample_no_noise, t = self._agent.sample_policy(
+                _, sample_no_noise, t = self._agent.sample_policy(
                     self._mpc_policy,
                     T=T,
                     rollout_num=self._rollout_num,
