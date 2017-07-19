@@ -4,6 +4,7 @@ import os
 from general.agent.agent import Agent
 from general.state_info.sample import Sample
 from robots.sim_rccar.simulation.square_env import SquareEnv
+from robots.sim_rccar.simulation.square_banked_env import SquareBankedEnv
 from robots.sim_rccar.simulation.cylinder_env import CylinderEnv
 
 from config import params
@@ -13,6 +14,8 @@ class AgentSimRCcar(Agent):
     def __init__(self):
         if params['sim']['sim_env'] == 'square':
             self.env = SquareEnv(params['sim'])
+        elif params['sim']['sim_env'] == 'square_banked':
+            self.env = SquareBankedEnv(params['sim'])
         elif params['sim']['sim_env'] == 'cylinder':
             self.env = CylinderEnv(params['sim'])
         else:
@@ -66,7 +69,7 @@ class AgentSimRCcar(Agent):
 
             if not only_noise:
                 sample_no_noise.set_U(u_t_no_noise, t=t)
-            
+
             if self.coll:
                 self._curr_rollout_t = 0
                 break
@@ -110,10 +113,10 @@ class AgentSimRCcar(Agent):
 
     @staticmethod
     def process_depth(image):
-        im = cv2.resize(
-            np.reshape(image, (image.shape[0], image.shape[1])),
-            (params['O']['camera']['height'], params['O']['camera']['width']),
-            interpolation=cv2.INTER_AREA)
+        im = np.reshape(image, (image.shape[0], image.shape[1]))
+        model_shape = (params['O']['camera']['height'], params['O']['camera']['width'])
+        if im.shape != model_shape:
+            im = cv2.resize(im, model_shape, interpolation=cv2.INTER_AREA)
         return im.astype(np.uint8)
 
     @staticmethod

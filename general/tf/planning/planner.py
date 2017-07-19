@@ -50,7 +50,12 @@ class Planner(object):
                 endpoints=self.params['epsilon_greedy']['endpoints'],
                 outside_value=self.params['epsilon_greedy']['outside_value'])
             self.eps_ph = tf.placeholder(self.dtype, [])
-            self.action_noisy = epsilon_greedy(self.action_noisy, self.params['epsilon_greedy'], eps=self.eps_ph, dtype=self.dtype)
+            self.action_noisy = epsilon_greedy(
+                self.action_noisy,
+                self.params['control_range']['lower'],
+                self.params['control_range']['upper'],
+                eps=self.eps_ph,
+                dtype=self.dtype)
 
     def visualize(
             self,

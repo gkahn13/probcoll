@@ -1,3 +1,0 @@
-# Contains lists to sweep over for every sweep param in the base file
-
-random_seed: [0, 1, 2, 3, 4]

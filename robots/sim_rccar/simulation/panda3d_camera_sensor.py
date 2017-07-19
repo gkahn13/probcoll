@@ -80,4 +80,3 @@ class Panda3dCameraSensor(object):
             depth_image = (255 ** depth_image).astype(np.uint8)
             images.append(depth_image)
         return tuple(images)
-

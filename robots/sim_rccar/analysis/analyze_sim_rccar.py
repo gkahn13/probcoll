@@ -91,7 +91,7 @@ class AnalyzeSimRCcar(Analyze):
                     total_time * params['probcoll']['dt'] / 60.))
             plt.xlabel('X position')
             plt.ylabel('Y position')
-            if params['sim']['sim_env'] == 'square':
+            if params['sim']['sim_env'] == 'square' or params['sim']['sim_env'] == 'square_banked':
                 plt.ylim([-22.5, 22.5])
                 plt.xlim([-22.5, 22.5])
                 plt.legend(handles=[blue_line, red_line], loc='center')

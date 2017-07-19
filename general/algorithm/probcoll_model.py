@@ -267,7 +267,7 @@ class ProbcollModel:
                     O_im = sample.get_O()[:, self.O_im_idxs(p=s_params)].astype(np.uint8)
                     O_vec = sample.get_O()[:, self.O_vec_idxs(p=s_params)]
                     output = sample.get_O()[:, self.output_idxs(p=s_params)].astype(np.uint8)
-                    buffer_len = 1
+                    buffer_len = 0
                     if len(U) < 1 + buffer_len: # used to be self.T, but now we are extending
                         continue
 
