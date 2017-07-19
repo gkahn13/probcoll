@@ -110,7 +110,7 @@ def run_exp(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('run', type=str, choices=('probcoll', 'train'))
-    parser.add_argument('robot', type=str, choices=('quadrotor', 'pointquad', 'bebop2d', 'rccar', 'point2d', 'point1d'),
+    parser.add_argument('robot', type=str, choices=('pointquad', 'bebop2d', 'rccar', 'sim_rccar'),
                            help='robot type')
     parser.add_argument('-exp_name', type=str, default=None,
                             help='experiment name')
