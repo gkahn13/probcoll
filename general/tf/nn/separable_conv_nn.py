@@ -1,7 +1,7 @@
 from general.tf import tf_utils
 import tensorflow as tf
 
-def convnn(
+def separable_convnn(
         inputs,
         params,
         scope='convnn',
@@ -39,6 +39,8 @@ def convnn(
     strides = params['strides']
     # Assuming all paddings will be the same type
     padding = params['padding']
+
+    assert(data_format == 'NHWC')
     next_layer_input = inputs
     with tf.variable_scope(scope, reuse=reuse):
         for i in xrange(len(kernels)):
@@ -60,11 +62,11 @@ def convnn(
             else:
                 normalizer_fn = None
                 normalizer_params = None
-            next_layer_input = tf.contrib.layers.conv2d(
+            next_layer_input = tf.contrib.layers.separable_conv2d(
                 inputs=next_layer_input,
                 num_outputs=filters[i],
-                data_format=data_format,
                 kernel_size=kernels[i],
+                depth_multiplier=1, # TODO
                 stride=strides[i],
                 padding=padding,
                 activation_fn=activation,

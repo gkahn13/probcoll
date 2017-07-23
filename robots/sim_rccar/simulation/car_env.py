@@ -25,6 +25,8 @@ class CarEnv(DirectObject):
 
     def __init__(self, params={}):
         self._params = params
+        if 'random_seed' in self._params:
+            np.random.seed(self._params['random_seed'])
         self._use_vel = self._params.get('use_vel', True)
         self._run_as_task = self._params.get('run_as_task', False)
         self._do_back_up = self._params.get('do_back_up', False)

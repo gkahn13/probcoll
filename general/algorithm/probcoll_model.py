@@ -15,6 +15,7 @@ import string
 from general.tf import tf_utils
 from general.tf.nn.fc_nn import fcnn
 from general.tf.nn.conv_nn import convnn
+from general.tf.nn.separable_conv_nn import separable_convnn
 from general.tf.nn.rnn import rnn
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
@@ -55,8 +56,8 @@ class ProbcollModel:
         self.dO_vec = len(self.O_vec_idxs()) * self.num_O
         self.doutput = len(self.output_idxs())
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
-        self._string_input_capacity = 32
-        self._shuffle_batch_capacity = 13 * self.batch_size
+        self._string_input_capacity = 64
+        self._shuffle_batch_capacity = 128 * self.batch_size
         self.preprocess_fnames = []
         self.threads = []
         self.graph = tf.Graph()
@@ -70,8 +71,8 @@ class ProbcollModel:
             allow_soft_placement=True)
         # config.intra_op_parallelism_threads = 1
         # config.inter_op_parallelism_threads = 1
-        print('creating session')
         with self.graph.as_default():
+            tf.set_random_seed(self.random_seed)
             self.sess = tf.Session(config=config)
         self._control_width = np.array(self.control_range["upper"]) - \
             np.array(self.control_range["lower"])
@@ -538,6 +539,8 @@ class ProbcollModel:
             observation_graph = fcnn
         elif obg_type == "cnn":
             observation_graph = convnn
+        elif obg_type == "separable_cnn":
+            observation_graph = separable_convnn
         else:
             raise NotImplementedError(
                 "Image graph {0} is not valid".format(obg_type))
@@ -551,25 +554,76 @@ class ProbcollModel:
             obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
         num_devices = len(params['model']['O_im_order'])
         obs_shaped_list = []
-        obs_frames = tf.split(obs_im_float, self.num_O, axis=1)
+#        obs_frames = tf.split(obs_im_float, self.num_O, axis=1)
         # TODO do reshaping in better way 
-        for obs_t in obs_frames:
-            obss = tf.split(obs_t, num_devices, axis=1)
-            for obs, device in zip(obss, params['model']['O_im_order']):
-                obs_shaped = tf.reshape(
-                    obs,
-                    [
-                        obs_batch,
-                        params["O"][device]["height"],
-                        params["O"][device]["width"],
-                        params["O"][device]["num_channels"]
-                    ])
-                obs_shaped_list.append(obs_shaped)
+#        for obs_t in obs_frames:
+#            obss = tf.split(obs_t, num_devices, axis=1)
+#            for obs, device in zip(obss, params['model']['O_im_order']):
+#                obs_shaped = tf.reshape(
+#                    obs,
+#                    [
+#                        obs_batch,
+#                        params["O"][device]["height"],
+#                        params["O"][device]["width"],
+#                        params["O"][device]["num_channels"]
+#                    ])
+#                if self.data_format == 'NCHW':
+#                    obs_shaped = tf.transpose(obs_shaped, (0, 3, 2, 1))
+#                obs_shaped_list.append(obs_shaped)
         # TODO dropout
+        assert(self.data_format == 'NHWC' or self.data_format == 'NCHW')
+        device = params['model']['O_im_order'][0]
+        if self.data_format == 'NHWC':
+            obs_im_float = tf.reshape(
+                obs_im_float,
+                [
+                    obs_batch,
+                    self.num_O,
+                    num_devices,
+                    params["O"][device]["height"],
+                    params["O"][device]["width"],
+                    params["O"][device]["num_channels"]
+                ])
+            obs_im_float = tf.transpose(
+                obs_im_float,
+                [0, 3, 4, 1, 2, 5])
+            obs_im_float = tf.reshape(
+                obs_im_float,
+                [
+                    obs_batch,
+                    params["O"][device]["height"],
+                    params["O"][device]["width"],
+                    params["O"][device]["num_channels"] * self.num_O * num_devices
+                ])
+        elif self.data_format == 'NCHW':
+            # TODO remember data must be stored as NCHW
+#            obs_im_float = tf.reshape(
+#                obs_im_float,
+#                [
+#                    obs_batch,
+#                    self.num_O,
+#                    num_devices,
+#                    params["O"][device]["height"],
+#                    params["O"][device]["width"],
+#                    params["O"][device]["num_channels"]
+#                ])
+#            obs_im_float = tf.transpose(
+#                obs_im_float,
+#                [0, 1, 2, 5, 3, 4])
+            obs_im_float = tf.reshape(
+                obs_im_float,
+                [
+                    obs_batch,
+                    params["O"][device]["num_channels"] * self.num_O * num_devices,
+                    params["O"][device]["height"],
+                    params["O"][device]["width"],
+                ])
+
         im_output, _ = observation_graph(
-            tf.concat(obs_shaped_list, axis=3),
+            obs_im_float,
             params['model']['image_graph'],
             dtype=self.dtype,
+            data_format=self.data_format,
             scope=scope,
             reuse=reuse,
             is_training=is_training)
@@ -590,8 +644,8 @@ class ProbcollModel:
             self, name, bootstrap_U_inputs, bootstrap_O_im_inputs, bootstrap_O_vec_inputs,
             reuse=False, tf_debug={}):
         assert(name == 'train' or name == 'val')
+        is_training = name == 'train'
         num_bootstrap = params['model']['num_bootstrap']
-
         bootstrap_output_mats = []
         bootstrap_output_preds = []
         ag_type = params["model"]["action_graph"]["graph_type"]
@@ -610,8 +664,6 @@ class ProbcollModel:
             assert(self.dO_im + self.dO_vec > 0)
 
         with tf.name_scope(name + '_inference'):
-            tf.set_random_seed(self.random_seed)
-
             for b in xrange(num_bootstrap):
                 ### inputs
                 u_input_b = bootstrap_U_inputs[b]
@@ -643,7 +695,8 @@ class ProbcollModel:
                             o_vec_input_b,
                             batch_size=batch_size,
                             reuse=reuse,
-                            scope="observation_graph_b{0}".format(b))
+                            scope="observation_graph_b{0}".format(b),
+                            is_training=is_training)
 
                         if not recurrent:
                             concat_list.append(initial_state)
@@ -691,6 +744,7 @@ class ProbcollModel:
                         ag_output,
                         params["model"]["output_graph"],
                         dtype=self.dtype,
+                        is_training=is_training,
                         scope="output_graph_b{0}".format(b),
                         reuse=reuse)
 
@@ -737,7 +791,6 @@ class ProbcollModel:
         batch_size = tf.shape(U_input)[0]
 
         with tf.name_scope('eval_inference'):
-            tf.set_random_seed(self.random_seed)
             u_input_b = U_input
             o_im_input_b = O_im_input
             o_vec_input_b = O_vec_input
@@ -779,7 +832,8 @@ class ProbcollModel:
                             o_vec_input_b,
                             batch_size=batch_size,
                             reuse=reuse,
-                            scope="observation_graph_b{0}".format(b))
+                            scope="observation_graph_b{0}".format(b),
+                            is_training=False)
 
                         if not recurrent:
                             concat_list.append(initial_state)
@@ -845,6 +899,7 @@ class ProbcollModel:
                         ag_output,
                         params["model"]["output_graph"],
                         dtype=self.dtype,
+                        is_training=False,
                         scope="output_graph_b{0}".format(b),
                         reuse=reuse)
 
@@ -968,7 +1023,6 @@ class ProbcollModel:
             for (g, var) in grad:
                 if g is not None:
                     clipped_grad.append((tf.clip_by_norm(g, self.grad_clip), var))
-#            with tf.control_dependencies(update_ops):
             optimizers.append(opt.apply_gradients(clipped_grad))
             grads += clipped_grad
 

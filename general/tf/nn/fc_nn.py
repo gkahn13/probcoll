@@ -7,6 +7,7 @@ def fcnn(
         params,
         dp_masks=None,
         dtype=tf.float32,
+        data_format='NCHW',
         scope='fcnn',
         reuse=False,
         is_training=True):
@@ -55,10 +56,26 @@ def fcnn(
                 activation = output_activation
             else:
                 activation = hidden_activation
+            if params.get('use_batch_norm', False):
+                normalizer_fn = tf.contrib.layers.batch_norm
+                scale = not (activation == tf.nn.relu or activation is None) 
+                normalizer_params = {
+                        'is_training': is_training,
+                        'data_format': data_format,
+                        'fused': True,
+                        'decay': params.get('batch_norm_decay', 0.999),
+                        'zero_debias_moving_mean': True,
+                        'scale': scale
+                    }
+            else:
+                normalizer_fn = None
+                normalizer_params = None
             next_layer_input = tf.contrib.layers.fully_connected(
                 inputs=next_layer_input,
                 num_outputs=dim,
                 activation_fn=activation,
+                normalizer_fn=normalizer_fn,
+                normalizer_params=normalizer_params,
                 weights_initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
                 biases_initializer=tf.constant_initializer(0., dtype=dtype),
                 weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),

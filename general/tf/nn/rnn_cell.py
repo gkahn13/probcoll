@@ -50,12 +50,14 @@ class DpMulintRNNCell(DpRNNCell):
             activation=tf.tanh,
             dtype=tf.float32,
             num_inputs=None,
+            use_layer_norm=False,
             weights_scope=None):
         
         self._num_units = num_units
         self._dropout_mask = dropout_mask
         self._activation = activation
         self._dtype = dtype
+        self._use_layer_norm = use_layer_norm
         
         with tf.variable_scope(weights_scope or type(self).__name__):
             self._weights_W = tf.get_variable(
@@ -81,6 +83,17 @@ class DpMulintRNNCell(DpRNNCell):
         with tf.variable_scope(scope or type(self).__name__):  # "BasicRNNCell"
             Wx = tf.matmul(inputs, self._weights_W)
             Uz = tf.matmul(state, self._weights_U)
+            if self._use_layer_norm:
+#                Wx = tf_utils.layer_norm(
+                Wx = tf.contrib.layers.layer_norm(
+                    Wx,
+                    center=False,
+                    scale=False)
+#                Uz = tf_utils.layer_norm(
+                Uz = tf.contrib.layer.layer_norm(
+                    Uz,
+                    center=False,
+                    scale=False)
             output = self._activation(
 		tf_utils.multiplicative_integration(
                     [Wx, Uz],
@@ -157,6 +170,7 @@ class DpMulintLSTMCell(DpLSTMCell):
             activation=tf.tanh,
             dtype=tf.float32,
             num_inputs=None,
+            use_layer_norm=False,
             weights_scope=None):
         
         self._num_units = num_units
@@ -164,6 +178,7 @@ class DpMulintLSTMCell(DpLSTMCell):
         self._dropout_mask = dropout_mask
         self._activation = activation
         self._dtype = dtype
+        self._use_layer_norm = use_layer_norm
         self._state_is_tuple = True
         
         with tf.variable_scope(weights_scope or type(self).__name__):
@@ -193,6 +208,17 @@ class DpMulintLSTMCell(DpLSTMCell):
             
             Wx = tf.matmul(inputs, self._weights_W)
             Uz = tf.matmul(h, self._weights_U)
+            if self._use_layer_norm:
+#                Wx = tf_utils.layer_norm(
+                Wx = tf.contrib.layers.layer_norm(
+                    Wx,
+                    center=False,
+                    scale=False)
+#                Uz = tf_utils.layer_norm(
+                Uz = tf.contrib.layers.layer_norm(
+                    Uz,
+                    center=False,
+                    scale=False)
             output = self._activation(
 		tf_utils.multiplicative_integration(
                     [Wx, Uz],
@@ -205,7 +231,10 @@ class DpMulintLSTMCell(DpLSTMCell):
             forget = c * tf.nn.sigmoid(f + self._forget_bias)
             new = tf.nn.sigmoid(i) * self._activation(j)
             new_c = forget + new
-            
+
+            if self._use_layer_norm:
+                new_c = tf_utils.layer_norm(new_c)
+
             # TODO make sure this is correct
             if self._dropout_mask is not None:
                 new_c = new_c * self._dropout_mask

@@ -12,6 +12,8 @@ from config import params
 class AgentSimRCcar(Agent):
 
     def __init__(self):
+        # To keep the seed consistent
+        params['sim']['random_seed'] = params['random_seed']
         if params['sim']['sim_env'] == 'square':
             self.env = SquareEnv(params['sim'])
         elif params['sim']['sim_env'] == 'square_banked':
@@ -36,8 +38,6 @@ class AgentSimRCcar(Agent):
             o_t = self.get_observation()
             self.last_n_obs.pop(0)
             self.last_n_obs.append(o_t)
-            # TODO only_noise
-
             if is_testing:
                 u_t, u_t_no_noise = policy.act(
                     self.last_n_obs,

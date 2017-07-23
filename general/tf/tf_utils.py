@@ -118,6 +118,51 @@ def multiplicative_integration(
 
     return final_output
 
+def layer_norm(
+        inputs,
+        center=True,
+        scale=True,
+        reuse=None,
+        trainable=True,
+        epsilon=1e-12,
+        scope=None):
+    # TODO
+    # Assumes that inputs is 2D
+    # add to collections in order to do l2 norm
+    with tf.variable_scope(
+            scope,
+            default_name='LayerNorm',
+            reuse=reuse):
+        shape = tf.shape(inputs)
+        param_shape = (inputs.get_shape()[1],)
+        dtype = inputs.dtype.base_dtype
+        beta = tf.zeros((shape[0],))
+        gamma = tf.ones((shape[0],))
+#        beta = tf.get_variable(
+#            'beta',
+#            shape=param_shape,
+#            dtype=dtype,
+#            initializer=tf.zeros_initializer(),
+#            trainable=trainable and center)
+#        gamma = tf.get_variable(
+#            'gamma',
+#            shape=param_shape,
+#            dtype=dtype,
+#            initializer=tf.ones_initializer(),
+#            trainable=trainable and scale)
+        inputs_T = tf.transpose(inputs)
+        inputs_T_reshaped = tf.reshape(inputs_T, (shape[1], shape[0], 1, 1))
+        outputs_T_reshaped, _, _ = tf.nn.fused_batch_norm(
+            inputs_T_reshaped,
+            scale=gamma,
+            offset=beta,
+            is_training=True,
+            epsilon=1e-4,
+            data_format='NCHW')
+        outputs_reshaped = tf.transpose(outputs_T_reshaped, (1, 0, 2, 3))
+        outputs = tf.reshape(outputs_reshaped, shape)
+        return outputs
+
 def spatial_soft_argmax(features, dtype=tf.float32):
     """
     features shape is [N, H, W, C]
