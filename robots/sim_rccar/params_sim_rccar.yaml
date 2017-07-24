@@ -1,8 +1,8 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar/bn'
-exp_name: 'cylinder_depth'
+exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar'
+exp_name: 'cylinder_bn'
 
 ##########################
 ### Probcoll algorithm ###
@@ -12,7 +12,7 @@ probcoll:
   dt: 0.25
   T: 24 # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 20
+  max_iter: 21
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -54,10 +54,10 @@ model:
   gpu_fraction: 0.8
 
   # Optimization
-  learning_rate: 1.e-3
-  grad_clip: 10. # Norm gradient clip
-  beta1: 0.9 # For avillaflor
-  beta2: 0.999 # For avillaflor
+  learning_rate: 5.e-4
+  grad_clip: 10.0 # Norm gradient clip
+  beta1: 0.9 # For ADAM
+  beta2: 0.999 # For ADAM
   batch_size: 64
   pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
@@ -66,7 +66,7 @@ model:
   # Train schedule
   steps: 500
   reset_freq: 0 # 0 means no resetting
-  reset_steps: 10000
+  reset_steps: 500
   display_steps: 50 
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
@@ -75,6 +75,7 @@ model:
 
   # Model architecture
   dtype: 'float32' # only float32 is currently implemented
+  data_format: 'NHWC'
   num_bootstrap: 1 # EXPERIMENTAL
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
@@ -100,7 +101,7 @@ model:
     graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
-    dropout: 1.0 # pct keep
+#    dropout: 1.0 # pct keep
     cell_args: # If you need to pass variables to cells 
       use_layer_norm: True
 
@@ -108,6 +109,8 @@ model:
     batch_norm_decay: 0.9
     use_batch_norm: True
     graph_type: 'fc'
+    use_batch_norm: True
+    batch_norm_decay: 0.9
  
 #################################################
 ### Planning objective and optimizer settings ###
@@ -151,7 +154,7 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [40, 1.0], [400, 0.1], [800, 0.01]]
+    endpoints: [[0, 1.0], [20, 1.0], [160, 0.01]]
     outside_value: 0.01
 
   control_noise:
@@ -189,7 +192,7 @@ sim:
   back_up:
     steer: [-5., 5.]
     vel: -1.
-    duration: 5.0
+    duration: 3.0
 
 ######################################################
 ########### States, controls, observations ###########

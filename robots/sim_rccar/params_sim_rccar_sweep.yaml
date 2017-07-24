@@ -1,3 +1,11 @@
+random_seed: [0, 1, 2]
+
 model:
-  T: [8, 12, 16]
-  reg: [1.e-3, 1.e-4, 1.e-5]
+  reg: [1.e-2, 1.e-3, 1.e-4]
+  learning_rate: [1.e-3, 5.e-4, 1.e-4]
+  grad_clip: [5.0, 10.0] # Norm gradient clip
+  image_graph:
+    graph_type: ['cnn', 'separable_cnn']
+
+  action_graph:
+    dropout: [1.0]
