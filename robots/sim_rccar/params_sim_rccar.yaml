@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'cylinder_depth'
+exp_name: 'cylinder_bn'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,7 +10,7 @@ exp_name: 'cylinder_depth'
 
 probcoll:
   dt: 0.25
-  T: 48 # timesteps per trajectory
+  T: 24 # timesteps per trajectory
   logger: 'debug' # debug/info/fatal what level to log
   max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -21,18 +21,18 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 20
+  num_rollouts: 40
 
   testing:
     num_rollout: 20
-    itr_freq: 4
+    itr_freq: 1
 
 ######################
 ### Probcoll model ###
 ######################
     
 model:
-  T: 12 # how many timesteps to predict
+  T: 8 # how many timesteps to predict
   logger: 'info' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
@@ -54,9 +54,9 @@ model:
 
   # Optimization
   learning_rate: 5.e-4
-  grad_clip: 5.0 # Norm gradient clip
-  beta1: 0.9 # For avillaflor
-  beta2: 0.999 # For avillaflor
+  grad_clip: 10.0 # Norm gradient clip
+  beta1: 0.9 # For ADAM
+  beta2: 0.999 # For ADAM
   batch_size: 64
   pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
@@ -65,7 +65,7 @@ model:
   # Train schedule
   steps: 500
   reset_freq: 0 # 0 means no resetting
-  reset_steps: 5000
+  reset_steps: 500
   display_steps: 50 
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
@@ -74,22 +74,25 @@ model:
 
   # Model architecture
   dtype: 'float32' # only float32 is currently implemented
+  data_format: 'NHWC'
   num_bootstrap: 1 # EXPERIMENTAL
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
 
   image_graph:
-    graph_type: 'cnn'
+    graph_type: 'separable_cnn'
     filters: [32, 64, 64]
     kernels: [8, 4, 3]
     strides: [4, 2, 1]
     padding: 'SAME' 
-    use_batch_norm: False
-    batch_norm_decay: 0.5
+    use_batch_norm: True
+    batch_norm_decay: 0.9
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax 
   
   observation_graph:
+    use_batch_norm: True
+    batch_norm_decay: 0.9
     output_activation: 'tanh'
     output_dim: 128 # This is the hidden size of the rnn
   
@@ -98,10 +101,13 @@ model:
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 1.0 # pct keep
-#    cell_args: # If you need to pass variables to cells 
+    cell_args: # If you need to pass variables to cells 
+      use_layer_norm: True
 
   output_graph: 
     graph_type: 'fc'
+    use_batch_norm: True
+    batch_norm_decay: 0.9
  
 #################################################
 ### Planning objective and optimizer settings ###
@@ -125,8 +131,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-30., 1.]
-    upper: [30., 1.]
+    lower: [-30., 2.]
+    upper: [30., 2.]
 
   random:
     K: 2048 # number of actions to sample from
@@ -145,7 +151,7 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [20, 1.0], [200, 0.1], [360, 0.01]]
+    endpoints: [[0, 1.0], [20, 1.0], [160, 0.01]]
     outside_value: 0.01
 
   control_noise:
@@ -173,7 +179,7 @@ sim:
   visualize: False
   use_vel: True
   use_back_cam: True
-  use_depth: True
+  use_depth: False
   accelClamp: 2.0
   mass: 10.0
   p: 1.25
@@ -184,7 +190,7 @@ sim:
   back_up:
     steer: [-5., 5.]
     vel: -1.
-    duration: 4.0
+    duration: 3.0
 
 ######################################################
 ########### States, controls, observations ###########
