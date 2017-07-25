@@ -1,7 +1,7 @@
 # contains all needed parameters for all files
 
 random_seed: 'sweep'
-exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar/sweep/bn'
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar/sweep/bn3'
 exp_name: 'cylinder_depth'
 
 ##########################
@@ -11,7 +11,7 @@ exp_name: 'cylinder_depth'
 probcoll:
   dt: 0.25
   T: 24 # timesteps per trajectory
-  logger: 'info' # debug/info/fatal what level to log
+  logger: 'fatal' # debug/info/fatal what level to log
   max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
@@ -21,7 +21,7 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 40
+  num_rollouts: 20
 
   testing:
     num_rollout: 20
@@ -33,7 +33,7 @@ probcoll:
     
 model:
   T: 8 # how many timesteps to predict
-  logger: 'info' # debug/info/warning/fatal what level to log
+  logger: 'fatal' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
@@ -54,19 +54,19 @@ model:
   gpu_fraction: 0.8
 
   # Optimization
-  learning_rate: 'sweep'
-  grad_clip: 'sweep' # Norm gradient clip
+  learning_rate: 1.e-3
+  grad_clip: 10. # Norm gradient clip
   beta1: 0.9 # For avillaflor
   beta2: 0.999 # For avillaflor
   batch_size: 64
   pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 'sweep' # L2 regularization
+  reg: 1.e-5 # L2 regularization
   
   # Train schedule
   steps: 500
-  reset_freq: 0 # 0 means no resetting
-  reset_steps: 10000
+  reset_freq: 'sweep' # 0 means no resetting
+  reset_steps: 5000
   display_steps: 50 
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
@@ -100,7 +100,7 @@ model:
     graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
-    dropout: 'sweep' # pct keep
+#    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
       use_layer_norm: True
 
@@ -151,15 +151,17 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [40, 1.0], [400, 0.1], [800, 0.01]]
-    outside_value: 0.01
+    endpoints: 'sweep'
+    outside_value: 0.0
 
   control_noise:
-    type: 'uniform' # zero / gaussian / uniform
+#    endpoints: 'sweep'
+#    outside_value: 0.0
 
+    type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [3.0, 0.3]
+      std: [3.0, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
@@ -176,7 +178,7 @@ planning:
 
 sim:
   sim_env: 'cylinder' # square / cylinder
-  visualize: True
+  visualize: False
   use_vel: True
   use_back_cam: True
   use_depth: False

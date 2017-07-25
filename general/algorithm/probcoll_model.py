@@ -850,6 +850,7 @@ class ProbcollModel:
                                 initial_state=initial_state,
                                 params=params["model"]["action_graph"],
                                 dp_masks=dp_masks,
+                                dp_batch_same=True,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
@@ -858,6 +859,7 @@ class ProbcollModel:
                                 inputs=input_layer,
                                 params=params["model"]["action_graph"],
                                 dp_masks=dp_masks,
+                                dp_batch_same=True,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
@@ -868,6 +870,7 @@ class ProbcollModel:
                                 inputs=input_layer,
                                 initial_state=initial_state,
                                 params=params["model"]["action_graph"],
+                                dp_batch_same=True,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
@@ -875,6 +878,7 @@ class ProbcollModel:
                             ag_output, action_dp_masks = action_graph(
                                 inputs=input_layer,
                                 params=params["model"]["action_graph"],
+                                dp_batch_same=True,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)

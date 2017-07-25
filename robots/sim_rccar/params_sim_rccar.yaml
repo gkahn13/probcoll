@@ -1,7 +1,7 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar'
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
 exp_name: 'cylinder_bn'
 
 ##########################
@@ -12,7 +12,7 @@ probcoll:
   dt: 0.25
   T: 24 # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 21
+  max_iter: 10
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -21,7 +21,7 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 40
+  num_rollouts: 20
 
   testing:
     num_rollout: 20
@@ -54,14 +54,14 @@ model:
   gpu_fraction: 0.8
 
   # Optimization
-  learning_rate: 5.e-4
+  learning_rate: 1.e-3
   grad_clip: 10.0 # Norm gradient clip
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
   batch_size: 64
   pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-3 # L2 regularization
+  reg: 1.e-5 # L2 regularization
   
   # Train schedule
   steps: 500
@@ -154,15 +154,17 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [20, 1.0], [160, 0.01]]
-    outside_value: 0.01
+    endpoints: [[0, 1.0], [4800, 0.0]]
+    outside_value: 0.0
 
   control_noise:
-    type: 'uniform' # zero / gaussian / uniform
+#    endpoints: [[0, 1.0], [4800, 0.0]]
+#    outside_value: 0.0
 
+    type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [3.0, 0.3]
+      std: [3.0, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
@@ -179,7 +181,7 @@ planning:
 
 sim:
   sim_env: 'cylinder' # square / cylinder
-  visualize: True
+  visualize: False
   use_vel: True
   use_back_cam: True
   use_depth: False

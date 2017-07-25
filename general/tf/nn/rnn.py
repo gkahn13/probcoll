@@ -7,6 +7,7 @@ def rnn(
         params,
         initial_state=None,
         dp_masks=None,
+        dp_batch_same=False,
         dtype=tf.float32,
         scope='rnn',
         reuse=False):
@@ -65,8 +66,12 @@ def rnn(
                 if dp_masks is not None:
                     dp = dp_masks[i]
                 else:
+                    if dp_batch_same:
+                        sample = distribution.sample((1, num_units))
+                    else:
+                        sample = distribution.sample((tf.shape(inputs)[0], num_units))
                     # Shape is not well defined without reshaping
-                    sample = tf.reshape(distribution.sample((tf.shape(inputs)[0], num_units)), (-1, num_units))
+                    sample = tf.reshape(sample, (-1, num_units))
                     mask = tf.cast(sample < dropout, dtype) / dropout
                     dp = mask
                     dp_return_masks.append(mask)

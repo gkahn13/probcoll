@@ -29,7 +29,7 @@ class AgentSimRCcar(Agent):
         self.reset()
         self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
 
-    def sample_policy(self, policy, T=1, rollout_num=0, is_testing=False, only_noise=False):
+    def sample_policy(self, policy, T=1, time_step=0, is_testing=False, only_noise=False):
         visualize = params['planning'].get('visualize', False)
         sample_noise = Sample(meta_data=params, T=T)
         sample_no_noise = Sample(meta_data=params, T=T)
@@ -42,7 +42,7 @@ class AgentSimRCcar(Agent):
                 u_t, u_t_no_noise = policy.act(
                     self.last_n_obs,
                     t,
-                    rollout_num,
+                    time_step=time_step + t,
                     only_noise=only_noise,
                     only_no_noise=is_testing,
                     visualize=visualize)
@@ -51,7 +51,7 @@ class AgentSimRCcar(Agent):
                 u_t, u_t_no_noise = policy.act(
                     self.last_n_obs,
                     self._curr_rollout_t,
-                    rollout_num,
+                    time_step=time_step + t,
                     only_noise=only_noise,
                     visualize=visualize)
                 self.act(u_t)

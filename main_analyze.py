@@ -1,12 +1,12 @@
 import argparse
-from robots.rccar.algorithm.analyze_aggregate_percent import AnalyzeAggPerRCcar
+from robots.sim_rccar.analysis.analyze_aggregate_percent import AnalyzeAggPerSimRCcar
 
 ############
 ### main ###
 ############
 
 def main(args):
-    analyze = AnalyzeAggPerRCcar()
+    analyze = AnalyzeAggPerSimRCcar()
     analyze.percent_plot(args.data_dir, args.save_path)
 
 if __name__ == '__main__':

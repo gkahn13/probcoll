@@ -79,7 +79,7 @@ def run_exp(args):
         run = args[5]
         for i, (param, exp_name) in enumerate(zip(params, exp_names)):
             param['model']['device'] = gpu
-            param['exp_name'] = '{0:04d}_{1}'.format(i + start_index, exp_name)
+            param['exp_name'] = '{0:04d}_{1}'.format(i + start_index, exp_name).replace("[", "(").replace("]", ")")
             exp_dir = os.path.join(param['exp_dir'], param['exp_name'])
             if not os.path.exists(exp_dir):
                 os.makedirs(exp_dir)

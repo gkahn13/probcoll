@@ -25,7 +25,7 @@ class ProbcollSimRCcar(Probcoll):
         self._agent = AgentSimRCcar()
         self._num_rollouts = params['probcoll']['num_rollouts']
         # Keeps track of how many rollouts have been done
-        self._rollout_num = 0
+        self._time_step = 0
         ### load prediction neural net
         self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)
     

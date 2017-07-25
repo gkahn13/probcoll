@@ -154,7 +154,6 @@ class Probcoll:
                 _, sample_no_noise, t = self._agent.sample_policy(
                     self._mpc_policy,
                     T=T,
-                    rollout_num=self._rollout_num,
                     is_testing=True)
 
                 if t + 1 < T:
@@ -186,7 +185,11 @@ class Probcoll:
             self._agent.reset()
             self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
             start = time.time()
-            sample_noise, sample_no_noise, t = self._agent.sample_policy(self._mpc_policy, T=T, rollout_num=self._rollout_num, only_noise=label_with_noise)
+            sample_noise, sample_no_noise, t = self._agent.sample_policy(
+                self._mpc_policy,
+                T=T,
+                time_step=self._time_step,
+                only_noise=label_with_noise)
             if t + 1 < T:
                 self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
             else:
@@ -202,5 +205,5 @@ class Probcoll:
                 cond,
                 elapsed,
                 t*params['probcoll']['dt']/elapsed))
-            self._rollout_num += 1 
+            self._time_step += t 
         self._itr_save_samples(itr, samples)

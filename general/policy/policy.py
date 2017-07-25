@@ -32,6 +32,11 @@ class Policy(object):
 
     def _setup_noise(self):
         with self.probcoll_model.graph.as_default():
+            # Noise schedule
+            self.noise_schedule = schedules.PiecewiseSchedule(
+                endpoints=self.params['epsilon_greedy']['endpoints'],
+                outside_value=self.params['epsilon_greedy']['outside_value'])
+            self.noise_multiplier_ph = tf.placeholder(self.dtype, [])
             def get_noisy_action():
                 action, _, _, _, _, _ = self._setup_action()
                 noise_type = self.params['control_noise']['type']
@@ -48,7 +53,7 @@ class Policy(object):
                 else:
                     raise NotImplementedError(
                         "Noise type {0} is not valid".format(noise_type))
-                return action + noise
+                return action + (noise * self.noise_multiplier_ph)
             # Epsilon greedy 
             self.eps_schedule = schedules.PiecewiseSchedule(
                 endpoints=self.params['epsilon_greedy']['endpoints'],
@@ -70,7 +75,7 @@ class Policy(object):
             control_costs):
         pass
 
-    def act(self, obs_frame, t, rollout_num, only_noise=False, only_no_noise=False, visualize=False):
+    def act(self, obs_frame, t, time_step=0, only_noise=False, only_no_noise=False, visualize=False):
         assert(not only_noise or not only_no_noise)
         if t == 0:
             self.probcoll_model.sess.run(self.reset_ops)
@@ -84,9 +89,11 @@ class Policy(object):
         feed_dict = {
                 self.O_im_input: o_im_input.astype(np.uint8),
                 self.O_vec_input: o_vec_input,
-                self.eps_ph: self.eps_schedule.value(rollout_num),
                 self._t: t
             }
+        if not only_no_noise:
+            feed_dict[self.eps_ph] = self.eps_schedule.value(time_step)     
+            feed_dict[self.noise_multiplier_ph] = self.noise_schedule.value(time_step)
         if visualize:
             action_noisy, action, actions_considered, \
                 coll_costs, control_costs  = self.probcoll_model.sess.run(
