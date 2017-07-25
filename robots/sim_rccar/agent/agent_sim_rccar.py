@@ -83,7 +83,7 @@ class AgentSimRCcar(Agent):
         self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
         self.coll = False
         if self.coll or hard_reset:
-            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
 
     def get_observation(self):
         obs_sample = Sample(meta_data=params, T=1)

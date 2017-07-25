@@ -1,7 +1,8 @@
 import numpy as np
-import cv2
-
+import cv2, os
+from general.utility.logger import get_logger
 import rospy
+from std_msgs.msg import Empty
 import sensor_msgs.msg as sensor_msgs
 import std_msgs.msg as std_msgs
 import geometry_msgs.msg as geometry_msgs
@@ -9,26 +10,28 @@ import visualization_msgs.msg as visualization_msgs
 import cv_bridge
 
 from general.agent.agent import Agent
-
 import general.ros.ros_utils as ros_utils
-
 from general.state_info.sample import Sample
-from general.policy.noise_models import ZeroNoise
 
 from config import params
 
 class AgentBebop2d(Agent):
 
-    def __init__(self,  world, dynamics, obs_noise=False, dyn_noise=False):
-        Agent.__init__(self, dynamics)
-        self._world = world
-        self.meta_data = params
-        self.obs_noise = obs_noise
-        self.dyn_noise = dyn_noise
-
+    def __init__(self):
+        self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
+        self._logger = get_logger(
+            self.__class__.__name__,
+            params['probcoll']['logger'],
+            os.path.join(self._save_dir, 'dagger.txt'))
+        self._curr_rollout_t = 0
+        # self._ros_start_rollout = ros_utils.RosCallbackEmpty(params['bebop']['topics']['start_rollout'], std_msgs.Empty)
+        self._ros_start_rollout = rospy.Subscriber(params['bebop']['topics']['start_rollout'], Empty, self.start)
+        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
+        rospy.init_node('DaggerPredictionBebop2d', anonymous=True)
         bebop_topics = params['bebop']['topics']
-
+        self.just_crashed = True
         ### subscribers
+        # import IPython; IPython.embed()
         self.image_callback = ros_utils.RosCallbackAll(bebop_topics['image'], sensor_msgs.Image,
                                                        max_num_msgs=1)
         self.coll_callback = ros_utils.RosCallbackEmpty(bebop_topics['collision'], std_msgs.Empty)
@@ -43,65 +46,113 @@ class AgentBebop2d(Agent):
 
         self.cv_bridge = cv_bridge.CvBridge()
 
-    def sample_policy(self, x0, policy, T=None, **policy_args):
-        if T is None:
-            T = policy._T
-        policy_sample = Sample(meta_data=params, T=T)
-        noise = policy_args.get('noise', ZeroNoise(params))
+        self._info = dict()
+        self.reset()
+        # self._info['linearvel'] = np.array([0.0, 0.0, 0.0])
 
-        rate = rospy.Rate(1. / params['dt'])
-        policy_sample.set_X(x0, t=0)
+    def start(self, msg):
+        self.just_crashed = False
+        self._logger.info('Starting')
+
+    def sample_policy(self, policy, T=1, rollout_num=0, is_testing=False, only_noise=False):
+        visualize = params['planning'].get('visualize', False)
+        sample_noise = Sample(meta_data=params, T=T)
+        sample_no_noise = Sample(meta_data=params, T=T)
+        r = rospy.Rate(1.0/params['probcoll']['dt'])
+        # import IPython; IPython.embed()
+        self.just_crashed = False
         for t in xrange(T):
-            # get observation and act
-            x_t = policy_sample.get_X(t=t)
-            o_t = self.get_observation(x_t)
-            u_t = policy.act(x_t, o_t, t, noise=noise)
-            if params['probcoll']['planner_type'] != 'teleop': # TODO hack
-                self.execute_control(u_t)
+            r.sleep()
+            # Get observation and act
+            o_t = self.get_observation()
+            self.last_n_obs.pop(0)
+            self.last_n_obs.append(o_t)
+            # TODO only_noise
+            # self.coll = o_t[-1]
+            if is_testing:
+                u_t, u_t_no_noise = policy.act(
+                    self.last_n_obs,
+                    t,
+                    rollout_num,
+                    only_noise=only_noise,
+                    only_no_noise=is_testing,
+                    visualize=visualize)
+                self.act(u_t_no_noise)
+                self._info['linearvel'] = u_t_no_noise
+            else:
+                u_t, u_t_no_noise = policy.act(
+                    self.last_n_obs,
+                    self._curr_rollout_t,
+                    rollout_num,
+                    only_noise=only_noise,
+                    visualize=visualize)
+                self.act(u_t)
+                self._info['linearvel'] = u_t
+            # TODO possibly determine state before
+            x_t = self.get_state()
+            # Record
+            sample_noise.set_X(x_t, t=t)
+            sample_noise.set_O(o_t, t=t)
+            # sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
+            # sample_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
+            sample_no_noise.set_X(x_t, t=t)
+            sample_no_noise.set_O(o_t, t=t)
+            # sample_no_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
+            # sample_no_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
+            if not is_testing:
+                sample_noise.set_U(u_t, t=t)
 
-            # record
-            policy_sample.set_X(x_t, t=t)
-            policy_sample.set_O(o_t, t=t)
-            policy_sample.set_U(u_t, t=t)
+            if not only_noise:
+                sample_no_noise.set_U(u_t_no_noise, t=t)
+            if self.coll:
+                self._curr_rollout_t = 0
+                break
+            else:
+                self._curr_rollout_t += 1
+        return sample_noise, sample_no_noise, t
 
-            # propagate dynamics
-            if t < T-1:
-                x_tp1 = self._dynamics.evolve(x_t, u_t)
-                policy_sample.set_X(x_tp1, t=t+1)
-            rate.sleep()
+    def reset(self, pos=None, ori=None, hard_reset=False):
+        # self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
+        self.coll = False
+        self.act(None)  # stop bebop
+        if self.just_crashed:
+            self._logger.info('Press start')
+            while self.just_crashed and not rospy.is_shutdown():
+                rospy.sleep(0.1)
+        if hard_reset:
+            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
 
-            # see if collision in the past cycle
-            policy_sample.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
+    def get_state(self):
+        state_sample = Sample(meta_data=params, T=1)
+        vel = self._info['linearvel']
+        state_sample.set_X(vel, t=0, sub_state='linearvel')
+        return state_sample.get_X(t=0)
 
-        return policy_sample
-
-    def reset(self, x):
-        pass
-
-    def get_observation(self, x):
-        obs_sample = Sample(meta_data=params, T=2)
-
+    def get_observation(self):
+        obs_sample = Sample(meta_data=params, T=1)
         ### collision
         coll_time = self.coll_callback.get()
-        is_coll = coll_time is not None
-        obs_sample.set_O([int(is_coll)], t=0, sub_obs='collision')
+        if coll_time is not None:
+            self.just_crashed = True
+            self.coll = True
+        # is_coll = coll_time is not None
+        obs_sample.set_O([int(self.coll)], t=0, sub_obs='collision')
 
         ### camera
         image_msgs = self.image_callback.get()
         assert(len(image_msgs) > 0)
         ### keep only those before the collision
-        if is_coll:
-            image_msgs_filt = [im for im in image_msgs if im.header.stamp.to_sec() < coll_time.to_sec()]
-            if len(image_msgs_filt) == 0:
-                image_msgs_filt = [image_msgs[-1]]
-            image_msgs = image_msgs_filt
+        # if self.coll:
+        #     image_msgs_filt = [im for im in image_msgs if im.header.stamp.to_sec() < coll_time.to_sec()]
+        #     if len(image_msgs_filt) == 0:
+        #         image_msgs_filt = [image_msgs[-1]]
+        #     image_msgs = image_msgs_filt
         image_msg = image_msgs[-1]
         im = AgentBebop2d.process_image(image_msg, self.cv_bridge)
         # im = np.zeros((params['O']['camera']['height'], params['O']['camera']['width']), dtype=np.float32)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
         ### publish image for debugging
-        self.im_debug_pub.publish(self.cv_bridge.cv2_to_imgmsg((255. * im).astype(np.uint8), 'mono8'))
-
+        # self.im_debug_pub.publish(self.cv_bridge.cv2_to_imgmsg((255. * im).astype(np.uint8), 'mono8'))
         return obs_sample.get_O(t=0)
 
     @staticmethod
@@ -116,7 +167,7 @@ class AgentBebop2d(Agent):
 
         return im
 
-    def execute_control(self, u):
+    def act(self, u):
         if u is not None:
             twist_msg = geometry_msgs.Twist(
                 linear=geometry_msgs.Point(u[0], u[1], 0.),
@@ -142,3 +193,6 @@ class AgentBebop2d(Agent):
             self.cmd_vel_debug_pub.publish(marker)
         else:
             self.cmd_vel_pub.publish(None)
+
+    def close(self):
+        pass

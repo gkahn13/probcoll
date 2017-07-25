@@ -15,7 +15,7 @@ except:
 
 try:
     from robots.bebop2d.algorithm.probcoll_bebop2d import ProbcollBebop2d
-    from robots.bebop2d.algorithm.analyze_bebop2d import AnalyzeBebop2d
+    # from robots.bebop2d.algorithm.analyze_bebop2d import AnalyzeBebop2d
 except:
     print('main.py: not importing Bebop2d')
 

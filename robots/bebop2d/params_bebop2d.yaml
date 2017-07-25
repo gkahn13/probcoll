@@ -1,132 +1,152 @@
 # contains all needed parameters for all files
 
-dt: 0.5
 random_seed: 0
-exp_dir: '/home/bding/Desktop/probcoll/experiments/bebop2d'
-exp_name: 'test'
-
+exp_dir: '/home/bding/Desktop/code/probcoll/experiments/bebop2d'
+exp_name: 'square'
   ##########################
 ### Probcoll algorithm ###
 ##########################
 
 probcoll:
-  T: 10 # timesteps per trajectory
+  dt: 0.5
+  T: 8 # timesteps per trajectory
+  logger: 'debug'
   max_iter: 10
-  planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
-  asynchronous_training: False
-  dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
-  control_noise:
-    type: 'gaussian' # zero / gaussian / OU / smoothedgaussian
+  label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 
-    zero: {}
-    gaussian:
-      std: [0.1, 0.1, 0]
-    smoothedgaussian:
-      std: [0.1, 0.1, 0]
-      T: 30
-    ou:
-      std: [0.1, 0.1, 0]
-      mean: [0.25, 0.0, 0.0]
-      theta: 0.15
+  # Training
+  training_start_iter: 0
+  is_training: True # EXPERIMENTAL
+  asynchronous_training: False # EXPERIMENTAL
+
+  # Conditions
+  num_rollouts: 8
+
+  testing:
+    num_rollout: 8
+    itr_freq: 4
 
 
-  label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
-  obs_noise: True # boolean use noise or not
 
-#  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
+#  planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
+#  asynchronous_training: False
+#  dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
+#  control_noise:
+#    type: 'gaussian' # zero / gaussian / OU / smoothedgaussian
+#
+#    zero: {}
+#    gaussian:
+#      std: [0.1, 0.1, 0]
+#    smoothedgaussian:
+#      std: [0.1, 0.1, 0]
+#      T: 30
+#    ou:
+#      std: [0.1, 0.1, 0]
+#      mean: [0.25, 0.0, 0.0]
+#      theta: 0.15
 
-  use_ground_truth: False
-  use_init_cost: True # TODO
-  
-  conditions:
-    repeats: 20 # TODO
-    num_test: 1
-    randomize_conds: False
-    randomize_reps: True
 
-    default:
-      linearvel: [0., 0, 0.0]
+#  label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
+#  obs_noise: True # boolean use noise or not
+#
+##  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
+#
+#  use_ground_truth: False
+#  use_init_cost: True # TODO
+#
+#  conditions:
+#    repeats: 20 # TODO
+#    num_test: 1
+#    randomize_conds: False
+#    randomize_reps: True
+#
+#    default:
+#      linearvel: [0., 0, 0.0]
+#
+#    range:
+#      linearvel:
+#        min: [0, 0, 0]
+#        max: [0, 0, 0]
+#        num: [1, 1, 1]
+#
+#    perturb: # repetition perturbations
+#      linearvel: [0.0, 0.0, 0.0]
 
-    range:
-      linearvel:
-        min: [0, 0, 0]
-        max: [0, 0, 0]
-        num: [1, 1, 1]
-
-    perturb: # repetition perturbations
-      linearvel: [0.0, 0.0, 0.0]
-
-##########################################
-########## Training environment ##########
-##########################################
-
-world:
-  randomize: True
 
 ##################################
 ####### Probcoll model ###########
 ##################################
 
 model:
-  T: 4 # how many timesteps to predict
-
-  control_range:
-    lower: [-0.25, -0.25, -1.57]
-    upper: [0.25, 0.25, 1.57]
+  T: 5 # how many timesteps to predict
+  logger: 'debug'
 
   # what to use as input to prediction model
-  X_order: []
   U_order: ['linearvel']
-  O_order: ['camera']
+  O_im_order: ['camera']
+  O_vec_order: []
   output_order: ['collision'] # taken from observations O
+  num_O: 4
 
-  # NN training parameters
-  early_stopping: False # if True, only saves model each epoch if it's the lowest cost on validation for all epochs
+  center_O_im: False
+  control_range:
+    lower: [0.0, -1.0, -1.57]
+    upper: [1.0, 1.0, 1.57]
+
+  # Device
   device: 0
-  gpu_fraction: 0.8 #TODO
-  reset_every_train: False # every time train is called, reinitialize weights?
-  learning_rate: 0.001
-  beta1: 0.9 # For Adam
-  beta2: 0.999 # For Adam
-  batch_size: 16
-  display_batch: 100 
-  val_freq: 90 # How often you compute validation
-  val_steps: 10  # How many steps you do on validation 
-  steps: 1000
-  val_pct: 0.2
+  gpu_fraction: 0.0
 
-  # how to resample data
-#  aggregate_save_data: True # put all data into one file?
-  save_type: 'fixedlen' # varlen / fixedlen
-  
-  observation_graph:
+  # Optimization
+  learning_rate: 5.e-4
+  grad_clip: 5.0 # Norm gradient clip
+  beta1: 0.9 # For avillaflor
+  beta2: 0.999 # For avillaflor
+  batch_size: 64
+  pct_coll: 0.75 # rebalancing trajectories
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-3 # L2 regularization
+
+  # Train schedule
+  steps: 500
+  reset_freq: 0 # 0 means no resetting
+  reset_steps: 5000
+  display_steps: 50
+  val_pct: 0.1 # Percent of the data stored as validation
+  val_freq: 0.1 # How often you compute validation (percentage)
+  val_steps: 5  # How many steps you do on validation
+  val_dropout: True # Whether you use dropout during validation
+
+  # Model architecture
+  dtype: 'float32' # only float32 is currently implemented
+  num_bootstrap: 1 # EXPERIMENTAL
+  prob_coll_strictly_increasing: True # True / False
+  mask: 'all' # all / last
+
+  image_graph:
     graph_type: 'cnn'
-    filters: [4, 4, 4]
-    kernels: [3, 3, 3]
-    strides: [2, 2, 2]
-    padding: 'VALID' 
-    conv_activation: 'relu' 
+    filters: [32, 64, 64]
+    kernels: [8, 4, 3]
+    strides: [4, 2, 1]
+    padding: 'SAME'
+    use_batch_norm: False
+    batch_norm_decay: 0.5
+    conv_activation: 'relu'
+    output_activation: 'relu' # relu / tanh/ spatial_softmax
+
+  observation_graph:
     output_activation: 'tanh'
+    output_dim: 128 # This is the hidden size of the rnn
 
-# TODO example fc action graph
-#  action_graph:
-#    graph_type: 'fc' # fc / rnn
-#    hidden_layers: [16, 16]
-#    output_dim: 24 # Has to be divisible by T
-#    hidden_activation: 'relu'
-#    dropout: 0.7
-  
   action_graph:
-    graph_type: 'rnn' # fc / rnn
+    graph_type: 'rnn'
     num_cells: 1
-    # TODO num_units isnt used because we use cnn output size as num_units
-#    num_units: 16 # state_size
-    cell_type: 'mulint_rnn' #rnn / mulint_rnn
-    dropout: 0.7 # pct keep
-#    cell_args: # If you need to pass variables to cells 
+    cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
+#    dropout: 1.0 # pct keep
+#    cell_args: # If you need to pass variables to cells
 
-  output_graph: # Must have dropout 1.0
-    graph_type: 'fc' # fc / rnn
+  output_graph:
+    graph_type: 'fc'
 
 
 #################################################
@@ -137,24 +157,42 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [1e5, 0., 0.] # TODO
+      weight: [100, 0., 0.] # TODO
+      std_weight: 0.0
+      pre_activation: True
     
     control_cost:
-      des: [0.25, 0., 0.] # TODO: hard-coded order: steering then speed
+      des: [0.8, 0., 0.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [1., 1., 1.]
+      weight: [1., 0.5, 0.0]
       # TODO uncertainty
 #    pre_activation: True # wether std is before or after activation (sigmoid)
-  
+
   num_dp: 16 # number of dropout passes to average over
-  planner_type: 'primitives' # random / primitives / cem
+  planner_type: 'random' # random / primitives / cem
   
   control_range:
-    lower: [-0.25, -0.25, -1.57]
-    upper: [0.25, 0.25, 1.57]
+    lower: [0.6, -0.6, -1.57]
+    upper: [0.6, 0.6, 1.57]
 
   random:
     K: 128 # number of actions to sample from
+
+  epsilon_greedy:
+    endpoints: [[0, 1.0], [20, 1.0], [200, 0.1], [360, 0.01]]
+    outside_value: 0.01
+
+  control_noise:
+    type: 'uniform' # zero / gaussian / uniform
+
+    zero: {}
+    gaussian:
+      std: [0.1, 0.1, 0.1]
+    uniform:
+      lower: [-0.1, -0.1, 0.0]
+      upper: [0.1, 0.1, 0.0]
+
+  visualize: False
 
 ######################################################
 ########### States, controls, observations ###########
@@ -189,6 +227,7 @@ O:
     height: 16
     width: 16
     noise: 0.01
+    num_channels: 1
   collision: {idx: 256, dim: 1, buffer: 0.0}
 
 ##################

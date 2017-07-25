@@ -146,7 +146,7 @@ class Probcoll:
                 self.probcoll_model.recover()
             T = params['probcoll']['T']
             samples = []
-            reset_pos, reset_ori = self._agent.get_pos_ori() 
+            # reset_pos, reset_ori = self._agent.get_pos_ori()
             for cond in xrange(params['probcoll']['testing']['num_rollout']):
                 self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
                 start = time.time()
@@ -170,7 +170,7 @@ class Probcoll:
                     elapsed,
                     t*params['probcoll']['dt']/elapsed))
             self._itr_save_samples(itr, samples, prefix='testing_')
-            self._agent.reset(pos=reset_pos, ori=reset_ori)
+            # self._agent.reset(pos=reset_pos, ori=reset_ori)
 
     def _async_training(self):
         pass
@@ -196,6 +196,8 @@ class Probcoll:
                 samples.append(sample_noise.match(slice(0, t + 1)))
             else:
                 samples.append(sample_no_noise.match(slice(0, t + 1)))
+            # if not samples[-1].isfinite():
+            #     import IPython; IPython.embed()
             assert(samples[-1].isfinite())
             elapsed = time.time() - start
             self._logger.info('\t\t\tFinished cond {0} ({1:.1f}s, {2:.3f}x real-time)'.format(
