@@ -1,7 +1,7 @@
 # contains all needed parameters for all files
 
 random_seed: 'sweep'
-exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar/sweep/bn4'
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar/sweep/bn5'
 exp_name: 'square_image'
 
 ##########################
@@ -187,11 +187,11 @@ sim:
   p: 1.25
   d: 0.0
 
-  do_back_up: False
+  do_back_up: True
   back_up:
     steer: [-5., 5.]
-    vel: -1.
-    duration: 5.0
+    vel: -2.
+    duration: 3.0
 
 ######################################################
 ########### States, controls, observations ###########

@@ -12,9 +12,8 @@ class AnalyzeAggPerSimRCcar(AnalyzeSimRCcar):
 
     def __init__(self):
         self.p_list = [
-                ['model', 'reset_freq', [0, 1]],
-                ['model', 'image_graph', 'graph_type', ['cnn', 'separable_cnn']],
-                ['planning', 'epsilon_greedy', 'endpoints',  [[[0, 1.0], [9600, 0.0]], [[0, 1.0], [4800, 0.0]], [[0, 1.0], [2400, 0.0]], [[0, 1.0], [1200, 0.0]]]]
+                ['model', 'reset_freq', [1, 2]],
+                ['planning', 'epsilon_greedy', 'endpoints', [[[0, 1.0], [51200, 0.0]], [[0, 1.0], [25600, 0.0]], [[0, 1.0], [12800, 0.0]], [[0, 1.0], [6400, 0.0]]]]
             ]
     
     #######################
@@ -37,8 +36,7 @@ class AnalyzeAggPerSimRCcar(AnalyzeSimRCcar):
 
     def _load_last_testing_samples_from_dir(self, dir_path):
         test_samples = []
-        itr = 2
-#        itr = params['probcoll']['testing']['itr_freq']
+        itr = 0
         while True:
             try:
                 samples = self._itr_load_testing_samples_from_dir(dir_path, itr)

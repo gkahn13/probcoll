@@ -766,7 +766,7 @@ class ProbcollModel:
 
     def graph_eval_inference(
             self, U_input, O_im_input=None, O_vec_input=None, bootstrap_initial_states=None,
-            reuse=False, tf_debug={}):
+            num_dp=1, reuse=False, tf_debug={}):
 
         bootstrap_output_mats = []
         bootstrap_output_preds = []
@@ -850,7 +850,7 @@ class ProbcollModel:
                                 initial_state=initial_state,
                                 params=params["model"]["action_graph"],
                                 dp_masks=dp_masks,
-                                dp_batch_same=True,
+                                num_dp=num_dp,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
@@ -859,7 +859,7 @@ class ProbcollModel:
                                 inputs=input_layer,
                                 params=params["model"]["action_graph"],
                                 dp_masks=dp_masks,
-                                dp_batch_same=True,
+                                num_dp=num_dp,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
@@ -870,7 +870,7 @@ class ProbcollModel:
                                 inputs=input_layer,
                                 initial_state=initial_state,
                                 params=params["model"]["action_graph"],
-                                dp_batch_same=True,
+                                num_dp=num_dp,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)
@@ -878,7 +878,7 @@ class ProbcollModel:
                             ag_output, action_dp_masks = action_graph(
                                 inputs=input_layer,
                                 params=params["model"]["action_graph"],
-                                dp_batch_same=True,
+                                num_dp=num_dp,
                                 dtype=self.dtype,
                                 scope="action_graph_b{0}".format(b),
                                 reuse=reuse)

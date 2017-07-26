@@ -6,7 +6,7 @@ def fcnn(
         inputs,
         params,
         dp_masks=None,
-        dp_batch_same=False,
+        num_dp=1,
         dtype=tf.float32,
         data_format='NCHW',
         scope='fcnn',
@@ -88,10 +88,12 @@ def fcnn(
                     next_layer_input = next_layer_input * dp_masks[i]
                 else:
                     # Shape is not well defined without reshaping
-                    if dp_batch_same:
-                        sample = distribution.sample((1, tf.shape(next_layer_input)[1]))
+                    shape = tf.shape(next_layer_input)
+                    if num_dp > 1:
+                        sample = distribution.sample(shape[0]/num_dp, dim)
+                        sample = tf.concat([sample] * num_dp, axis=0)
                     else:
-                        sample = distribution.sample(tf.shape(next_layer_input))
+                        sample = distribution.sample(shape)
                     sample = tf.reshape(sample, (-1, dim))
                     mask = tf.cast(sample < dropout, dtype) / dropout
                     next_layer_input = next_layer_input * mask

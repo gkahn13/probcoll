@@ -101,7 +101,7 @@ model:
     graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
-#    dropout: 1.0 # pct keep
+    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
       use_layer_norm: True
 
@@ -131,7 +131,7 @@ planning:
 
   # Planner
   planner_type: 'random' # random / cem / random_policy
-  num_dp: 1 # number of dropout passes to average over during planning
+  num_dp: 2 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
     lower: [-15., 2.]

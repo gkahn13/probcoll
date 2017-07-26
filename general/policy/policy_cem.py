@@ -12,28 +12,29 @@ class PolicyCem(Policy):
             np.array(self.params['control_range']['lower'] * T, dtype=np.float32),
             np.array(self.params['control_range']['upper'] * T, dtype=np.float32))
         u_samples = tf.cast(tf.reshape(flat_u_samples, (m, T, dU)), dtype=self.dtype)
-
-        stack_u = tf.concat([u_samples]*self.params['num_dp'], axis=0)
+        num_dp = self.params['num_dp']
+        stack_u = tf.concat([u_samples] * num_dp, axis=0)
         # TODO incorporate std later
         output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
             stack_u,
             bootstrap_initial_states=embeddings,
+            num_dp=num_dp,
             reuse=True) 
 
         pred_mean = tf.reduce_mean(
-            tf.split(output_pred_mean, self.params['num_dp'], axis=0), axis=0)
+            tf.split(output_pred_mean, num_dp, axis=0), axis=0)
 
         pred_std = tf.reduce_mean(
-            tf.split(output_pred_std, self.params['num_dp'], axis=0), axis=0)
+            tf.split(output_pred_std, num_dp, axis=0), axis=0)
 
         mat_mean = tf.reduce_mean(
-            tf.split(output_mat_mean, self.params['num_dp'], axis=0), axis=0)
+            tf.split(output_mat_mean, num_dp, axis=0), axis=0)
 
         mat_std = tf.reduce_mean(
-            tf.split(output_mat_std, self.params['num_dp'], axis=0), axis=0)
+            tf.split(output_mat_std, num_dp, axis=0), axis=0)
         
         mat_mean = tf.reduce_mean(
-            tf.split(output_mat_mean, self.params['num_dp'], axis=0), axis=0)
+            tf.split(output_mat_mean, num_dp, axis=0), axis=0)
         
         control_costs = control_cost_fn.eval(u_samples)
         coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)

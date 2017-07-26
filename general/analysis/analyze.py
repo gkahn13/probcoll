@@ -104,18 +104,6 @@ class Analyze:
         else:
             return None, None
 
-    def _itr_load_mpcs(self, itr):
-        fname = os.path.join(self._itr_dir(itr), 'mpcs_itr_{0}.pkl'.format(itr))
-        with open(fname, 'r') as f:
-            d = pickle.load(f)
-        return d
-
-    def _itr_load_worlds(self, itr):
-        fname = os.path.join(self._itr_dir(itr), 'worlds_itr_{0}.pkl'.format(itr))
-        with open(fname, 'r') as f:
-            d = pickle.load(f)
-        return d
-
     #######################
     ### Data processing ###
     #######################
@@ -152,31 +140,6 @@ class Analyze:
 
         self._logger.info('Loaded {0} testing iterations of samples'.format(len(samples_itrs)))
         return samples_itrs, times
-
-    def _load_mpcs(self):
-        mpcs_itrs = []
-        itr = 0
-        while True:
-            try:
-                mpcs_itrs.append(self._itr_load_mpcs(itr))
-                itr += 1
-            except:
-                break
-
-        return mpcs_itrs
-
-    def _load_worlds(self):
-        worlds_itrs = []
-
-        itr = 0
-        while True:
-            try:
-                worlds_itrs.append(self._itr_load_worlds(itr))
-                itr += 1
-            except:
-                break
-
-        return worlds_itrs
 
     ################
     ### Plotting ###
