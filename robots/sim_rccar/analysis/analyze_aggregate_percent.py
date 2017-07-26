@@ -12,16 +12,11 @@ class AnalyzeAggPerSimRCcar(AnalyzeSimRCcar):
 
     def __init__(self):
         self.p_list = [
-                ['model', 'reg', [1.e-4, 1.e-5]],
-                ['model', 'reset_freq', [0, 1]]
+                ['model', 'reset_freq', [0, 1]],
+                ['model', 'image_graph', 'graph_type', ['cnn', 'separable_cnn']],
+                ['planning', 'epsilon_greedy', 'endpoints',  [[[0, 1.0], [9600, 0.0]], [[0, 1.0], [4800, 0.0]], [[0, 1.0], [2400, 0.0]], [[0, 1.0], [1200, 0.0]]]]
             ]
-#        self.p_list = [
-#                ['model', 'reg', [1.e-2, 1.e-3, 1.e-4]],
-#                ['model', 'learning_rate', [1.e-3, 5.e-4, 1.e-4]],
-#                ['model', 'grad_clip', [5.0, 10.0]],
-#                ['model', 'image_graph', 'graph_type', ['cnn', 'separable_cnn']]
-#            ]
-
+    
     #######################
     ### Data processing ###
     #######################

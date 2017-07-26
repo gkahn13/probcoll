@@ -146,11 +146,12 @@ class Probcoll:
                 self.probcoll_model.recover()
             T = params['probcoll']['T']
             samples = []
-            reset_pos, reset_ori = self._agent.get_pos_ori() 
+#            reset_pos, reset_ori = self._agent.get_pos_ori() 
             for cond in xrange(params['probcoll']['testing']['num_rollout']):
                 self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
                 start = time.time()
-                self._agent.reset(hard_reset=True)
+                self._agent.reset()
+#                self._agent.reset(hard_reset=True)
                 _, sample_no_noise, t = self._agent.sample_policy(
                     self._mpc_policy,
                     T=T,
@@ -169,7 +170,7 @@ class Probcoll:
                     elapsed,
                     t*params['probcoll']['dt']/elapsed))
             self._itr_save_samples(itr, samples, prefix='testing_')
-            self._agent.reset(pos=reset_pos, ori=reset_ori)
+#            self._agent.reset(pos=reset_pos, ori=reset_ori)
 
     def _async_training(self):
         pass

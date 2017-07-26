@@ -1,8 +1,8 @@
 # contains all needed parameters for all files
 
 random_seed: 'sweep'
-exp_dir: '/home/adam/probcoll/experiments/sim_rccar/sweep/bn3'
-exp_name: 'cylinder_depth'
+exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar/sweep/bn4'
+exp_name: 'square_image'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,7 +10,7 @@ exp_name: 'cylinder_depth'
 
 probcoll:
   dt: 0.25
-  T: 24 # timesteps per trajectory
+  T: 128 # timesteps per trajectory
   logger: 'fatal' # debug/info/fatal what level to log
   max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -25,7 +25,7 @@ probcoll:
 
   testing:
     num_rollout: 20
-    itr_freq: 2
+    itr_freq: 4
 
 ######################
 ### Probcoll model ###
@@ -80,7 +80,7 @@ model:
   mask: 'all' # all / last
 
   image_graph:
-    graph_type: 'sweep'
+    graph_type: 'cnn'
     filters: [32, 64, 64]
     kernels: [8, 4, 3]
     strides: [4, 2, 1]
@@ -131,8 +131,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-15., 2.]
-    upper: [15., 2.]
+    lower: [-30., 2.]
+    upper: [30., 2.]
 
   random:
     K: 2048 # number of actions to sample from
@@ -177,7 +177,7 @@ planning:
 ###################
 
 sim:
-  sim_env: 'cylinder' # square / cylinder
+  sim_env: 'square' # square / cylinder
   visualize: False
   use_vel: True
   use_back_cam: True
