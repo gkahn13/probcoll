@@ -12,7 +12,7 @@ probcoll:
   dt: 0.25
   T: 24 # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 10
+  max_iter: 8
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -21,7 +21,8 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 20
+#  num_rollouts: 20
+  num_timesteps: 240
 
   testing:
     num_rollout: 20
@@ -181,7 +182,7 @@ planning:
 
 sim:
   sim_env: 'cylinder' # square / cylinder
-  visualize: False
+  visualize: True
   use_vel: True
   use_back_cam: True
   use_depth: False

@@ -23,7 +23,8 @@ class ProbcollSimRCcar(Probcoll):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
         self._agent = AgentSimRCcar()
-        self._num_rollouts = params['probcoll']['num_rollouts']
+        self._num_timesteps = params['probcoll']['num_timesteps']
+#        self._num_rollouts = params['probcoll']['num_rollouts']
         # Keeps track of how many rollouts have been done
         self._time_step = 0
         ### load prediction neural net

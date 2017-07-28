@@ -396,6 +396,7 @@ class CarEnv(DirectObject):
         info['pos'] = np.array(self._vehicle_pointer.getPos())
         info['hpr'] = np.array(self._vehicle_pointer.getHpr())
         info['vel'] = self._get_speed()
+        info['coll'] = self._collision
         return info
     
     def _back_up(self):

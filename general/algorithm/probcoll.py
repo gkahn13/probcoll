@@ -148,7 +148,7 @@ class Probcoll:
             samples = []
 #            reset_pos, reset_ori = self._agent.get_pos_ori() 
             for cond in xrange(params['probcoll']['testing']['num_rollout']):
-                self._logger.info('\t\tTesting cond {0} itr {1}'.format(cond, itr))
+                self._logger.info('\t\tTesting itr {0} cond {1}'.format(itr, cond))
                 start = time.time()
                 self._agent.reset()
 #                self._agent.reset(hard_reset=True)
@@ -180,31 +180,39 @@ class Probcoll:
             self._agent.reset()
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
-
+        self._logger.info('\t\tStarting itr {0}'.format(itr))
         samples = []
-        for cond in xrange(self._num_rollouts):
-            self._agent.reset()
-            self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
-            start = time.time()
+        iteration_steps = 0
+        start = time.time()
+        while iteration_steps < self._num_timesteps:
+#        for cond in xrange(self._num_rollouts):
+#            self._agent.reset()
+#            self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
+#            start = time.time()
+            max_T = min(T, self._num_timesteps - iteration_steps) 
             sample_noise, sample_no_noise, t = self._agent.sample_policy(
                 self._mpc_policy,
-                T=T,
+#                T=T,
+                T=max_T,
                 time_step=self._time_step,
                 only_noise=label_with_noise)
-            if t + 1 < T:
-                self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
-            else:
-                self._logger.info('\t\t\tLasted for t={0}'.format(t))
-
+            iteration_steps += t + 1
+            self._time_step += t + 1 
             if label_with_noise:
                 samples.append(sample_noise.match(slice(0, t + 1)))
             else:
                 samples.append(sample_no_noise.match(slice(0, t + 1)))
             assert(samples[-1].isfinite())
-            elapsed = time.time() - start
-            self._logger.info('\t\t\tFinished cond {0} ({1:.1f}s, {2:.3f}x real-time)'.format(
-                cond,
-                elapsed,
-                t*params['probcoll']['dt']/elapsed))
-            self._time_step += t 
+            if samples[-1].get_O(t=t, sub_obs='collision'):
+#            if t + 1 < T:
+                self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
+            else:
+                self._logger.info('\t\t\tLasted for t={0}'.format(t))
+
+        assert(self._num_timesteps == iteration_steps)
+        elapsed = time.time() - start
+        self._logger.info('\t\t\tFinished itr {0} ({1:.1f}s, {2:.3f}x real-time)'.format(
+            itr,
+            elapsed,
+            self._num_timesteps*params['probcoll']['dt']/elapsed))
         self._itr_save_samples(itr, samples)

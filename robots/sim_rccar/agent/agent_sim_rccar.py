@@ -57,13 +57,14 @@ class AgentSimRCcar(Agent):
                 self.act(u_t)
             # TODO possibly determine state before
             x_t = self.get_state()
+            coll = self.get_coll()
             # Record
             sample_noise.set_X(x_t, t=t)
             sample_noise.set_O(o_t, t=t)
-            sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
+            sample_noise.set_O([coll], t=t, sub_obs='collision')
             sample_no_noise.set_X(x_t, t=t)
             sample_no_noise.set_O(o_t, t=t)
-            sample_no_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
+            sample_no_noise.set_O([coll], t=t, sub_obs='collision')
 
             if not is_testing:
                 sample_noise.set_U(u_t, t=t)
@@ -71,8 +72,9 @@ class AgentSimRCcar(Agent):
             if not only_noise:
                 sample_no_noise.set_U(u_t_no_noise, t=t)
 
-            if self.coll:
+            if self._done:
                 self._curr_rollout_t = 0
+                self.reset()
                 break
             else:
                 self._curr_rollout_t += 1
@@ -81,8 +83,8 @@ class AgentSimRCcar(Agent):
 
     def reset(self, pos=None, ori=None, hard_reset=False):
         self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
-        self.coll = False
-        if self.coll or hard_reset:
+        self._done = False
+        if self._done or hard_reset:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
 
     def get_observation(self):
@@ -109,6 +111,9 @@ class AgentSimRCcar(Agent):
         state_sample.set_X(vel, t=0, sub_state='velocity')
         return state_sample.get_X(t=0)
 
+    def get_coll(self):
+        return self._info['coll']
+
     def get_pos_ori(self):
         return self._info['pos'], self._info['hpr']
 
@@ -133,7 +138,7 @@ class AgentSimRCcar(Agent):
         return im
 
     def act(self, u=[0.0, 0.0]):
-        self._obs, _, self.coll, self._info = self.env.step(u)
-    
+        self._obs, _, self._done, self._info = self.env.step(u)
+ 
     def close(self):
         pass
