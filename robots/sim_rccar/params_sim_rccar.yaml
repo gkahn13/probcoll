@@ -1,8 +1,8 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'cylinder_step'
+exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar'
+exp_name: 'cylinder_bn'
 
 ##########################
 ### Probcoll algorithm ###
