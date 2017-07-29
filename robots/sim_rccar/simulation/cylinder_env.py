@@ -12,6 +12,9 @@ class CylinderEnv(CarEnv):
     def _default_pos(self):
         return (0.0, -6., 0.25)
 
+    def _get_done(self):
+        return self._collision or np.array(self._vehicle_pointer.getPos())[1] >= 6.0
+
     def _default_restart_pos(self):
         ran = np.linspace(-3.5, 3.5, 20)
         np.random.shuffle(ran)

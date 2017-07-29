@@ -137,41 +137,6 @@ class Probcoll:
                     start = time.time()
                     self.probcoll_model.train()
 
-    def run_testing(self, itr):
-        if (itr == self._max_iter - 1 \
-                or itr % params['probcoll']['testing']['itr_freq'] == 0): 
-            self._logger.info('Itr {0} testing'.format(itr))
-            if self._async_on:
-                self._logger.debug('Recovering probcoll model')
-                self.probcoll_model.recover()
-            T = params['probcoll']['T']
-            samples = []
-#            reset_pos, reset_ori = self._agent.get_pos_ori() 
-            for cond in xrange(params['probcoll']['testing']['num_rollout']):
-                self._logger.info('\t\tTesting itr {0} cond {1}'.format(itr, cond))
-                start = time.time()
-                self._agent.reset()
-#                self._agent.reset(hard_reset=True)
-                _, sample_no_noise, t = self._agent.sample_policy(
-                    self._mpc_policy,
-                    T=T,
-                    is_testing=True)
-
-                if t + 1 < T:
-                    self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
-                else:
-                    self._logger.info('\t\t\tLasted for t={0}'.format(t))
-
-                samples.append(sample_no_noise.match(slice(0, t + 1)))
-                assert(samples[-1].isfinite())
-                elapsed = time.time() - start
-                self._logger.info('\t\t\tFinished cond {0} of testing ({1:.1f}s, {2:.3f}x real-time)'.format(
-                    cond,
-                    elapsed,
-                    t*params['probcoll']['dt']/elapsed))
-            self._itr_save_samples(itr, samples, prefix='testing_')
-#            self._agent.reset(pos=reset_pos, ori=reset_ori)
-
     def _async_training(self):
         pass
 
@@ -216,3 +181,40 @@ class Probcoll:
             elapsed,
             self._num_timesteps*params['probcoll']['dt']/elapsed))
         self._itr_save_samples(itr, samples)
+
+    def run_testing(self, itr):
+        if (itr == self._max_iter - 1 \
+                or itr % params['probcoll']['testing']['itr_freq'] == 0): 
+            self._logger.info('Itr {0} testing'.format(itr))
+            if self._async_on:
+                self._logger.debug('Recovering probcoll model')
+                self.probcoll_model.recover()
+            T = params['probcoll']['T']
+            samples = []
+#            reset_pos, reset_ori = self._agent.get_pos_ori() 
+            for cond in xrange(params['probcoll']['testing']['num_rollout']):
+                self._logger.info('\t\tTesting itr {0} cond {1}'.format(itr, cond))
+                start = time.time()
+                self._agent.reset()
+#                self._agent.reset(hard_reset=True)
+                _, sample_no_noise, t = self._agent.sample_policy(
+                    self._mpc_policy,
+                    T=T,
+                    is_testing=True)
+
+                if sample_no_noise.get_O(t=t, sub_obs='collision'):
+#                if t + 1 < T:
+                    self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
+                else:
+                    self._logger.info('\t\t\tLasted for t={0}'.format(t))
+
+                samples.append(sample_no_noise.match(slice(0, t + 1)))
+                assert(samples[-1].isfinite())
+                elapsed = time.time() - start
+                self._logger.info('\t\t\tFinished cond {0} of testing ({1:.1f}s, {2:.3f}x real-time)'.format(
+                    cond,
+                    elapsed,
+                    t*params['probcoll']['dt']/elapsed))
+            self._itr_save_samples(itr, samples, prefix='testing_')
+#            self._agent.reset(pos=reset_pos, ori=reset_ori)
+

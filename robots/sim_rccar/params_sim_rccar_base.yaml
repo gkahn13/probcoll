@@ -1,7 +1,7 @@
 # contains all needed parameters for all files
 
 random_seed: 'sweep'
-exp_dir: '/home/adam/probcoll/experiments/sim_rccar/sweep/bn5'
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar/sweep/bn7'
 exp_name: 'square_image'
 
 ##########################
@@ -10,7 +10,7 @@ exp_name: 'square_image'
 
 probcoll:
   dt: 0.25
-  T: 128 # timesteps per trajectory
+  T: 640 # timesteps per trajectory
   logger: 'fatal' # debug/info/fatal what level to log
   max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -21,7 +21,8 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 20
+#  num_rollouts: 20
+  num_timesteps: 640 
 
   testing:
     num_rollout: 20
@@ -41,7 +42,7 @@ model:
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 4
-  data_format: 'NHWC'
+  data_format: 'NCHW'
 
   # Normalize input  
   center_O_im: False 
@@ -65,7 +66,7 @@ model:
   
   # Train schedule
   steps: 500
-  reset_freq: 'sweep' # 0 means no resetting
+  reset_freq: 0 # 0 means no resetting
   reset_steps: 5000
   display_steps: 50 
   val_pct: 0.1 # Percent of the data stored as validation

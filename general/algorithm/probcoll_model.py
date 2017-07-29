@@ -433,8 +433,8 @@ class ProbcollModel:
     #############
 
     def _graph_inputs_outputs_from_file(self, name):
-        with tf.device('/cpu:0'):
-            with tf.name_scope(name + '_file_input'):
+        with tf.name_scope(name + '_file_input'):
+            with tf.device('/cpu:0'):
                 filename_vars = (
                         tf.get_variable(
                             name + '_no_coll_fnames',

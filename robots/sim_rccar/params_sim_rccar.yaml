@@ -10,7 +10,7 @@ exp_name: 'cylinder_step'
 
 probcoll:
   dt: 0.25
-  T: 24 # timesteps per trajectory
+  T: 240 # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
   max_iter: 8
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -76,13 +76,13 @@ model:
 
   # Model architecture
   dtype: 'float32' # only float32 is currently implemented
-  data_format: 'NHWC'
+  data_format: 'NCHW'
   num_bootstrap: 1 # EXPERIMENTAL
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
 
   image_graph:
-    graph_type: 'separable_cnn'
+    graph_type: 'cnn'
     filters: [32, 64, 64]
     kernels: [8, 4, 3]
     strides: [4, 2, 1]
@@ -102,13 +102,11 @@ model:
     graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
-    dropout: 0.8 # pct keep
+#    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
       use_layer_norm: True
 
   output_graph: 
-    batch_norm_decay: 0.9
-    use_batch_norm: True
     graph_type: 'fc'
     use_batch_norm: True
     batch_norm_decay: 0.9
@@ -132,7 +130,7 @@ planning:
 
   # Planner
   planner_type: 'random' # random / cem / random_policy
-  num_dp: 2 # number of dropout passes to average over during planning
+  num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
     lower: [-15., 2.]
@@ -155,7 +153,7 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [4800, 0.0]]
+    endpoints: [[0, 1.0], [960, 0.0]]
     outside_value: 0.0
 
   control_noise:
@@ -182,7 +180,7 @@ planning:
 
 sim:
   sim_env: 'cylinder' # square / cylinder
-  visualize: True
+  visualize: False
   use_vel: True
   use_back_cam: True
   use_depth: False

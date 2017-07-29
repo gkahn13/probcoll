@@ -12,9 +12,13 @@ class AnalyzeAggPerSimRCcar(AnalyzeSimRCcar):
 
     def __init__(self):
         self.p_list = [
-                ['model', 'reset_freq', [1, 2]],
-                ['planning', 'epsilon_greedy', 'endpoints', [[[0, 1.0], [51200, 0.0]], [[0, 1.0], [25600, 0.0]], [[0, 1.0], [12800, 0.0]], [[0, 1.0], [6400, 0.0]]]]
+                ['random_seed', [0, 1, 2]],
+#                ['planning', 'epsilon_greedy', 'endpoints', [[[0, 1.0], [6400, 0.0]], [[0, 1.0], [3200, 0.0]], [[0, 1.0], [1600, 0.0]]]]
             ]
+#        self.p_list = [
+#                ['model', 'reset_freq', [1, 2]],
+#                ['planning', 'epsilon_greedy', 'endpoints', [[[0, 1.0], [51200, 0.0]], [[0, 1.0], [25600, 0.0]], [[0, 1.0], [12800, 0.0]], [[0, 1.0], [6400, 0.0]]]]
+#            ]
     
     #######################
     ### Data processing ###

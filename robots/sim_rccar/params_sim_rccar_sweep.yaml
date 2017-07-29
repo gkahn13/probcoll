@@ -1,7 +1,4 @@
 random_seed: [0, 1, 2]
-
-model:
-  reset_freq: [1, 2, 4]
   
 planning:
   epsilon_greedy:
