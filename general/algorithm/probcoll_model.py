@@ -554,22 +554,7 @@ class ProbcollModel:
             obs_im_float = obs_im_float - tf.reduce_mean(obs_im_float, axis=0)
         num_devices = len(params['model']['O_im_order'])
         obs_shaped_list = []
-#        obs_frames = tf.split(obs_im_float, self.num_O, axis=1)
         # TODO do reshaping in better way 
-#        for obs_t in obs_frames:
-#            obss = tf.split(obs_t, num_devices, axis=1)
-#            for obs, device in zip(obss, params['model']['O_im_order']):
-#                obs_shaped = tf.reshape(
-#                    obs,
-#                    [
-#                        obs_batch,
-#                        params["O"][device]["height"],
-#                        params["O"][device]["width"],
-#                        params["O"][device]["num_channels"]
-#                    ])
-#                if self.data_format == 'NCHW':
-#                    obs_shaped = tf.transpose(obs_shaped, (0, 3, 2, 1))
-#                obs_shaped_list.append(obs_shaped)
         # TODO dropout
         assert(self.data_format == 'NHWC' or self.data_format == 'NCHW')
         device = params['model']['O_im_order'][0]
@@ -596,20 +581,9 @@ class ProbcollModel:
                     params["O"][device]["num_channels"] * self.num_O * num_devices
                 ])
         elif self.data_format == 'NCHW':
-            # TODO remember data must be stored as NCHW
-#            obs_im_float = tf.reshape(
-#                obs_im_float,
-#                [
-#                    obs_batch,
-#                    self.num_O,
-#                    num_devices,
-#                    params["O"][device]["height"],
-#                    params["O"][device]["width"],
-#                    params["O"][device]["num_channels"]
-#                ])
-#            obs_im_float = tf.transpose(
-#                obs_im_float,
-#                [0, 1, 2, 5, 3, 4])
+            # TODO store data as NCHW to improve speed
+            # TODO ok for now because everything is 1 channel
+            assert(params["O"][device]["num_channels"] == 1)
             obs_im_float = tf.reshape(
                 obs_im_float,
                 [
@@ -1274,7 +1248,7 @@ class ProbcollModel:
                     plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
 
                     self._logger.info(
-                        '\terror: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
+                        'error: {0:5.2f}%, error coll: {1:5.2f}%, error nocoll: {2:5.2f}%, pct coll: {3:4.1f}%, cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
                             100 * np.mean(val_values['err']),
                             100 * np.mean(val_values['err_coll']),
                             100 * np.mean(val_values['err_nocoll']),
@@ -1330,7 +1304,7 @@ class ProbcollModel:
                     plotter.add_train('cross_entropy', step * self.batch_size, np.mean(train_values['cross_entropy']))
 
                     self._logger.info('Training step pct: {0:.1f}'.format(100 * step / float(itr_steps)))
-                    self._logger.info('\terror: {0:5.2f}%,  error coll: {1:5.2f}%,  error nocoll: {2:5.2f}%,  pct coll: {3:4.1f}%,  cost: {4:4.2f}, ce: {5:4.2f}'.format(
+                    self._logger.info('error: {0:5.2f}%, error coll: {1:5.2f}%, error nocoll: {2:5.2f}%, pct coll: {3:4.1f}%, cost: {4:4.2f}, ce: {5:4.2f}'.format(
                         100 * np.mean(train_values['err']),
                         100 * np.mean(train_values['err_coll']),
                         100 * np.mean(train_values['err_nocoll']),

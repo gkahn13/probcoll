@@ -15,6 +15,14 @@ class CylinderEnv(CarEnv):
     def _get_done(self):
         return self._collision or np.array(self._vehicle_pointer.getPos())[1] >= 6.0
 
+    def _get_info(self):
+        info = {}
+        info['pos'] = np.array(self._vehicle_pointer.getPos())
+        info['hpr'] = np.array(self._vehicle_pointer.getHpr())
+        info['vel'] = self._get_speed()
+        info['coll'] = self._collision and np.array(self._vehicle_pointer.getPos())[1] < 6.0
+        return info
+
     def _default_restart_pos(self):
         ran = np.linspace(-3.5, 3.5, 20)
         np.random.shuffle(ran)

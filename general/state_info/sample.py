@@ -230,13 +230,14 @@ class Sample(object):
     def load_with_time(fname):
         assert(os.path.exists(fname))
         samples = []
-        tot_T = 0
+        times = []
         assert (os.path.splitext(fname)[-1] == '.npz')
         d = np.load(fname)
         for meta_data, X, U, O in zip(d['meta_datas'], d['Xs'], d['Us'], d['Os']):
             T = len(X)
-            tot_T += T
+            times.append(T)
+#            tot_T += T
             s = Sample(meta_data=meta_data, T=T, X=X, U=U, O=O)
             samples.append(s)
-
-        return samples, tot_T
+        return samples, times
+#        return samples, tot_T

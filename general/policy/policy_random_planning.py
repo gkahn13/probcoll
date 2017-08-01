@@ -41,8 +41,8 @@ class PolicyRandomPlanning(Policy):
                 mat_mean = tf.reduce_mean(
                     tf.split(output_mat_mean, num_dp, axis=0), axis=0)
                 
-                control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
-                coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
+                control_cost_fn = CostDesired(self.params['cost']['control_cost'], self.params['control_range']) 
+                coll_cost_fn = CostColl(self.params['cost']['coll_cost'], self.params['control_range'])
                 
                 control_costs = control_cost_fn.eval(u_samples)
                 coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)

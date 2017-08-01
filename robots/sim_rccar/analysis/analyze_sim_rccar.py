@@ -50,34 +50,30 @@ class AnalyzeSimRCcar(Analyze):
         if times is None:
             times = sample_times
 
-        pkl_dict = {}
         if testing:
             if not os.path.exists(os.path.dirname(self._plot_testing_stats_file)):
                 os.makedirs(os.path.dirname(self._plot_testing_stats_file))
         else:
             if not os.path.exists(os.path.dirname(self._plot_stats_file)):
                 os.makedirs(os.path.dirname(self._plot_stats_file))
-        
-        pkl_dict['positions'] = self._plot_position(samples_itrs, times, testing=testing)
 
-        if testing:
-            stats_f = self._plot_testing_stats_file_pkl
-        else:
-            stats_f = self._plot_stats_file_pkl
-        
-        with open(stats_f, 'w') as f:
-            pickle.dump(pkl_dict, f)
-
-        return times
+        total_times = self._plot_position(samples_itrs, times, testing=testing)
+        if not testing:
+            self._plot_speed_crash_statistics(samples_itrs, times)
+        return total_times
 
     def _plot_position(self, samples_itrs, times, testing=False):
-        positions_itrs = [] 
         blue_line = matplotlib.lines.Line2D([], [], color='b', label='collision')
         red_line = matplotlib.lines.Line2D([], [], color='r', label='no collision')
+        total_times = []
         total_time = 0
         for itr, samples in samples_itrs:
-            total_time = sum([times[i] for i in xrange(itr + 1)])
-            positions_x, positions_y, collision = [], [], []
+            if testing:
+                total_time = times[itr]
+            else:
+                cur_time = total_time
+                total_time += sum(times[itr])
+            total_times.append(total_time)
             plt.figure()
             if testing:
                 plt.title('Trajectories for testing itr {0}\n{1} runtime : {2:.2f} min'.format(
@@ -88,7 +84,7 @@ class AnalyzeSimRCcar(Analyze):
                 plt.title('Trajectories for itr {0}\n{1} runtime : {2:.2f} min'.format(
                     itr,
                     params['exp_name'],
-                    total_time * params['probcoll']['dt'] / 60.))
+                    cur_time * params['probcoll']['dt'] / 60.))
             plt.xlabel('X position')
             plt.ylabel('Y position')
             if params['sim']['sim_env'] == 'square' or params['sim']['sim_env'] == 'square_banked':
@@ -108,12 +104,45 @@ class AnalyzeSimRCcar(Analyze):
                     plt.scatter(pos_x[-1], pos_y[-1], marker="x", color='r')
                 else:
                     plt.plot(pos_x, pos_y, color='b')
-                positions_x.append(pos_x)
-                positions_y.append(pos_y)
-            positions_itrs.append([positions_x, positions_y, collision])
             plt.savefig(self._plot_trajectories_file(itr, testing)) 
             plt.close()
-        return positions_itrs
+        return total_times        
+
+    def _plot_speed_crash_statistics(self, samples_itrs, times):
+        # Make 3 plots
+        f, axes = plt.subplots(3, 1, sharex=True, figsize=(15,15))
+        avg_crashes = []
+        avg_speeds = []
+        cumulative_crash_energies = []
+        cumulative_crash_energy = 0
+        crashes = []
+        speeds = []
+        for (itr, samples), time_list in zip(samples_itrs, times):
+            for s, time in zip(samples, time_list):
+                for t in range(time):
+                    speeds.append(s.get_U(t=t, sub_control='cmd_vel')[0])
+                    crashes.append(s.get_O(t=t, sub_obs='collision')[0])
+                    avg_speeds.append(float(sum(speeds[-1000:])) / len(speeds[-1000:]))
+                    avg_crashes.append(float(sum(crashes[-1000:])) / (len(crashes[-1000:]) * params['probcoll']['dt']))
+                    cumulative_crash_energy += crashes[-1] * (speeds[-1] ** 2)
+                    cumulative_crash_energies.append(cumulative_crash_energy)
+        avg_speeds = np.array(avg_speeds)
+        avg_crashes = np.array(avg_crashes)
+        cumulative_crash_energies = np.array(cumulative_crash_energies)
+        time_range = np.arange(len(avg_speeds)) * params['probcoll']['dt'] / 60.
+        axes[0].set_title('Moving Average speed')
+        axes[0].set_ylabel('Speed (m / s)')
+        axes[0].plot(time_range, avg_speeds)
+        axes[1].set_title('Moving Average crashes per time')
+        axes[1].set_ylabel('Crashes / s')
+        axes[1].plot(time_range, avg_crashes)
+        axes[2].set_title('Cumulative energy from crashing over time')
+        axes[2].set_ylabel('Energy')
+        axes[2].plot(time_range, cumulative_crash_energies)
+        axes[2].set_xlabel('Time (min)')
+        if not os.path.exists(os.path.dirname(self._plot_stats_file)):
+            os.makedirs(os.path.dirname(self._plot_stats_file))
+        f.savefig(self._plot_stats_file)
     
     ###########
     ### Run ###

@@ -1,8 +1,8 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar'
-exp_name: 'cylinder_bn'
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
+exp_name: 'cylinder_multi_speed'
 
 ##########################
 ### Probcoll algorithm ###
@@ -12,7 +12,7 @@ probcoll:
   dt: 0.25
   T: 240 # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 8
+  max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -21,7 +21,6 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-#  num_rollouts: 20
   num_timesteps: 240
 
   testing:
@@ -42,7 +41,6 @@ model:
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 4
-  data_format: 'NHWC'
 
   # Normalize input  
   center_O_im: False 
@@ -119,14 +117,14 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [0., 10.] 
+      weight: [0., 1.] 
       std_weight: 0.0 # EXPERIMENTAL
       pre_activation: True # EXPERIMENTAL wether std is before or after activation (sigmoid)
     
     control_cost:
       des: [0., 2.] # TODO: hard-coded order: steering then speed
       cost: square # square
-      weight: [0.0, 1.0]     
+      weight: [0.0, 10.]     
 
   # Planner
   planner_type: 'random' # random / cem / random_policy
@@ -137,7 +135,7 @@ planning:
     upper: [15., 2.]
 
   random:
-    K: 2048 # number of actions to sample from
+    K: 4096 # number of actions to sample from
 
   cem:
     init_M: 2048 # number of actions to sample from
@@ -153,12 +151,16 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: [[0, 1.0], [960, 0.0]]
+    control_range:
+      lower: [-15., 2.]
+      upper: [15., 2.]
+    endpoints: []
+    endpoints: [[0, 1.0], [1200, 0.0]]
     outside_value: 0.0
 
   control_noise:
-#    endpoints: [[0, 1.0], [4800, 0.0]]
-#    outside_value: 0.0
+    endpoints: [[0, 1.0], [1200, 0.0]]
+    outside_value: 0.0
 
     type: 'gaussian' # zero / gaussian / uniform
     zero: {}

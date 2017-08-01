@@ -150,14 +150,9 @@ class Probcoll:
         iteration_steps = 0
         start = time.time()
         while iteration_steps < self._num_timesteps:
-#        for cond in xrange(self._num_rollouts):
-#            self._agent.reset()
-#            self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
-#            start = time.time()
             max_T = min(T, self._num_timesteps - iteration_steps) 
             sample_noise, sample_no_noise, t = self._agent.sample_policy(
                 self._mpc_policy,
-#                T=T,
                 T=max_T,
                 time_step=self._time_step,
                 only_noise=label_with_noise)
@@ -169,7 +164,6 @@ class Probcoll:
                 samples.append(sample_no_noise.match(slice(0, t + 1)))
             assert(samples[-1].isfinite())
             if samples[-1].get_O(t=t, sub_obs='collision'):
-#            if t + 1 < T:
                 self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
             else:
                 self._logger.info('\t\t\tLasted for t={0}'.format(t))
@@ -191,30 +185,26 @@ class Probcoll:
                 self.probcoll_model.recover()
             T = params['probcoll']['T']
             samples = []
-#            reset_pos, reset_ori = self._agent.get_pos_ori() 
+            self._agent.reset()
+            total_time = 0
+            start = time.time()
             for cond in xrange(params['probcoll']['testing']['num_rollout']):
-                self._logger.info('\t\tTesting itr {0} cond {1}'.format(itr, cond))
-                start = time.time()
-                self._agent.reset()
-#                self._agent.reset(hard_reset=True)
                 _, sample_no_noise, t = self._agent.sample_policy(
                     self._mpc_policy,
                     T=T,
                     is_testing=True)
-
+                total_time += t
                 if sample_no_noise.get_O(t=t, sub_obs='collision'):
-#                if t + 1 < T:
                     self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
                 else:
                     self._logger.info('\t\t\tLasted for t={0}'.format(t))
 
                 samples.append(sample_no_noise.match(slice(0, t + 1)))
                 assert(samples[-1].isfinite())
-                elapsed = time.time() - start
-                self._logger.info('\t\t\tFinished cond {0} of testing ({1:.1f}s, {2:.3f}x real-time)'.format(
-                    cond,
-                    elapsed,
-                    t*params['probcoll']['dt']/elapsed))
+            elapsed = time.time() - start
+            self._logger.info('\t\t\tFinished testing itr {0} ({1:.1f}s, {2:.3f}x real-time)'.format(
+                itr,
+                elapsed,
+                total_time*params['probcoll']['dt']/elapsed))
             self._itr_save_samples(itr, samples, prefix='testing_')
-#            self._agent.reset(pos=reset_pos, ori=reset_ori)
 

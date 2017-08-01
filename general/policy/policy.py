@@ -34,8 +34,8 @@ class Policy(object):
         with self.probcoll_model.graph.as_default():
             # Noise schedule
             self.noise_schedule = schedules.PiecewiseSchedule(
-                endpoints=self.params['epsilon_greedy']['endpoints'],
-                outside_value=self.params['epsilon_greedy']['outside_value'])
+                endpoints=self.params['control_noise']['endpoints'],
+                outside_value=self.params['control_noise']['outside_value'])
             self.noise_multiplier_ph = tf.placeholder(self.dtype, [])
             def get_noisy_action():
                 action, _, _, _, _, _ = self._setup_action()
@@ -61,8 +61,8 @@ class Policy(object):
             self.eps_ph = tf.placeholder(self.dtype, [])
             self.action_noisy = epsilon_greedy(
                 get_noisy_action,
-                self.params['control_range']['lower'],
-                self.params['control_range']['upper'],
+                self.params['epsilon_greedy']['control_range']['lower'],
+                self.params['epsilon_greedy']['control_range']['upper'],
                 eps=self.eps_ph,
                 dtype=self.dtype)
 

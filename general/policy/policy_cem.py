@@ -14,7 +14,6 @@ class PolicyCem(Policy):
         u_samples = tf.cast(tf.reshape(flat_u_samples, (m, T, dU)), dtype=self.dtype)
         num_dp = self.params['num_dp']
         stack_u = tf.concat([u_samples] * num_dp, axis=0)
-        # TODO incorporate std later
         output_pred_mean, output_pred_std, output_mat_mean, output_mat_std = self.probcoll_model.graph_eval_inference(
             stack_u,
             bootstrap_initial_states=embeddings,
@@ -100,8 +99,8 @@ class PolicyCem(Policy):
                             reuse=True,
                             scope="observation_graph_b{0}".format(b)) for b in xrange(self.probcoll_model.num_bootstrap)
                     ]
-                control_cost_fn = CostDesired(self.params['cost']['control_cost']) 
-                coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
+                control_cost_fn = CostDesired(self.params['cost']['control_cost'], self.params['control_range']) 
+                coll_cost_fn = CostColl(self.params['cost']['coll_cost'], self.params['control_range'])
 
                 T = self.probcoll_model.T
                 eps = self.params['cem']['eps']

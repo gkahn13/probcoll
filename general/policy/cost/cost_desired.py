@@ -1,13 +1,15 @@
 import tensorflow as tf
+import numpy as np
 from general.policy.cost.cost import Cost
 
 class CostDesired(Cost):
     """Cost for deviating from desired value.
     """
 
-    def __init__(self, params):
+    def __init__(self, params, control_range):
         self.des = tf.constant(params['des'])
         self.weight = tf.constant(params['weight'])
+        self.range = np.maximum(control_range['upper'], np.array(control_range['upper']) - np.array(control_range['lower']))
         if params['cost'] == "square":
             self.cost = tf.square
         else:
@@ -15,7 +17,7 @@ class CostDesired(Cost):
                 "CostDesired {0} is not valid".format(cost))
 
     def eval(self, data):
-        diff = data - self.des
+        diff = (data - self.des) / self.range
         components = self.cost(diff) * self.weight
         weighted_sum = tf.reduce_sum(components, axis=[1, 2])
         
