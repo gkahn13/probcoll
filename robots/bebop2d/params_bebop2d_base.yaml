@@ -1,0 +1,255 @@
+# contains all needed parameters for all files
+
+random_seed: 0
+exp_dir: '/home/bding/Desktop/code/probcoll/experiments/bebop2d'
+exp_name: 'square'
+  ##########################
+### Probcoll algorithm ###
+##########################
+
+probcoll:
+  dt: 0.5
+  T: 8 # timesteps per trajectory
+  logger: 'debug'
+  max_iter: 0
+  label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
+
+  # Training
+  training_start_iter: 0
+  is_training: True # EXPERIMENTAL
+  asynchronous_training: False # EXPERIMENTAL
+
+  # Conditions
+  num_rollouts: 8
+
+  testing:
+    num_rollout: 4
+    itr_freq: 4
+  init_data: /home/bding/Desktop/code/probcoll/init_data
+
+
+
+
+#  planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
+#  asynchronous_training: False
+#  dyn_noise: [0.01, 0.01, 0.] # how much noise added in dynamics
+#  control_noise:
+#    type: 'gaussian' # zero / gaussian / OU / smoothedgaussian
+#
+#    zero: {}
+#    gaussian:
+#      std: [0.1, 0.1, 0]
+#    smoothedgaussian:
+#      std: [0.1, 0.1, 0]
+#      T: 30
+#    ou:
+#      std: [0.1, 0.1, 0]
+#      mean: [0.25, 0.0, 0.0]
+#      theta: 0.15
+
+
+#  label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
+#  obs_noise: True # boolean use noise or not
+#
+##  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
+#
+#  use_ground_truth: False
+#  use_init_cost: True # TODO
+#
+#  conditions:
+#    repeats: 20 # TODO
+#    num_test: 1
+#    randomize_conds: False
+#    randomize_reps: True
+#
+#    default:
+#      linearvel: [0., 0, 0.0]
+#
+#    range:
+#      linearvel:
+#        min: [0, 0, 0]
+#        max: [0, 0, 0]
+#        num: [1, 1, 1]
+#
+#    perturb: # repetition perturbations
+#      linearvel: [0.0, 0.0, 0.0]
+
+
+##################################
+####### Probcoll model ###########
+##################################
+
+model:
+  T: 6 # how many timesteps to predict
+  logger: 'debug'
+
+  # what to use as input to prediction model
+  U_order: ['linearvel']
+  O_im_order: ['camera']
+  O_vec_order: []
+  output_order: ['collision'] # taken from observations O
+  num_O: 1
+
+  center_O_im: False
+  control_range:
+    lower: [0.0, -1.0, -1.57]
+    upper: [1.0, 1.0, 1.57]
+
+  # Device
+  device: 0
+  gpu_fraction: 0.0
+
+  # Optimization
+  learning_rate: 'sweep'
+  grad_clip: 5.0 # Norm gradient clip
+  beta1: 0.9 # For avillaflor
+  beta2: 0.999 # For avillaflor
+  batch_size: 64
+  pct_coll: 0.75 # rebalancing trajectories
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-5 # L2 regularization
+
+  # Train schedule
+  steps: 1000
+  reset_freq: 0 # 0 means no resetting
+  reset_steps: 10000
+  display_steps: 50
+  val_pct: 0.1 # Percent of the data stored as validation
+  val_freq: 0.1 # How often you compute validation (percentage)
+  val_steps: 5  # How many steps you do on validation
+  val_dropout: True # Whether you use dropout during validation
+
+  # Model architecture
+  dtype: 'float32' # only float32 is currently implemented
+  num_bootstrap: 1 # EXPERIMENTAL
+  prob_coll_strictly_increasing: True # True / False
+  mask: 'all' # all / last
+
+  image_graph:
+    graph_type: 'cnn'
+    filters: [32, 64, 64]
+    kernels: [8, 4, 3]
+    strides: [4, 2, 1]
+    padding: 'SAME'
+    use_batch_norm: False
+    batch_norm_decay: 0.5
+    conv_activation: 'relu'
+    output_activation: 'relu' # relu / tanh/ spatial_softmax
+
+  observation_graph:
+    output_activation: 'tanh'
+    output_dim: 128 # This is the hidden size of the rnn
+
+  action_graph:
+    graph_type: 'rnn'
+    num_cells: 1
+    cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
+#    dropout: 1.0 # pct keep
+#    cell_args: # If you need to pass variables to cells
+
+  output_graph:
+    graph_type: 'fc'
+
+
+#################################################
+### Planning objective and optimizer settings ###
+#################################################
+
+planning:
+  cost:
+    coll_cost:
+      cost: square # square
+      weight: [10, 0., 0.] # TODO
+      std_weight: 0.0
+      pre_activation: True
+    
+    control_cost:
+      des: [0.6, 0., 0.] # TODO: hard-coded order: steering then speed
+      cost: square
+      weight: [1., 0.0, 0.0]
+      # TODO uncertainty
+#    pre_activation: True # wether std is before or after activation (sigmoid)
+
+  num_dp: 1 # number of dropout passes to average over
+  planner_type: 'random' # random / primitives / cem
+  
+  control_range:
+    lower: [0.6, 0, 0]
+    upper: [0.6, 0, 0]
+
+  random:
+    K: 1 # number of actions to sample from
+
+  epsilon_greedy:
+    endpoints: [[0, 1.0], [4, 1.0], [8, 0.0], [40, 0.00]]
+    outside_value: 0.01
+
+  control_noise:
+    type: 'uniform' # zero / gaussian / uniform
+
+    zero: {}
+    gaussian:
+      std: [0.1, 0.1, 0.1]
+    uniform:
+#      lower: [-0.1, -0.1, 0.0]
+#      upper: [0.1, 0.1, 0.0]
+      lower: [0.0, 0.0, 0.0]
+      upper: [0.0, 0.0, 0.0]
+
+  visualize: False
+
+  teleop: False
+
+######################################################
+########### States, controls, observations ###########
+######################################################
+
+X:
+  dim: 3
+  order: ['linearvel']
+
+  linearvel: {idx: 0, dim: 3}
+#  dim: 13
+#  order: ['position', 'orientation', 'linearvel', 'angularvel']
+#
+#  position:    {idx: 0,  dim: 3}
+#  orientation: {idx: 3,  dim: 4} # wxyz
+#  linearvel:   {idx: 7,  dim: 3}
+#  angularvel:  {idx: 10, dim: 3}
+
+U:
+  dim: 3
+  order: ['linearvel']
+
+  linearvel: {idx: 0, dim: 3}
+
+O:
+  dim: 257
+  order: ['camera', 'collision']
+
+  camera: # TODO
+    idx: 0
+    dim: 256
+    height: 16
+    width: 16
+    noise: 0.01
+    num_channels: 1
+  collision: {idx: 256, dim: 1, buffer: 0.0}
+
+##################
+### ros topics ###
+##################
+
+bebop:
+  topics:
+    image: '/bebop/image_raw' # sensor_msgs/Image
+    cmd_vel: '/vservo/cmd_vel' # geometry_msgs/Twist
+    measured_vel: '/bebop/states/ardrone3/PilotingState/SpeedChanged' # bebop_msgs/Ardrone3PilotingStateSpeedChanged
+    cmd_acc: '/bebop/cmd_vel' # geometry_msgs/Twist
+
+    collision: '/bebop/collision' # std_msgs/Empty
+    start_rollout: '/bebop/start_rollout' # std_msgs/Empty
+    bad_rollout: '/bebop/bad_rollout' # std_msgs/Empty
+
+    debug_image: '/bebop/debug/image' # sensor_msgs/Image
+    debug_cmd_vel: '/bebop/debug/cmd_vel' # visualization_msgs/Marker
