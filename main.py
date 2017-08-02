@@ -15,7 +15,7 @@ except:
 
 try:
     from robots.bebop2d.algorithm.probcoll_bebop2d import ProbcollBebop2d
-    # from robots.bebop2d.algorithm.analyze_bebop2d import AnalyzeBebop2d
+    from robots.bebop2d.analysis.analyze_bebop2d import AnalyzeBebop2d
 except:
     print('main.py: not importing Bebop2d')
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         if robot == 'pointquad':
             analyze = AnalyzePointquad(on_replay=args.on_replay)
         elif robot == 'bebop2d':
-            analyze = AnalyzeBebop2d(on_replay=args.on_replay)
+            analyze = AnalyzeBebop2d()
         elif robot == 'rccar':
             analyze = AnalyzeRCcar(on_replay=args.on_replay)
         elif robot == 'sim_rccar':

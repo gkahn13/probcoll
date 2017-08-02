@@ -26,8 +26,10 @@ class Probcoll:
             params['probcoll']['logger'],
             os.path.join(self._save_dir, 'dagger.txt'))
         self._mpc_policy = self._create_mpc()
-        shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
-
+        try:
+            shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
+        except:
+            pass
     @abc.abstractmethod
     def _setup(self):
         ### load prediction neural net
@@ -138,7 +140,7 @@ class Probcoll:
                     self.probcoll_model.train()
 
     def run_testing(self, itr):
-        if (itr == self._max_iter - 1 \
+        if itr > 0 and (itr == self._max_iter - 1 \
                 or itr % params['probcoll']['testing']['itr_freq'] == 0): 
             self._logger.info('Itr {0} testing'.format(itr))
             if self._async_on:
@@ -204,5 +206,6 @@ class Probcoll:
                 cond,
                 elapsed,
                 t*params['probcoll']['dt']/elapsed))
-            self._rollout_num += 1 
+            self._rollout_num += 1
+        self._agent.act(None)
         self._itr_save_samples(itr, samples)

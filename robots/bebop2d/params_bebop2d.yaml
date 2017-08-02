@@ -23,8 +23,10 @@ probcoll:
   num_rollouts: 8
 
   testing:
-    num_rollout: 8
+    num_rollout: 4
     itr_freq: 4
+  init_data: /home/bding/Desktop/code/probcoll/init_data
+
 
 
 
@@ -78,7 +80,7 @@ probcoll:
 ##################################
 
 model:
-  T: 5 # how many timesteps to predict
+  T: 6 # how many timesteps to predict
   logger: 'debug'
 
   # what to use as input to prediction model
@@ -86,7 +88,7 @@ model:
   O_im_order: ['camera']
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
-  num_O: 4
+  num_O: 1
 
   center_O_im: False
   control_range:
@@ -105,12 +107,12 @@ model:
   batch_size: 64
   pct_coll: 0.75 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-3 # L2 regularization
+  reg: 1.e-5 # L2 regularization
 
   # Train schedule
-  steps: 500
+  steps: 1000
   reset_freq: 0 # 0 means no resetting
-  reset_steps: 5000
+  reset_steps: 10000
   display_steps: 50
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
@@ -157,29 +159,29 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [100, 0., 0.] # TODO
+      weight: [10, 0., 0.] # TODO
       std_weight: 0.0
       pre_activation: True
     
     control_cost:
-      des: [0.8, 0., 0.] # TODO: hard-coded order: steering then speed
+      des: [0.6, 0., 0.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [1., 0.5, 0.0]
+      weight: [1., 0.0, 0.0]
       # TODO uncertainty
 #    pre_activation: True # wether std is before or after activation (sigmoid)
 
-  num_dp: 16 # number of dropout passes to average over
+  num_dp: 1 # number of dropout passes to average over
   planner_type: 'random' # random / primitives / cem
   
   control_range:
-    lower: [0.6, -0.6, -1.57]
-    upper: [0.6, 0.6, 1.57]
+    lower: [0.6, 0, 0]
+    upper: [0.6, 0, 0]
 
   random:
-    K: 128 # number of actions to sample from
+    K: 1 # number of actions to sample from
 
   epsilon_greedy:
-    endpoints: [[0, 1.0], [20, 1.0], [200, 0.1], [360, 0.01]]
+    endpoints: [[0, 1.0], [4, 1.0], [8, 0.0], [40, 0.00]]
     outside_value: 0.01
 
   control_noise:
@@ -189,10 +191,14 @@ planning:
     gaussian:
       std: [0.1, 0.1, 0.1]
     uniform:
-      lower: [-0.1, -0.1, 0.0]
-      upper: [0.1, 0.1, 0.0]
+#      lower: [-0.1, -0.1, 0.0]
+#      upper: [0.1, 0.1, 0.0]
+      lower: [0.0, 0.0, 0.0]
+      upper: [0.0, 0.0, 0.0]
 
   visualize: False
+
+  teleop: False
 
 ######################################################
 ########### States, controls, observations ###########
