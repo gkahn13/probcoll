@@ -161,9 +161,9 @@ if __name__ == '__main__':
     params, exp_names = build_experiments(base_params, sweep_params) 
     print("Running experiments {0}".format(str(exp_names)))
     num_gpus = len(args.gpus)
-    num_fit = max(1, int(0.9 / base_params['model']['gpu_fraction']))
+    # num_fit = max(1, int(0.9 / base_params['model']['gpu_fraction']))
     args_lists = []
-    num_proc = num_gpus * num_fit
+    num_proc = 1
     for i in range(num_proc):
         args_list = [None, None, None, None, None, None, None, None]
         args_list[0] = exp_names[
@@ -173,7 +173,7 @@ if __name__ == '__main__':
             int(i/float(num_proc)*len(params)):\
             int((i+1)/float(num_proc)*len(params))]
         args_list[2] = int(i/float(num_proc) * len(params))
-        args_list[3] = args.gpus[i % num_gpus]
+        args_list[3] = ''
         args_list[4] = args.robot
         args_list[5] = args.run
         args_list[6] = args.data_dirs
