@@ -152,12 +152,18 @@ class AnalyzeBebop2d(Analyze):
                             only_no_noise=True,
                             visualize=False)
                         f = plt.figure()
+                        # import IPython; IPython.embed()
                         for j in xrange(num_O):
+                            # import IPython; IPython.embed()
+                            # if s.get_O()[i:i+num_O][-1][-1] == 1 and j==num_O - 1:
+                            #     import IPython; IPython.embed()
                             img = np.reshape(s.get_O()[i + j][:-1], [16, 16])
                             a = f.add_subplot(2, np.ceil(num_O/2.0), j + 1)
-                            plt.imshow(img, cmap='gray')
+                            plt.imshow(img, cmap='gray', vmin=0, vmax=1)
                             a.set_title(j)
-                        f.suptitle(str(u_t_no_noise))
+                        # if s.get_O()[i:i+num_O][-1][-1] == 1:
+                        #     import IPython; IPython.embed()
+                        f.suptitle(str(u_t_no_noise) + str(s.get_O()[i:i+num_O][-1][-1]))
                         plt.savefig(params['exp_dir'] + '/'+
                                     params['exp_name'] + '/' + 'plots/' + 'itr_'+ str(itr)+'_sample_'+str(n)+'_act_'+str(i) + '.jpg')
 

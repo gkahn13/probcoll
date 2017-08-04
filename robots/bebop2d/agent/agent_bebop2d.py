@@ -110,6 +110,7 @@ class AgentBebop2d(Agent):
             # Record
             sample_noise.set_X(x_t, t=t)
             sample_noise.set_O(o_t, t=t)
+            import IPython; IPython.embed()
             # sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
             # sample_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
             sample_no_noise.set_X(x_t, t=t)
@@ -128,6 +129,88 @@ class AgentBebop2d(Agent):
                 self._curr_rollout_t += 1
         return sample_noise, sample_no_noise, t
 
+    def sample_artificial_policy(self, policy, T=1, rollout_num=0, is_testing=False, only_noise=False):
+        visualize = params['planning'].get('visualize', False)
+        sample_noise = Sample(meta_data=params, T=T)
+        sample_no_noise = Sample(meta_data=params, T=T)
+        o_t_no_collide = np.zeros([257], dtype='float32')
+        o_t_collide = np.ones([257], dtype='float32')
+        o_t_collide[-1] = 1
+        control1 = np.array([0.6, 0.6, 0.6], dtype='float32')
+        control2 = np.array([0.0, 0.0, 0.0], dtype='float32')
+        case = np.random.random_integers(0, 1)
+        if case == 0:
+            print 'non-collision case'
+            for t in xrange(T):
+                # Get observation and act
+                o_t = o_t_no_collide
+                if np.random.random_integers(0, 1) == 1:
+                    u_t = control1
+                else:
+                    u_t = control2
+                self.last_n_obs.pop(0)
+                self.last_n_obs.append(o_t)
+                # TODO only_noise
+                self._info['linearvel'] = u_t
+                x_t = u_t
+                # print x_t
+                # Record
+                sample_noise.set_X(x_t, t=t)
+                sample_noise.set_O(o_t, t=t)
+                sample_no_noise.set_X(x_t, t=t)
+                sample_no_noise.set_O(o_t, t=t)
+                if not is_testing:
+                    sample_noise.set_U(u_t, t=t)
+                # import IPython;IPython.embed()
+                if not only_noise:
+                    sample_no_noise.set_U(u_t, t=t)
+                if self.coll:
+                    self._curr_rollout_t = 0
+                    break
+                else:
+                    self._curr_rollout_t += 1
+        else:
+            print 'collision case'
+            for t in xrange(1):
+                # Get observation and act
+                if t == 0:
+                    o_t = o_t_collide
+                    u_t = control1
+                else:
+                    o_t = o_t_no_collide
+                    if np.random.random_integers(0, 1) == 1:
+                        u_t = control1
+                    else:
+                        u_t = control2
+                self.last_n_obs.pop(0)
+                self.last_n_obs.append(o_t)
+                # TODO only_noise
+                self._info['linearvel'] = u_t
+                x_t = u_t
+                # print x_t
+                # Record
+                sample_noise.set_X(x_t, t=t)
+                sample_noise.set_O(o_t, t=t)
+                # sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
+                # sample_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
+                sample_no_noise.set_X(x_t, t=t)
+                sample_no_noise.set_O(o_t, t=t)
+                # sample_no_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
+                # sample_no_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
+                if not is_testing:
+                    sample_noise.set_U(u_t, t=t)
+                # import IPython;IPython.embed()
+                if not only_noise:
+                    sample_no_noise.set_U(u_t, t=t)
+                if t == T -1:
+                    self._curr_rollout_t = 0
+                    break
+                else:
+                    self._curr_rollout_t += 1
+
+            # import IPython; IPython.embed()
+        return sample_noise, sample_no_noise, t
+
     def reset(self, pos=None, ori=None, hard_reset=False):
         # self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
         self.act(None)  # stop bebop
@@ -136,8 +219,8 @@ class AgentBebop2d(Agent):
         self._logger.info('Press start')
         # while self.just_crashed and not rospy.is_shutdown():
         self.just_crashed = True
-        while self.just_crashed and not rospy.is_shutdown():
-            rospy.sleep(0.1)
+        # while self.just_crashed and not rospy.is_shutdown():
+        #     rospy.sleep(0.1)
         self.coll_callback.get()
         self.coll = False
         if hard_reset:

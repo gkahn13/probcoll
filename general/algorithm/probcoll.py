@@ -4,7 +4,7 @@ import numpy as np
 import multiprocessing
 from general.algorithm.probcoll_model import ProbcollModel
 from config import params
-
+import tensorflow as tf
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
 class Probcoll:
@@ -71,6 +71,7 @@ class Probcoll:
     ### Run methods ###
     ###################
 
+
     def run(self):
         """
         for some iterations:
@@ -81,6 +82,7 @@ class Probcoll:
         """
         try:
             ### find last model file
+            samples_start_itr = 0
             for samples_start_itr in xrange(self._max_iter-1, -1, -1):
                 sample_file = self._itr_samples_file(samples_start_itr, create=False)
                 if os.path.exists(sample_file):
@@ -95,12 +97,12 @@ class Probcoll:
                 for fname in fnames:
                     self._logger.info('\t{0}'.format(fname))
                 self.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
-
+            # import IPython; IPython.embed()
             ### if any data and haven't trained on it already, train on it
             if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
                 self._run_training(samples_start_itr)
             start_itr = samples_start_itr
-
+            # import IPython; IPython.embed()
             ### training loop
             for itr in xrange(start_itr, self._max_iter):
                 self._run_itr(itr)
@@ -188,7 +190,7 @@ class Probcoll:
             self._agent.reset()
             self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
             start = time.time()
-            sample_noise, sample_no_noise, t = self._agent.sample_policy(self._mpc_policy, T=T, rollout_num=self._rollout_num, only_noise=label_with_noise)
+            sample_noise, sample_no_noise, t = self._agent.sample_artificial_policy(self._mpc_policy, T=T, rollout_num=self._rollout_num, only_noise=label_with_noise)
             if t + 1 < T:
                 self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
             else:
@@ -207,5 +209,5 @@ class Probcoll:
                 elapsed,
                 t*params['probcoll']['dt']/elapsed))
             self._rollout_num += 1
-        self._agent.act(None)
+        # self._agent.act(None)
         self._itr_save_samples(itr, samples)

@@ -8,8 +8,8 @@ exp_name: 'square'
 ##########################
 
 probcoll:
-  dt: 0.5
-  T: 8 # timesteps per trajectory
+  dt: 0.25
+  T: 20 # timesteps per trajectory
   logger: 'debug'
   max_iter: 10
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -24,8 +24,8 @@ probcoll:
 
   testing:
     num_rollout: 4
-    itr_freq: 4
-  init_data: /home/bding/Desktop/code/probcoll/init_data
+    itr_freq: 40
+#  init_data: /home/bding/Desktop/code/probcoll/init_data
 
 
 
@@ -80,7 +80,7 @@ probcoll:
 ##################################
 
 model:
-  T: 6 # how many timesteps to predict
+  T: 1 # how many timesteps to predict
   logger: 'debug'
 
   # what to use as input to prediction model
@@ -105,12 +105,12 @@ model:
   beta1: 0.9 # For avillaflor
   beta2: 0.999 # For avillaflor
   batch_size: 64
-  pct_coll: 0.75 # rebalancing trajectories
+  pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-5 # L2 regularization
+  reg: 0.0 # L2 regularization
 
   # Train schedule
-  steps: 1000
+  steps: 500
   reset_freq: 0 # 0 means no resetting
   reset_steps: 10000
   display_steps: 50
@@ -130,8 +130,11 @@ model:
     filters: [32, 64, 64]
     kernels: [8, 4, 3]
     strides: [4, 2, 1]
+#    filters: [4, 4, 4]
+#    kernels: [3, 3, 3]
+#    strides: [2, 2, 2]
     padding: 'SAME'
-    use_batch_norm: False
+    use_batch_norm: True
     batch_norm_decay: 0.5
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax
@@ -159,7 +162,7 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [10, 0., 0.] # TODO
+      weight: [100, 0., 0.] # TODO
       std_weight: 0.0
       pre_activation: True
     
@@ -181,7 +184,7 @@ planning:
     K: 1 # number of actions to sample from
 
   epsilon_greedy:
-    endpoints: [[0, 1.0], [4, 1.0], [8, 0.0], [40, 0.00]]
+    endpoints: [[0, 0.0], [4, 0.0], [8, 0.0], [40, 0.00]]
     outside_value: 0.01
 
   control_noise:
@@ -196,7 +199,7 @@ planning:
       lower: [0.0, 0.0, 0.0]
       upper: [0.0, 0.0, 0.0]
 
-  visualize: False
+  visualize: True
 
   teleop: False
 
