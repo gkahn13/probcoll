@@ -573,6 +573,8 @@ class ProbcollModel:
             scope=scope,
             reuse=reuse,
             is_training=is_training)
+        # import IPython; IPython.embed()
+        # self.tf_debug['im_output'] = im_output
         if len(im_output.get_shape()) > 2:
             im_output = tf.contrib.layers.flatten(im_output)
         output, _ = fcnn(
@@ -584,6 +586,7 @@ class ProbcollModel:
             is_training=is_training)
         if obs_batch == 1:
             output = tf.tile(output, [batch_size, 1])
+        # import IPython; IPython.embed()
         return output
 
     def _graph_inference(
@@ -1042,7 +1045,9 @@ class ProbcollModel:
             ### initialize
             self._initializer = [tf.local_variables_initializer(), tf.global_variables_initializer()]
             self.graph_init_vars()
-
+            # import IPython; IPython.embed()
+            self._variables = tf.trainable_variables()
+            self.before_trained = self.sess.run(self._variables)
             # Set logs writer into folder /tmp/tensorflow_logs
             merged = tf.summary.merge_all()
             writer = tf.summary.FileWriter(
@@ -1288,7 +1293,12 @@ class ProbcollModel:
                     save_start = time.time()
 
                 step += 1
-
+            self.after_trained = self.sess.run(self._variables)
+            for i in xrange(len(self.before_trained)):
+                if not np.array_equal(self.before_trained[i], self.after_trained[i]):
+                    print self._variables[i]
+                    # print self.before_trained[i]
+            # import IPython; IPython.embed()
             # Logs the number of times files were accessed
             fnames_condensed = defaultdict(int)
             for k, v in train_fnames_dict.items():

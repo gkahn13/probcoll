@@ -19,6 +19,7 @@ class Probcoll:
             self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
             self._save_dir = save_dir
+            self._save_dir = save_dir
         self._data_dir = data_dir
         self._setup()
         self._logger = get_logger(

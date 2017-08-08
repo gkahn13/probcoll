@@ -152,14 +152,13 @@ class AnalyzeBebop2d(Analyze):
                             only_no_noise=True,
                             visualize=False)
                         f = plt.figure()
-                        # import IPython; IPython.embed()
                         for j in xrange(num_O):
                             # import IPython; IPython.embed()
                             # if s.get_O()[i:i+num_O][-1][-1] == 1 and j==num_O - 1:
                             #     import IPython; IPython.embed()
                             img = np.reshape(s.get_O()[i + j][:-1], [16, 16])
                             a = f.add_subplot(2, np.ceil(num_O/2.0), j + 1)
-                            plt.imshow(img, cmap='gray', vmin=0, vmax=1)
+                            plt.imshow(img, cmap='gray', vmin=0, vmax=255)
                             a.set_title(j)
                         # if s.get_O()[i:i+num_O][-1][-1] == 1:
                         #     import IPython; IPython.embed()

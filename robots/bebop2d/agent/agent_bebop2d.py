@@ -70,9 +70,9 @@ class AgentBebop2d(Agent):
         while self.is_teleop and self.cur_teleop_command is None:
             r.sleep()
         for t in xrange(T):
-            r.sleep()
             # Get observation and act
             o_t = self.get_observation()
+            # import IPython; IPython.embed()
             self.last_n_obs.pop(0)
             self.last_n_obs.append(o_t)
             # TODO only_noise
@@ -99,27 +99,26 @@ class AgentBebop2d(Agent):
                     only_noise=False,
                     visualize=visualize)
                 if not self.is_teleop:
+                    print u_t
                     self.act(u_t)
                     self._info['linearvel'] = u_t
                 else:
                     self._info['linearvel'] = self.cur_teleop_command
-            # TODO possibly determine state before
-            print '{0}, {1}'.format(u_t, u_t_no_noise)
             x_t = self.get_state()
-            # print x_t
-            # Record
+            r.sleep()
+            coll_time = self.coll_callback.get()
+            if coll_time is not None:
+                self.just_crashed = True
+                self.coll = True
+                o_t[-1] = 1
+            else:
+                o_t[-1] = 0
             sample_noise.set_X(x_t, t=t)
             sample_noise.set_O(o_t, t=t)
-            import IPython; IPython.embed()
-            # sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
-            # sample_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
             sample_no_noise.set_X(x_t, t=t)
             sample_no_noise.set_O(o_t, t=t)
-            # sample_no_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
-            # sample_no_noise.set_O([int(self.coll_callback.get() is not None)], t=t, sub_obs='collision')
             if not is_testing:
                 sample_noise.set_U(u_t, t=t)
-            # import IPython;IPython.embed()
             if not only_noise:
                 sample_no_noise.set_U(u_t_no_noise, t=t)
             if self.coll:
@@ -133,21 +132,33 @@ class AgentBebop2d(Agent):
         visualize = params['planning'].get('visualize', False)
         sample_noise = Sample(meta_data=params, T=T)
         sample_no_noise = Sample(meta_data=params, T=T)
-        o_t_no_collide = np.zeros([257], dtype='float32')
-        o_t_collide = np.ones([257], dtype='float32')
-        o_t_collide[-1] = 1
-        control1 = np.array([0.6, 0.6, 0.6], dtype='float32')
+        o_t_no_collide = 255*np.ones([257], dtype='float32')
+        o_t_collide = np.zeros([257], dtype='float32')
+        # o_t_collide = np.load('collide1.npy')
+        # o_t_no_collide = np.load('no_collide1.npy')
+        o_t_collide[-1] = 0
+        # o_t_collide[:10] = np.ones([10], dtype='float32')
+        # o_t_collide[10] = 1
+        # o_t_collide[20] = 1
+        # o_t_collide[30] = 1
+        o_t_no_collide[-1] = 0
+        control1 = np.array([0.6, 0.0, 0.0], dtype='float32')
         control2 = np.array([0.0, 0.0, 0.0], dtype='float32')
         case = np.random.random_integers(0, 1)
+        r = rospy.Rate(1.0)
         if case == 0:
             print 'non-collision case'
             for t in xrange(T):
                 # Get observation and act
-                o_t = o_t_no_collide
+                o_t = o_t_no_collide.copy()
+                # o_t = o_t + np.random.normal(0, 0.02, 257)
+                # o_t.clip(min=0, max=1)
+                o_t_collide[-1] = 0 
                 if np.random.random_integers(0, 1) == 1:
                     u_t = control1
                 else:
                     u_t = control2
+                print u_t
                 self.last_n_obs.pop(0)
                 self.last_n_obs.append(o_t)
                 # TODO only_noise
@@ -155,6 +166,8 @@ class AgentBebop2d(Agent):
                 x_t = u_t
                 # print x_t
                 # Record
+                # r.sleep()
+                o_t_collide[-1] = 0
                 sample_noise.set_X(x_t, t=t)
                 sample_noise.set_O(o_t, t=t)
                 sample_no_noise.set_X(x_t, t=t)
@@ -182,6 +195,9 @@ class AgentBebop2d(Agent):
                         u_t = control1
                     else:
                         u_t = control2
+                # o_t = o_t + np.random.normal(0, 0.02, 257)
+                # o_t.clip(min=0, max=1)
+                o_t[-1] = 0
                 self.last_n_obs.pop(0)
                 self.last_n_obs.append(o_t)
                 # TODO only_noise
@@ -189,6 +205,8 @@ class AgentBebop2d(Agent):
                 x_t = u_t
                 # print x_t
                 # Record
+                # r.sleep()
+                o_t[-1] = 1
                 sample_noise.set_X(x_t, t=t)
                 sample_noise.set_O(o_t, t=t)
                 # sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
@@ -218,7 +236,7 @@ class AgentBebop2d(Agent):
         # if self.just_crashed:
         self._logger.info('Press start')
         # while self.just_crashed and not rospy.is_shutdown():
-        self.just_crashed = True
+        # self.just_crashed = True
         # while self.just_crashed and not rospy.is_shutdown():
         #     rospy.sleep(0.1)
         self.coll_callback.get()
@@ -235,12 +253,8 @@ class AgentBebop2d(Agent):
     def get_observation(self):
         obs_sample = Sample(meta_data=params, T=1)
         ### collision
-        coll_time = self.coll_callback.get()
-        if coll_time is not None:
-            self.just_crashed = True
-            self.coll = True
         # is_coll = coll_time is not None
-        obs_sample.set_O([int(self.coll)], t=0, sub_obs='collision')
+        obs_sample.set_O([0], t=0, sub_obs='collision')
 
         ### camera
         image_msgs = self.image_callback.get()
@@ -265,7 +279,7 @@ class AgentBebop2d(Agent):
             return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
         image = rgb2gray(cvb.imgmsg_to_cv2(image_msg).astype(np.float32))
-        im = (1./255.) * cv2.resize(image,
+        im = cv2.resize(image,
                                     (params['O']['camera']['height'], params['O']['camera']['width']),
                                     interpolation=cv2.INTER_AREA) # TODO how does this deal with aspect ratio
 
