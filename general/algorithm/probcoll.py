@@ -193,10 +193,9 @@ class Probcoll:
             start = time.time()
             sample_noise, sample_no_noise, t = self._agent.sample_policy(self._mpc_policy, T=T, rollout_num=self._rollout_num, only_noise=label_with_noise)
             if t + 1 < T:
-                self._logger.warning('\t\t\tCrashed at t={0}'.format(t))
+                self._logger.warning('\t\t\tCrashed or stopped at t={0}'.format(t))
             else:
                 self._logger.info('\t\t\tLasted for t={0}'.format(t))
-
             if label_with_noise:
                 samples.append(sample_noise.match(slice(0, t + 1)))
             else:

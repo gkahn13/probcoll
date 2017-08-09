@@ -139,18 +139,18 @@ class AnalyzeBebop2d(Analyze):
         samples_itrs, sample_times = self._load_samples()
         # import IPython; IPython.embed()
         num_O = params['model']['num_O']
+        visualized = params['planning']['visualize']
         for itr, samples in samples_itrs:
             for n, s in enumerate(samples):
                 if len(s.get_O()) >= num_O:
                     for i in xrange(len(s.get_O()) - num_O + 1):
-                        # import IPython; IPython.embed()
                         _, u_t_no_noise = prediction._mpc_policy.act(
                             s.get_O()[i:i+num_O],
                             0,
                             0,
                             only_noise=False,
                             only_no_noise=True,
-                            visualize=False)
+                            visualize=visualized)
                         f = plt.figure()
                         for j in xrange(num_O):
                             # import IPython; IPython.embed()

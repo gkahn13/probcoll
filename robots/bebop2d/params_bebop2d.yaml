@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/bding/Desktop/code/probcoll/experiments/bebop2d'
-exp_name: 'box'
+exp_name: 'arena'
   ##########################
 ### Probcoll algorithm ###
 ##########################
@@ -168,7 +168,7 @@ planning:
     control_cost:
       des: [0.8, 0., 0.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [1., 0.0, 0.0]
+      weight: [1.0, 1.0, 0.0]
       # TODO uncertainty
 #    pre_activation: True # wether std is before or after activation (sigmoid)
 
@@ -183,7 +183,7 @@ planning:
     K: 512 # number of actions to sample from
 
   epsilon_greedy:
-    endpoints: [[0, 1.0], [6, 1.0], [12, 0.0], [40, 0.00]]
+    endpoints: [[0, 1.0], [6, 1.0], [12, 0.5], [18, 0.0]]
     outside_value: 0.01
 
   control_noise:
