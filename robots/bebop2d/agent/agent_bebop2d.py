@@ -91,7 +91,6 @@ class AgentBebop2d(Agent):
                 else:
                     self._info['linearvel'] = self.cur_teleop_command
             else:
-                # import IPython;IPython.embed()
                 u_t, u_t_no_noise = policy.act(
                     self.last_n_obs,
                     self._curr_rollout_t,
@@ -99,8 +98,9 @@ class AgentBebop2d(Agent):
                     only_noise=False,
                     visualize=visualize)
                 if not self.is_teleop:
-                    print u_t
-                    self.act(u_t)
+                    print 'noisy act:{0}'.format(u_t)
+                    print 'executed act: {0}'.format(u_t_no_noise)
+                    self.act(u_t_no_noise)
                     self._info['linearvel'] = u_t
                 else:
                     self._info['linearvel'] = self.cur_teleop_command
@@ -132,10 +132,10 @@ class AgentBebop2d(Agent):
         visualize = params['planning'].get('visualize', False)
         sample_noise = Sample(meta_data=params, T=T)
         sample_no_noise = Sample(meta_data=params, T=T)
-        o_t_no_collide = 255*np.ones([257], dtype='float32')
-        o_t_collide = np.zeros([257], dtype='float32')
-        # o_t_collide = np.load('collide1.npy')
-        # o_t_no_collide = np.load('no_collide1.npy')
+        # o_t_no_collide = 255*np.ones([257], dtype='float32')
+        # o_t_collide = np.zeros([257], dtype='float32')
+        o_t_collide = np.load('collide.npy')
+        o_t_no_collide = np.load('no_collide.npy')
         o_t_collide[-1] = 0
         # o_t_collide[:10] = np.ones([10], dtype='float32')
         # o_t_collide[10] = 1
@@ -151,14 +151,14 @@ class AgentBebop2d(Agent):
             for t in xrange(T):
                 # Get observation and act
                 o_t = o_t_no_collide.copy()
-                # o_t = o_t + np.random.normal(0, 0.02, 257)
-                # o_t.clip(min=0, max=1)
-                o_t_collide[-1] = 0 
+                o_t = o_t + np.random.normal(0, 3, 257)
+                o_t = o_t.clip(min=0, max=255)
+                o_t[-1] = 0
                 if np.random.random_integers(0, 1) == 1:
                     u_t = control1
                 else:
                     u_t = control2
-                print u_t
+                # print u_t
                 self.last_n_obs.pop(0)
                 self.last_n_obs.append(o_t)
                 # TODO only_noise
@@ -167,7 +167,8 @@ class AgentBebop2d(Agent):
                 # print x_t
                 # Record
                 # r.sleep()
-                o_t_collide[-1] = 0
+                o_t[-1] = 0
+                assert o_t[-1] == 0
                 sample_noise.set_X(x_t, t=t)
                 sample_noise.set_O(o_t, t=t)
                 sample_no_noise.set_X(x_t, t=t)
@@ -187,16 +188,16 @@ class AgentBebop2d(Agent):
             for t in xrange(1):
                 # Get observation and act
                 if t == 0:
-                    o_t = o_t_collide
+                    o_t = o_t_collide.copy()
                     u_t = control1
                 else:
-                    o_t = o_t_no_collide
+                    o_t = o_t_no_collide.copy()
                     if np.random.random_integers(0, 1) == 1:
                         u_t = control1
                     else:
                         u_t = control2
-                # o_t = o_t + np.random.normal(0, 0.02, 257)
-                # o_t.clip(min=0, max=1)
+                o_t = o_t + np.random.normal(0, 3, 257)
+                o_t = o_t.clip(min=0, max=255)
                 o_t[-1] = 0
                 self.last_n_obs.pop(0)
                 self.last_n_obs.append(o_t)
@@ -207,6 +208,7 @@ class AgentBebop2d(Agent):
                 # Record
                 # r.sleep()
                 o_t[-1] = 1
+                assert o_t[-1] == 1
                 sample_noise.set_X(x_t, t=t)
                 sample_noise.set_O(o_t, t=t)
                 # sample_noise.set_O([int(self.coll)], t=t, sub_obs='collision')
@@ -236,9 +238,9 @@ class AgentBebop2d(Agent):
         # if self.just_crashed:
         self._logger.info('Press start')
         # while self.just_crashed and not rospy.is_shutdown():
-        # self.just_crashed = True
-        # while self.just_crashed and not rospy.is_shutdown():
-        #     rospy.sleep(0.1)
+        self.just_crashed = True
+        while self.just_crashed and not rospy.is_shutdown():
+            rospy.sleep(0.1)
         self.coll_callback.get()
         self.coll = False
         if hard_reset:
@@ -287,13 +289,12 @@ class AgentBebop2d(Agent):
 
     def act(self, u):
         if u is not None:
-            # print u
+            print u
             if u[0] == 0 and u[1]== 0:
                 twist_msg = geometry_msgs.Twist(
                     linear=geometry_msgs.Point(0., 0., 0.),
                     angular=geometry_msgs.Point(0., 0., 0)
                 )
-                r = rospy.Rate(2)
                 self.cmd_vel_pub.publish(None)
                 # r.sleep()
                 # self.cmd_vel_pub.publish(twist_msg)

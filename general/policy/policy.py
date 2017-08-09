@@ -89,7 +89,7 @@ class Policy(object):
             }
         if visualize:
             action_noisy, action, actions_considered, \
-                coll_costs, control_costs  = self.probcoll_model.sess.run(
+                coll_costs, control_costs = self.probcoll_model.sess.run(
                     [
                         self.action_noisy,
                         self.action,

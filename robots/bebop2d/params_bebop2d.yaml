@@ -2,14 +2,14 @@
 
 random_seed: 0
 exp_dir: '/home/bding/Desktop/code/probcoll/experiments/bebop2d'
-exp_name: 'square'
+exp_name: 'box'
   ##########################
 ### Probcoll algorithm ###
 ##########################
 
 probcoll:
-  dt: 0.5
-  T: 10 # timesteps per trajectory
+  dt: 0.25
+  T: 40 # timesteps per trajectory
   logger: 'debug'
   max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -20,12 +20,12 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 8
+  num_rollouts: 6
 
   testing:
     num_rollout: 4
     itr_freq: 40
-#  init_data: /home/bding/Desktop/code/probcoll/init_
+#  init_data: /home/bding/Desktop/code/probcoll/init_data
 
 
 
@@ -79,7 +79,7 @@ probcoll:
 ##################################
 
 model:
-  T: 1 # how many timesteps to predict
+  T: 4 # how many timesteps to predict
   logger: 'debug'
 
   # what to use as input to prediction model
@@ -87,9 +87,9 @@ model:
   O_im_order: ['camera']
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
-  num_O: 1
+  num_O: 4
 
-  center_O_im: True
+  center_O_im: False
   control_range:
     lower: [0.0, -1.0, -1.57]
     upper: [1.0, 1.0, 1.57]
@@ -106,7 +106,7 @@ model:
   batch_size: 64
   pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 0 # L2 regularization
+  reg: 1.0e-3 # L2 regularization
 
   # Train schedule
   steps: 1000
@@ -114,7 +114,7 @@ model:
   reset_steps: 10000
   display_steps: 50
   val_pct: 0.1 # Percent of the data stored as validation
-  val_freq: 0.2 # How often you compute validation (percentage)
+  val_freq: 0.5 # How often you compute validation (percentage)
   val_steps: 5  # How many steps you do on validation
   val_dropout: True # Whether you use dropout during validation
 
@@ -161,12 +161,12 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [20, 0., 0.] # TODO
+      weight: [20., 0., 0.] # TODO
       std_weight: 0.0
       pre_activation: True
     
     control_cost:
-      des: [0.6, 0., 0.] # TODO: hard-coded order: steering then speed
+      des: [0.8, 0., 0.] # TODO: hard-coded order: steering then speed
       cost: square
       weight: [1., 0.0, 0.0]
       # TODO uncertainty
@@ -176,14 +176,14 @@ planning:
   planner_type: 'random' # random / primitives / cem
   
   control_range:
-    lower: [0.6, 0, 0]
-    upper: [0.6, 0, 0]
+    lower: [0.0, -1, 0]
+    upper: [1.0, 1, 0]
 
   random:
-    K: 1 # number of actions to sample from
+    K: 512 # number of actions to sample from
 
   epsilon_greedy:
-    endpoints: [[0, 1.0], [4, 1.0], [8, 0.0], [40, 0.00]]
+    endpoints: [[0, 1.0], [6, 1.0], [12, 0.0], [40, 0.00]]
     outside_value: 0.01
 
   control_noise:
@@ -193,13 +193,12 @@ planning:
     gaussian:
       std: [0.1, 0.1, 0.1]
     uniform:
-#      lower: [-0.1, -0.1, 0.0]
-#      upper: [0.1, 0.1, 0.0]
+      lower: [0.0, 0.0, 0.0]
+      upper: [0.0, 0.0, 0.0]
       lower: [0.0, 0.0, 0.0]
       upper: [0.0, 0.0, 0.0]
 
   visualize: False
-
   teleop: False
 
 ######################################################

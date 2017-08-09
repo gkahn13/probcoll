@@ -78,7 +78,7 @@ class PolicyRandomPlanningBebop2d(PolicyRandomPlanning):
             action_noisy,
             coll_costs,
             control_costs):
-        # print 'action: {0}'.format(action)
+        print 'action: {0}'.format(action)
         # print 'action_considered: {0}'.format(actions_considered)
         print 'coll_costs: {0}'.format(coll_costs)
         print 'control_costs: {0}'.format(control_costs)
