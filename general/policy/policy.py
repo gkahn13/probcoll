@@ -18,8 +18,8 @@ class Policy(object):
         self.reset_ops = []
         with self.probcoll_model.graph.as_default():
             self._t = tf.placeholder(tf.int32, [])
-        self.action, self.actions_considered, self.O_im_input, \
-                self.O_vec_input, self.control_costs, self.coll_costs\
+        self.action, self.actions_considered, self.O_im_input, self.O_vec_input,\
+                self.control_costs, self.coll_costs, self.avg_cost\
             = self._setup_action()
         self._setup_noise()
         
@@ -38,7 +38,7 @@ class Policy(object):
                 outside_value=self.params['control_noise']['outside_value'])
             self.noise_multiplier_ph = tf.placeholder(self.dtype, [])
             def get_noisy_action():
-                action, _, _, _, _, _ = self._setup_action()
+                action, _, _, _, _, _, _ = self._setup_action()
                 noise_type = self.params['control_noise']['type']
                 if noise_type == 'zero':
                     return action
@@ -74,6 +74,22 @@ class Policy(object):
             coll_costs,
             control_costs):
         pass
+
+    def get_value(self, obs_frame, t=0):
+        o_im_input = []
+        o_vec_input = []
+        for o in obs_frame:
+            o_im_input.append(o[self.probcoll_model.O_im_idxs()])
+            o_vec_input.append(o[self.probcoll_model.O_vec_idxs()])
+        o_im_input = np.concatenate(o_im_input).reshape(1, -1)
+        o_vec_input = np.concatenate(o_vec_input).reshape(1, -1)
+        feed_dict = {
+                self.O_im_input: o_im_input.astype(np.uint8),
+                self.O_vec_input: o_vec_input,
+                self._t: t
+            }
+        avg_cost, = self.probcoll_model.sess.run([self.avg_cost], feed_dict)
+        return -1 * avg_cost
 
     def act(self, obs_frame, t, time_step=0, only_noise=False, only_no_noise=False, visualize=False):
         assert(not only_noise or not only_no_noise)

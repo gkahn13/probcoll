@@ -84,13 +84,11 @@ class DpMulintRNNCell(DpRNNCell):
             Wx = tf.matmul(inputs, self._weights_W)
             Uz = tf.matmul(state, self._weights_U)
             if self._use_layer_norm:
-#                Wx = tf_utils.layer_norm(
                 Wx = tf.contrib.layers.layer_norm(
                     Wx,
                     center=False,
                     scale=False)
-#                Uz = tf_utils.layer_norm(
-                Uz = tf.contrib.layer.layer_norm(
+                Uz = tf.contrib.layers.layer_norm(
                     Uz,
                     center=False,
                     scale=False)
@@ -209,12 +207,10 @@ class DpMulintLSTMCell(DpLSTMCell):
             Wx = tf.matmul(inputs, self._weights_W)
             Uz = tf.matmul(h, self._weights_U)
             if self._use_layer_norm:
-#                Wx = tf_utils.layer_norm(
                 Wx = tf.contrib.layers.layer_norm(
                     Wx,
                     center=False,
                     scale=False)
-#                Uz = tf_utils.layer_norm(
                 Uz = tf.contrib.layers.layer_norm(
                     Uz,
                     center=False,

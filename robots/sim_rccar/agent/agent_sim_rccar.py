@@ -26,8 +26,9 @@ class AgentSimRCcar(Agent):
                     params['sim']['sim_env']))
 
         self._curr_rollout_t = 0
-        self.reset()
+        self._done = False
         self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+        self.reset()
 
     def sample_policy(self, policy, T=1, time_step=0, is_testing=False, only_noise=False):
         visualize = params['planning'].get('visualize', False)
@@ -74,18 +75,26 @@ class AgentSimRCcar(Agent):
 
             if self._done:
                 self._curr_rollout_t = 0
-                self.reset()
+                self.reset(is_testing=is_testing)
                 break
             else:
                 self._curr_rollout_t += 1
 
         return sample_noise, sample_no_noise, t 
 
-    def reset(self, pos=None, ori=None, hard_reset=False):
-        self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
-        self._done = False
+    def get_value(self, policy, pos=None, ori=None):
+        self.reset(pos=pos, ori=ori, hard_reset=True)
+        o_t = self.get_observation()
+        self.last_n_obs.pop(0)
+        self.last_n_obs.append(o_t)
+        val = policy.get_value(obs_frame=self.last_n_obs)
+        return val
+
+    def reset(self, pos=None, ori=None, hard_reset=False, is_testing=False):
+        self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset, random_reset=not is_testing)
         if self._done or hard_reset:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+        self._done = False
 
     def get_observation(self):
         obs_sample = Sample(meta_data=params, T=1)

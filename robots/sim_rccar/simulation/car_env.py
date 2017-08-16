@@ -256,6 +256,16 @@ class CarEnv(DirectObject):
             self._restart_index = (self._restart_index + 1) % num
             return pos_hpr[:3], pos_hpr[3:]
 
+    def _next_random_restart_pos_hpr(self):
+        num = len(self._restart_pos)
+        if num == 0:
+            return None, None
+        else:
+            index = np.random.randint(num)
+            pos_hpr = self._restart_pos[index]
+            self._restart_index = (self._restart_index + 1) % num
+            return pos_hpr[:3], pos_hpr[3:]
+
     def _setup_light(self):
         alight = AmbientLight('ambientLight')
         alight.setColor(Vec4(0.5, 0.5, 0.5, 1))
@@ -271,7 +281,7 @@ class CarEnv(DirectObject):
         return (0.0, 0.0, 3.14)
 
     def _default_restart_pos():
-        return [self._default_pos() + self._default_hpr]
+        return [self._default_pos() + self._default_hpr()]
 
     def _get_speed(self):
         vel = self._vehicle.getCurrentSpeedKmHour() / 3.6
@@ -421,14 +431,17 @@ class CarEnv(DirectObject):
 
     # Environment functions
 
-    def reset(self, pos=None, hpr=None, hard_reset=False):
+    def reset(self, pos=None, hpr=None, hard_reset=False, random_reset=False):
         if self._do_back_up and not hard_reset and \
                 pos is None and hpr is None:
             if self._collision:
                 self._back_up()
         else:
             if pos is None and hpr is None:
-                pos, hpr = self._next_restart_pos_hpr()
+                if random_reset:
+                    pos, hpr = self._next_random_restart_pos_hpr()
+                else:
+                    pos, hpr = self._next_restart_pos_hpr()
             self._place_vehicle(pos=pos, hpr=hpr)
         self._collision = False
         return self._get_observation()

@@ -9,7 +9,7 @@ class CostColl(Cost):
     def __init__(self, params, control_range):
         self.weight = tf.constant(params['weight'])
         self.std_weight = params.get('std_weight', 0.)
-        self.range = np.maximum(control_range['upper'], np.array(control_range['upper']) - np.array(control_range['lower']))
+        self.range = np.array(control_range['upper'])
         self.pre_activation = params.get('pre_activation', False)
         if params['cost'] == "square":
             self.cost = tf.square

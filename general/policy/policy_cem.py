@@ -140,10 +140,11 @@ class PolicyCem(Policy):
                         coll_cost_fn,
                         control_range,
                         eps))
-
+                total_costs = control_costs + coll_costs
+                avg_cost = tf.reduce_mean(total_costs)
                 flat_end_action_seq = tf.reshape(action_seq[1:], (dU * (T - 1),))
                 next_mean = tf.concat([flat_end_action_seq, flat_end_action_seq[-dU:]], axis=0)
                 update_mean = tf.assign(mu, next_mean)
                 with tf.control_dependencies([update_mean]):
                     action = action_seq[0]
-                return action, u_samples, O_im_input, O_vec_input, control_costs, coll_costs 
+                return action, u_samples, O_im_input, O_vec_input, control_costs, coll_costs, avg_cost 

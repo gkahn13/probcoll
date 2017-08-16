@@ -9,7 +9,8 @@ class CostDesired(Cost):
     def __init__(self, params, control_range):
         self.des = tf.constant(params['des'])
         self.weight = tf.constant(params['weight'])
-        self.range = np.maximum(control_range['upper'], np.array(control_range['upper']) - np.array(control_range['lower']))
+        ran = np.array(control_range['upper']) - np.array(control_range['lower'])
+        self.range = np.clip(ran, a_min=1.e-3, a_max=np.inf)
         if params['cost'] == "square":
             self.cost = tf.square
         else:

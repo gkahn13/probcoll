@@ -124,7 +124,7 @@ def layer_norm(
         scale=True,
         reuse=None,
         trainable=True,
-        epsilon=1e-12,
+        epsilon=1e-4,
         scope=None):
     # TODO
     # Assumes that inputs is 2D
@@ -157,7 +157,7 @@ def layer_norm(
             scale=gamma,
             offset=beta,
             is_training=True,
-            epsilon=1e-4,
+            epsilon=epsilon,
             data_format='NCHW')
         outputs_reshaped = tf.transpose(outputs_T_reshaped, (1, 0, 2, 3))
         outputs = tf.reshape(outputs_reshaped, shape)

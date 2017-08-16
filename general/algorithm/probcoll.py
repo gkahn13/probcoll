@@ -25,8 +25,10 @@ class Probcoll:
             self.__class__.__name__,
             params['probcoll']['logger'],
             os.path.join(self._save_dir, 'dagger.txt'))
-        self._mpc_policy = self._create_mpc()
-        shutil.copy(params['yaml_path'], os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name'])))
+        self.policy = self._create_mpc()
+        new_yaml_path = os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name']))
+        if not os.path.exists(new_yaml_path):
+            shutil.copy(params['yaml_path'], new_yaml_path)
 
     @abc.abstractmethod
     def _setup(self):
@@ -34,7 +36,7 @@ class Probcoll:
         self.probcoll_model = None
         self._asynchprobcoll_model = None
         self._max_iter = None
-        self._agent = None
+        self.agent = None
         raise NotImplementedError('Implement in subclass')
 
     #########################
@@ -79,6 +81,9 @@ class Probcoll:
         """
         try:
             ### find last model file
+            samples_start_itr = 0
+            # Keeps track of how many rollouts have been done
+            self._time_step = 0
             for samples_start_itr in xrange(self._max_iter-1, -1, -1):
                 sample_file = self._itr_samples_file(samples_start_itr, create=False)
                 if os.path.exists(sample_file):
@@ -98,7 +103,7 @@ class Probcoll:
             if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
                 self._run_training(samples_start_itr)
             start_itr = samples_start_itr
-
+            self._time_step = self._num_timesteps * start_itr
             ### training loop
             for itr in xrange(start_itr, self._max_iter):
                 self._run_itr(itr)
@@ -122,7 +127,7 @@ class Probcoll:
     def close(self):
         for p in self._jobs:
             p.kill()
-        self._agent.close()
+        self.agent.close()
         self.probcoll_model.close()
     
     def _run_training(self, itr):
@@ -141,8 +146,6 @@ class Probcoll:
         pass
 
     def _run_rollout(self, itr):
-        if itr == 0:
-            self._agent.reset()
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
         self._logger.info('\t\tStarting itr {0}'.format(itr))
@@ -151,8 +154,8 @@ class Probcoll:
         start = time.time()
         while iteration_steps < self._num_timesteps:
             max_T = min(T, self._num_timesteps - iteration_steps) 
-            sample_noise, sample_no_noise, t = self._agent.sample_policy(
-                self._mpc_policy,
+            sample_noise, sample_no_noise, t = self.agent.sample_policy(
+                self.policy,
                 T=max_T,
                 time_step=self._time_step,
                 only_noise=label_with_noise)
@@ -177,20 +180,21 @@ class Probcoll:
         self._itr_save_samples(itr, samples)
 
     def run_testing(self, itr):
-        if (itr == self._max_iter - 1 \
-                or itr % params['probcoll']['testing']['itr_freq'] == 0): 
+        if itr >= params['probcoll']['training_start_iter']\
+                and ((itr == self._max_iter - 1 or itr == 0 \
+                or (itr - 1) % params['probcoll']['testing']['itr_freq'] == 0)): 
             self._logger.info('Itr {0} testing'.format(itr))
             if self._async_on:
                 self._logger.debug('Recovering probcoll model')
                 self.probcoll_model.recover()
             T = params['probcoll']['T']
             samples = []
-            self._agent.reset()
+            self.agent.reset()
             total_time = 0
             start = time.time()
             for cond in xrange(params['probcoll']['testing']['num_rollout']):
-                _, sample_no_noise, t = self._agent.sample_policy(
-                    self._mpc_policy,
+                _, sample_no_noise, t = self.agent.sample_policy(
+                    self.policy,
                     T=T,
                     is_testing=True)
                 total_time += t

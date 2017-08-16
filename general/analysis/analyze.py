@@ -8,14 +8,17 @@ from config import params, load_params
 
 class Analyze:
 
-    def __init__(self, on_replay=False, parent_exp_dir=None):
-        self.on_replay = on_replay
-        self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
+    def __init__(self, on_replay=False, save_dir=None):
+        if save_dir is None:
+            self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
+        else:
+            self._save_dir = save_dir
 
         yaml_path = self._get_yaml(self._save_dir)
         load_params(yaml_path)
         params['yaml_path'] = yaml_path
-
+        
+        self.on_replay = on_replay
         if self.on_replay:
             self._save_dir = os.path.join(self._save_dir, 'replay')
 
@@ -64,6 +67,11 @@ class Analyze:
     @property
     def _plot_pred_mean_file(self):
         return os.path.join(self._save_dir, self._image_folder, 'pred_mean_{0}.png'.format(params['exp_name']))
+
+    def _plot_get_stats_file(self, prefix='', testing=False):
+        if testing:
+            prefix = prefix + '_testing'
+        return os.path.join(self._save_dir, self._image_folder, '{0}_stats_{1}.png'.format(prefix, params['exp_name']))
 
     @property
     def _plot_pred_std_file(self):
@@ -153,4 +161,7 @@ class Analyze:
 
     @abc.abstractmethod
     def run(self):
+        raise NotImplementedError('Implement in subclass')
+
+    def run_testing(self):
         raise NotImplementedError('Implement in subclass')

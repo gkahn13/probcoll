@@ -1,7 +1,6 @@
 from general.tf import tf_utils
 import tensorflow as tf
 
-#TODO batch norm
 def fcnn(
         inputs,
         params,
@@ -42,6 +41,7 @@ def fcnn(
     hidden_layers = params.get('hidden_layers', [])
     output_dim = params['output_dim']
     dropout = params.get('dropout', None)
+    normalizer = params.get('normalizer', None)
     if dp_masks is not None or dropout is None:
         dp_return_masks = None
     else:
@@ -57,7 +57,7 @@ def fcnn(
                 activation = output_activation
             else:
                 activation = hidden_activation
-            if params.get('use_batch_norm', False):
+            if normalizer == 'batch_norm':
                 normalizer_fn = tf.contrib.layers.batch_norm
                 scale = not (activation == tf.nn.relu or activation is None) 
                 normalizer_params = {
@@ -66,11 +66,22 @@ def fcnn(
                         'fused': True,
                         'decay': params.get('batch_norm_decay', 0.999),
                         'zero_debias_moving_mean': True,
-                        'scale': scale
+                        'scale': scale,
+                        'center': True
                     }
-            else:
+            elif normalizer == 'layer_norm':
+                normalizer_fn = tf.contrib.layers.layer_norm
+                scale = not (activation == tf.nn.relu or activation is None) 
+                normalizer_params = {
+                        'scale': scale,
+                        'center': True
+                    }
+            elif normalizer is None:
                 normalizer_fn = None
                 normalizer_params = None
+            else:
+                raise NotImplementedError(
+                    'Normalizer {0} is not valid'.format(normalizer))
             next_layer_input = tf.contrib.layers.fully_connected(
                 inputs=next_layer_input,
                 num_outputs=dim,

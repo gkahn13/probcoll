@@ -48,6 +48,7 @@ class PolicyRandomPlanning(Policy):
                 coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
 
                 total_cost = control_costs + coll_costs
+                avg_cost = tf.reduce_mean(total_cost)
                 index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
                 action = u_samples[index, 0]
-                return action, u_samples, O_im_input, O_vec_input, control_costs, coll_costs 
+                return action, u_samples, O_im_input, O_vec_input, control_costs, coll_costs, avg_cost 

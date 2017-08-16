@@ -56,9 +56,9 @@ class ProbcollModel:
         self.dO_vec = len(self.O_vec_idxs()) * self.num_O
         self.doutput = len(self.output_idxs())
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
-        self._string_input_capacity = 64
-        self._shuffle_batch_capacity = 128 * self.batch_size
-        self.preprocess_fnames = []
+        self.dropout = params["model"]["rnn_graph"].get("dropout", None)
+        self._string_input_capacity = 16
+        self._shuffle_batch_capacity = 32 * self.batch_size
         self.threads = []
         self.graph = tf.Graph()
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
@@ -69,16 +69,9 @@ class ProbcollModel:
             gpu_options=gpu_options,
             log_device_placement=False,
             allow_soft_placement=True)
-        # config.intra_op_parallelism_threads = 1
-        # config.inter_op_parallelism_threads = 1
         with self.graph.as_default():
             tf.set_random_seed(self.random_seed)
             self.sess = tf.Session(config=config)
-        self._control_width = np.array(self.control_range["upper"]) - \
-            np.array(self.control_range["lower"])
-        self._control_mean = (np.array(self.control_range["upper"]) + \
-            np.array(self.control_range["lower"]))/2.
-        self.dropout = params["model"]["action_graph"].get("dropout", None)
 
         code_file_exists = os.path.exists(self._code_file)
         if code_file_exists:
@@ -141,20 +134,21 @@ class ProbcollModel:
         for key in ('U', 'O'):
             d[key] = params[key]
 
-        for key in ('image_graph', 'action_graph', 'output_graph'):
-            d[key] = pm_params[key]['graph_type']
-
         return hashlib.md5(str(d)).hexdigest()
 
-    def _next_model_file(self):
+    def get_train_itr(self):
         latest_file = tf.train.latest_checkpoint(
             self._checkpoints_dir)
         if latest_file is None:
-            next_num = 0
+            itr = -1
         else:
             # File should be some number.ckpt
-            num = int(os.path.splitext(os.path.basename(latest_file))[0])
-            next_num = num + 1
+            itr = int(os.path.splitext(os.path.basename(latest_file))[0])
+        return itr
+
+    def _next_model_file(self):
+        num = self.get_train_itr()
+        next_num = num + 1 
         return os.path.join(
             self._checkpoints_dir,
             "{0:d}.ckpt".format(next_num)), next_num
@@ -432,7 +426,7 @@ class ProbcollModel:
     ### Graph ###
     #############
 
-    def _graph_inputs_outputs_from_file(self, name):
+    def _graph_inputs_outputs_from_data(self, name):
         with tf.name_scope(name + '_file_input'):
             with tf.device('/cpu:0'):
                 filename_vars = (
@@ -451,15 +445,15 @@ class ProbcollModel:
                 filename_queues = (
                         tf.train.string_input_producer(
                             filename_vars[0],
-                            capacity=self._string_input_capacity),
+                            capacity=self._string_input_capacity,
+                            shuffle=True),
                         tf.train.string_input_producer(
                             filename_vars[1],
-                            capacity=self._string_input_capacity)
+                            capacity=self._string_input_capacity,
+                            shuffle=True)
                     )
 
                 ### read and decode
-                readers = [tf.TFRecordReader(), tf.TFRecordReader()]
-
                 features = {}
                 
                 features['fname'] = tf.FixedLenFeature([], tf.string)
@@ -475,30 +469,39 @@ class ProbcollModel:
                 bootstrap_O_vec_inputs = []
                 bootstrap_outputs = []
                 bootstrap_lens = []
-
+                
                 coll_batch_size = int(self.batch_size * self.pct_coll)
                 no_coll_batch_size = self.batch_size - coll_batch_size
                 batch_sizes = [no_coll_batch_size, coll_batch_size]
-                for fq, reader, batch_size in zip(filename_queues, readers, batch_sizes):
-                    serialized_examples = [reader.read(fq)[1] for b in xrange(self.num_bootstrap)]
-                    parsed_example = [
-                            tf.parse_single_example(serialized_examples[b], features=features)
-                            for b in xrange(self.num_bootstrap)
-                        ]
-                    bootstrap_fname = [parsed_example[b]['fname'] for b in xrange(self.num_bootstrap)]
-                    bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
-                                         for b in xrange(self.num_bootstrap)]
-                    bootstrap_O_im_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O_im'], tf.uint8), (self.dO_im,))
-                                         for b in xrange(self.num_bootstrap)]
-                    bootstrap_O_vec_input = [tf.reshape(parsed_example[b]['O_vec'], (self.dO_vec,))
-                                         for b in xrange(self.num_bootstrap)]
-                    bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in xrange(self.num_bootstrap)]
-                    bootstrap_len = [tf.reshape(parsed_example[b]['len'], ())
-                                     for b in xrange(self.num_bootstrap)]
-                    inputs = tuple(bootstrap_fname + bootstrap_U_input + bootstrap_O_im_input + bootstrap_O_vec_input + bootstrap_output + bootstrap_len)
+                num_reading_threads = params['model'].get('num_reading_threads', 4)
+                coll_num_threads = int(num_reading_threads * self.pct_coll)
+                no_coll_num_threads = num_reading_threads - coll_num_threads
+                num_threads = [no_coll_num_threads, coll_num_threads]
+                for fq, batch_size, num_thread in zip(filename_queues, batch_sizes, num_threads):
+                    input_list = []
+                    for _ in range(num_thread):
+                        reader = tf.TFRecordReader() 
+                        serialized_examples = [reader.read(fq)[1] for b in range(self.num_bootstrap)]
+                        parsed_example = [
+                                tf.parse_single_example(serialized_examples[b], features=features)
+                                for b in range(self.num_bootstrap)
+                            ]
+                        bootstrap_fname = [parsed_example[b]['fname'] for b in range(self.num_bootstrap)]
+                        bootstrap_U_input = [tf.reshape(parsed_example[b]['U'], (self.T, self.dU))
+                                             for b in range(self.num_bootstrap)]
+                        bootstrap_O_im_input = [tf.reshape(tf.decode_raw(parsed_example[b]['O_im'], tf.uint8), (self.dO_im,))
+                                             for b in range(self.num_bootstrap)]
+                        bootstrap_O_vec_input = [tf.reshape(parsed_example[b]['O_vec'], (self.dO_vec,))
+                                             for b in range(self.num_bootstrap)]
+                        bootstrap_output = [tf.reshape(tf.decode_raw(parsed_example[b]['output'], tf.uint8), (self.T, self.doutput))  for b in range(self.num_bootstrap)]
+                        bootstrap_len = [tf.reshape(parsed_example[b]['len'], ())
+                                         for b in range(self.num_bootstrap)]
+                        inputs = tuple(bootstrap_fname + bootstrap_U_input + bootstrap_O_im_input + bootstrap_O_vec_input + bootstrap_output + bootstrap_len)
 
-                    shuffled = tf.train.shuffle_batch(
-                        inputs,
+                        input_list.append(inputs)
+
+                    shuffled = tf.train.shuffle_batch_join(
+                        input_list,
                         batch_size=batch_size,
                         capacity=self._shuffle_batch_capacity,
                         min_after_dequeue=10*batch_size)
@@ -528,10 +531,10 @@ class ProbcollModel:
 
     def _graph_inputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
-            U_inputs = tf.placeholder(self.dtype, [None, self.T, self.dU])
-            O_im_input = tf.placeholder(tf.uint8, [1, self.dO_im])
-            O_vec_input = tf.placeholder(self.dtype, [1, self.dO_vec])
-        return U_inputs, O_im_input, O_vec_input
+            U_ph = tf.placeholder(self.dtype, [None, self.T, self.dU])
+            O_im_ph = tf.placeholder(tf.uint8, [1, self.dO_im])
+            O_vec_ph = tf.placeholder(self.dtype, [1, self.dO_vec])
+        return U_ph, O_im_ph, O_vec_ph
 
     def get_embedding(self, observation_im, observation_vec, batch_size=1, reuse=False, scope=None, is_training=True):
         obg_type = params["model"]["image_graph"]["graph_type"]
@@ -622,23 +625,23 @@ class ProbcollModel:
         num_bootstrap = params['model']['num_bootstrap']
         bootstrap_output_mats = []
         bootstrap_output_preds = []
-        ag_type = params["model"]["action_graph"]["graph_type"]
+        rnn_type = params["model"]["rnn_graph"]["graph_type"]
 
-        if ag_type == "fc":
-            action_graph = fcnn
+        if rnn_type == "fc":
+            rnn_graph = fcnn
             recurrent = False
-        elif ag_type == "rnn":
-            action_graph = rnn
+        elif rnn_type == "rnn":
+            rnn_graph = rnn
             recurrent = True
         else:
             raise NotImplementedError(
-                "Action graph {0} is not valid".format(ag_type))
+                "RNN graph {0} is not valid".format(rnn_type))
 
         if recurrent:
             assert(self.dO_im + self.dO_vec > 0)
 
         with tf.name_scope(name + '_inference'):
-            for b in xrange(num_bootstrap):
+            for b in range(num_bootstrap):
                 ### inputs
                 u_input_b = bootstrap_U_inputs[b]
                 o_im_input_b = bootstrap_O_im_inputs[b]
@@ -655,10 +658,20 @@ class ProbcollModel:
                             control_mean)
                         u_input_b = tf.cast((u_input_b - control_mean) / control_width, self.dtype)
 
+                        u_input_b, _  = fcnn(
+                            tf.reshape(u_input_b, [batch_size * self.T, self.dU]),
+                            params["model"]["action_graph"],
+                            dtype=self.dtype,
+                            is_training=is_training,
+                            scope="action_graph_b{0}".format(b),
+                            reuse=reuse)
+                        
+                        d_action = params['model']['action_graph']['output_dim']
+
                         if recurrent:
-                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T, self.dU])
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T, d_action])
                         else:
-                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T * self.dU])
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T * d_action])
 
                         concat_list.append(u_input_flat_b)
 
@@ -681,41 +694,41 @@ class ProbcollModel:
                         input_layer = tf.concat(concat_list, axis=1)
 
                     if name == 'val' and not self.val_dropout:
-                        act_params = copy.deepcopy(params['model']['action_graph'])
+                        act_params = copy.deepcopy(params['model']['rnn_graph'])
                         act_params['dropout'] = None
                     else:
-                        act_params = params['model']['action_graph']
+                        act_params = params['model']['rnn_graph']
                     if recurrent:
-                        ag_output, _  = action_graph(
+                        rnn_output, _  = rnn_graph(
                             inputs=input_layer,
                             initial_state=initial_state,
                             params=act_params,
                             dtype=self.dtype,
-                            scope="action_graph_b{0}".format(b),
+                            scope="rnn_graph_b{0}".format(b),
                             reuse=reuse)
                     else:
-                        ag_output, _  = action_graph(
+                        rnn_output, _  = rnn_graph(
                             inputs=input_layer,
                             params=act_params,
                             dtype=self.dtype,
-                            scope="action_graph_b{0}".format(b),
+                            scope="rnn_graph_b{0}".format(b),
                             reuse=reuse)
 
                     if recurrent:
-                        ag_output = tf.reshape(
-                            ag_output,
-                            (batch_size * self.T, int(ag_output.get_shape()[-1])))
+                        rnn_output = tf.reshape(
+                            rnn_output,
+                            (batch_size * self.T, int(rnn_output.get_shape()[-1])))
                     else:
-                        ag_output = tf.reshape(
-                            ag_output,
-                            (batch_size * self.T, int(ag_output.get_shape()[-1])/self.T))
+                        rnn_output = tf.reshape(
+                            rnn_output,
+                            (batch_size * self.T, int(rnn_output.get_shape()[-1])/self.T))
 
                     # Dropout should never be put on outputgraph
                     # Outputgraph should always have output with self.doutput dimension
                     params["model"]["output_graph"]["output_dim"] = self.doutput
                     params["model"]["output_graph"]["dropout"] = None
                     output_mat_b, _  = fcnn(
-                        ag_output,
+                        rnn_output,
                         params["model"]["output_graph"],
                         dtype=self.dtype,
                         is_training=is_training,
@@ -747,17 +760,17 @@ class ProbcollModel:
         dp_masks = []
         given_initial_states = bootstrap_initial_states is not None
         num_bootstrap = params['model']['num_bootstrap']
-        ag_type = params["model"]["action_graph"]["graph_type"]
+        rnn_type = params["model"]["rnn_graph"]["graph_type"]
 
-        if ag_type == "fc":
-            action_graph = fcnn
+        if rnn_type == "fc":
+            rnn_graph = fcnn
             recurrent = False
-        elif ag_type == "rnn":
-            action_graph = rnn
+        elif rnn_type == "rnn":
+            rnn_graph = rnn
             recurrent = True
         else:
             raise NotImplementedError(
-                "Action graph {0} is not valid".format(ag_type))
+                "RNN graph {0} is not valid".format(rnn_type))
 
         if recurrent:
             assert(self.dO_im + self.dO_vec > 0 or given_initial_states)
@@ -769,27 +782,38 @@ class ProbcollModel:
             o_im_input_b = O_im_input
             o_vec_input_b = O_vec_input
 
-            base_concat_list = []
+#            base_concat_list = []
 
-            if self.dU > 0:
-                control_mean = (np.array(params['model']['control_range']['lower']) + \
-                    np.array(params['model']['control_range']['upper']))/2.
-                control_width = (np.array(params['model']['control_range']['upper']) - \
-                    control_mean)
-                u_input_b = tf.cast((u_input_b - control_mean) / control_width, self.dtype)
-
-                if recurrent:
-                    u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T, self.dU])
-                else:
-                    u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T * self.dU])
-
-                base_concat_list.append(u_input_flat_b)
-
-            for b in xrange(num_bootstrap):
-                concat_list = copy.copy(base_concat_list)
+            for b in range(num_bootstrap):
+                concat_list = []
+#                concat_list = copy.copy(base_concat_list)
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
+                    
+                    if self.dU > 0:
+                        control_mean = (np.array(params['model']['control_range']['lower']) + \
+                            np.array(params['model']['control_range']['upper']))/2.
+                        control_width = (np.array(params['model']['control_range']['upper']) - \
+                            control_mean)
+                        u_input_b = tf.cast((u_input_b - control_mean) / control_width, self.dtype)
+                        u_input_b, _  = fcnn(
+                            tf.reshape(u_input_b, [batch_size * self.T, self.dU]),
+                            params["model"]["action_graph"],
+                            dtype=self.dtype,
+                            is_training=False,
+                            scope="action_graph_b{0}".format(b),
+                            reuse=reuse)
+                       
+                        d_action = params['model']['action_graph']['output_dim']
 
+                        if recurrent:
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T, d_action])
+                        else:
+                            u_input_flat_b = tf.reshape(u_input_b, [batch_size, self.T * d_action])
+
+                        concat_list.append(u_input_flat_b)
+
+                    
                     if given_initial_states:
                         if isinstance(bootstrap_initial_states, list):
                             if bootstrap_initial_states[b].get_shape()[0].value == 1:
@@ -819,62 +843,62 @@ class ProbcollModel:
 
                     if b > 0:
                         if recurrent:
-                            ag_output, action_dp_masks = action_graph(
+                            rnn_output, rnn_dp_masks = rnn_graph(
                                 inputs=input_layer,
                                 initial_state=initial_state,
-                                params=params["model"]["action_graph"],
+                                params=params["model"]["rnn_graph"],
                                 dp_masks=dp_masks,
                                 num_dp=num_dp,
                                 dtype=self.dtype,
-                                scope="action_graph_b{0}".format(b),
+                                scope="rnn_graph_b{0}".format(b),
                                 reuse=reuse)
                         else:
-                            ag_output, action_dp_masks = action_graph(
+                            rnn_output, rnn_dp_masks = rnn_graph(
                                 inputs=input_layer,
-                                params=params["model"]["action_graph"],
+                                params=params["model"]["rnn_graph"],
                                 dp_masks=dp_masks,
                                 num_dp=num_dp,
                                 dtype=self.dtype,
-                                scope="action_graph_b{0}".format(b),
+                                scope="rnn_graph_b{0}".format(b),
                                 reuse=reuse)
 
                     else:
                         if recurrent:
-                            ag_output, action_dp_masks = action_graph(
+                            rnn_output, rnn_dp_masks = rnn_graph(
                                 inputs=input_layer,
                                 initial_state=initial_state,
-                                params=params["model"]["action_graph"],
+                                params=params["model"]["rnn_graph"],
                                 num_dp=num_dp,
                                 dtype=self.dtype,
-                                scope="action_graph_b{0}".format(b),
+                                scope="rnn_graph_b{0}".format(b),
                                 reuse=reuse)
                         else:
-                            ag_output, action_dp_masks = action_graph(
+                            rnn_output, rnn_dp_masks = rnn_graph(
                                 inputs=input_layer,
-                                params=params["model"]["action_graph"],
+                                params=params["model"]["rnn_graph"],
                                 num_dp=num_dp,
                                 dtype=self.dtype,
-                                scope="action_graph_b{0}".format(b),
+                                scope="rnn_graph_b{0}".format(b),
                                 reuse=reuse)
 
                         if self.dropout is not None:
-                            dp_masks += action_dp_masks
+                            dp_masks += rnn_dp_masks
 
                     if recurrent:
-                        ag_output = tf.reshape(
-                            ag_output,
-                            (batch_size * self.T, int(ag_output.get_shape()[-1])))
+                        rnn_output = tf.reshape(
+                            rnn_output,
+                            (batch_size * self.T, int(rnn_output.get_shape()[-1])))
                     else:
-                        ag_output = tf.reshape(
-                            ag_output,
-                            (batch_size * self.T, int(ag_output.get_shape()[-1])/self.T))
+                        rnn_output = tf.reshape(
+                            rnn_output,
+                            (batch_size * self.T, int(rnn_output.get_shape()[-1])/self.T))
 
                     # Dropout should never be put on outputgraph
                     # Outputgraph should always have output with self.doutput dimension
                     params["model"]["output_graph"]["output_dim"] = self.doutput
                     params["model"]["output_graph"]["dropout"] = None
                     output_mat_b, _  = fcnn(
-                        ag_output,
+                        rnn_output,
                         params["model"]["output_graph"],
                         dtype=self.dtype,
                         is_training=False,
@@ -915,8 +939,11 @@ class ProbcollModel:
             num_errs_on_coll = 0
             num_nocoll = 0
             num_errs_on_nocoll = 0
-            for b, (output_mat_b, output_b, length_b) in enumerate(zip(bootstrap_output_mats, bootstrap_outputs, bootstrap_lengths)):
+            for b in range(self.num_bootstrap):
 
+                output_mat_b = bootstrap_output_mats[b]
+                output_b = bootstrap_outputs[b]
+                length_b = bootstrap_lengths[b]
                 output_b = tf.cast(output_b, self.dtype)
                 output_pred_b = tf.nn.sigmoid(output_mat_b)
 
@@ -933,12 +960,15 @@ class ProbcollModel:
                             dtype=self.dtype)] * self.doutput,
                         2)
                     factor = tf.reduce_sum(all_mask * output_b) / tf.reduce_sum(tf.cast(tf.reduce_sum(length_b), self.dtype))
-                    coll_weight = (self.coll_weight_pct - self.coll_weight_pct * factor) / (factor - self.coll_weight_pct * factor) 
-                    one_mask = tf.one_hot(
-                        tf.cast(length_b - 1, tf.int32),
-                        self.T) * (coll_weight - 1.)
-                    one_mask_coll = tf.stack([one_mask] * self.doutput, 2) * output_b
-                    mask = all_mask + one_mask_coll
+                    if hasattr(self, 'coll_weight_pct'):
+                        coll_weight = (self.coll_weight_pct - self.coll_weight_pct * factor) / (factor - self.coll_weight_pct * factor) 
+                        one_mask = tf.one_hot(
+                            tf.cast(length_b - 1, tf.int32),
+                            self.T) * (coll_weight - 1.)
+                        one_mask_coll = tf.stack([one_mask] * self.doutput, 2) * output_b
+                        mask = all_mask + one_mask_coll
+                    else:
+                        mask = all_mask
                 else:
                     raise NotImplementedError(
                         "Mask {0} is not valid".format(
@@ -1042,7 +1072,7 @@ class ProbcollModel:
             ### prepare for training
             for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
                 d['fnames'], d['U_inputs'], d['O_im_inputs'], d['O_vec_inputs'], d['outputs'], d['len'], \
-                queues, queue_vars = self._graph_inputs_outputs_from_file(name)
+                queues, queue_vars = self._graph_inputs_outputs_from_data(name)
                 d['no_coll_queue'], d['coll_queue'] = queues
                 d['no_coll_dequeue'], d['coll_dequeue'] = self._graph_dequeue(*queues)
                 d['no_coll_queue_var'], d['coll_queue_var'] = queue_vars
@@ -1133,7 +1163,7 @@ class ProbcollModel:
             if len(tfrecords_fnames) > 0:
                     self.sess.run(dequeue)
         # Flush data queues
-        for _ in xrange(int(self._shuffle_batch_capacity / self.batch_size)):
+        for _ in range(int(self._shuffle_batch_capacity / self.batch_size)):
             self.sess.run([self.d_train['U_inputs'], self.d_val['U_inputs']])
 
     def train(self, reset=False, **kwargs):
@@ -1198,7 +1228,7 @@ class ProbcollModel:
             train_fnames_dict = defaultdict(int)
 
             step = 0
-            epoch_start = save_start = time.time()
+            epoch_start = save_start = train_start = time.time()
             if reset:
                 itr_steps = self.reset_steps
             else:
@@ -1248,15 +1278,14 @@ class ProbcollModel:
                     plotter.add_val('cross_entropy', np.mean(val_values['cross_entropy']))
 
                     self._logger.info(
-                        'error: {0:5.2f}%, error coll: {1:5.2f}%, error nocoll: {2:5.2f}%, pct coll: {3:4.1f}%, cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} s per {7:04d} samples)'.format(
+                        'error: {0:5.2f}%, error coll: {1:5.2f}%, error nocoll: {2:5.2f}%, pct coll: {3:4.1f}%, cost: {4:4.2f}, ce: {5:4.2f} ({6:.2f} samples / s)'.format(
                             100 * np.mean(val_values['err']),
                             100 * np.mean(val_values['err_coll']),
                             100 * np.mean(val_values['err_nocoll']),
                             100 * val_nums['coll'] / (val_nums['coll'] + val_nums['nocoll']),
                             np.mean(val_values['cost']),
                             np.mean(val_values['cross_entropy']),
-                            time.time() - epoch_start,
-                            int((self.val_freq * itr_steps + self.val_steps ) * self.batch_size)))
+                            float((self.val_freq * itr_steps + self.val_steps ) * self.batch_size) /  (time.time() - epoch_start)))
 
                     epoch_start = time.time()
 
@@ -1321,6 +1350,9 @@ class ProbcollModel:
 
                 step += 1
 
+            self._logger.info('Training Speed: {0:.2f} samples / s'.format(
+                float((itr_steps + self.val_steps / self.val_freq) * self.batch_size) /  (time.time() - train_start)))
+            
             # Logs the number of times files were accessed
             fnames_condensed = defaultdict(int)
             for k, v in train_fnames_dict.items():
@@ -1356,6 +1388,12 @@ class ProbcollModel:
     def load(self, model_file):
         self.saver.restore(self.sess, model_file)
 
+    def load_itr(self, itr):
+        f = os.path.join(
+            self._checkpoints_dir,
+            "{0:d}.ckpt".format(itr))
+        self.load(f)
+        
     def save(self, model_file):
         self._logger.debug("Saving checkpoint")
         self.saver.save(self.sess, model_file, write_meta_graph=False)

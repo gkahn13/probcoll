@@ -20,7 +20,7 @@ class PolicyRandomPlanningSimRCcar(PolicyRandomPlanning):
                 topics['debug_cost_probcoll'],
                 vm.MarkerArray,
                 queue_size=10)
-    
+            
     def visualize(
             self,
             actions_considered,

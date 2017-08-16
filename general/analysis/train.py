@@ -52,7 +52,7 @@ class Train:
                 if self.add_data:
                     self._probcoll_model.add_data(self._get_files())
                 self._probcoll_model.train()
-                self._probcoll.run_testing(params['world']['testing']['itr_freq'])
-                self._analyze.run()
+                self._probcoll.run_testing(0)
+                self._analyze.run_testing()
             finally:
                 self._probcoll.close()

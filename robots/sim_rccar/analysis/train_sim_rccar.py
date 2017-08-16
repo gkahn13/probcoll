@@ -13,4 +13,4 @@ class TrainSimRCcar(Train):
             else:
                 self._probcoll= ProbcollSimRCcar(save_dir=self._plot_dir, data_dir=self._data_dirs[0])
             self._probcoll_model = self._probcoll.probcoll_model
-            self._analyze = AnalyzeSimRCcar()
+            self._analyze = AnalyzeSimRCcar(save_dir=self._plot_dir)

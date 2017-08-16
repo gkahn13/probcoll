@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'cylinder_multi_speed'
+exp_name: 'cylinder_re_greg_batch'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,9 +10,9 @@ exp_name: 'cylinder_multi_speed'
 
 probcoll:
   dt: 0.25
-  T: 240 # timesteps per trajectory
+  T: 240  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 20
+  max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
@@ -32,7 +32,7 @@ probcoll:
 ######################
     
 model:
-  T: 8 # how many timesteps to predict
+  T: 12 # how many timesteps to predict
   logger: 'info' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
@@ -51,6 +51,7 @@ model:
   # Device
   device: 0
   gpu_fraction: 0.8
+  num_reading_threads: 4
 
   # Optimization
   learning_rate: 1.e-3
@@ -58,17 +59,17 @@ model:
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
   batch_size: 64
-  pct_coll: 0.75 # rebalancing trajectories
+  pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-5 # L2 regularization
+  reg: 0. # L2 regularization
   
   # Train schedule
   steps: 500
   reset_freq: 0 # 0 means no resetting
   reset_steps: 500
   display_steps: 50 
-  val_pct: 0.1 # Percent of the data stored as validation
-  val_freq: 0.1 # How often you compute validation (percentage)
+  val_pct: 0.0 # Percent of the data stored as validation
+  val_freq: 1.0 # How often you compute validation (percentage)
   val_steps: 5  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
 
@@ -85,18 +86,28 @@ model:
     kernels: [8, 4, 3]
     strides: [4, 2, 1]
     padding: 'SAME' 
-    use_batch_norm: True
-    batch_norm_decay: 0.9
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax 
+    normalizer: 'batch_norm'
+    batch_norm_decay: 0.9
   
   observation_graph:
-    use_batch_norm: True
-    batch_norm_decay: 0.9
-    output_activation: 'tanh'
+    hidden_layers: [256]
+    hidden_activation: 'relu'
     output_dim: 128 # This is the hidden size of the rnn
-  
+    output_activation: 'relu'
+    normalizer: 'batch_norm'
+    batch_norm_decay: 0.9
+
   action_graph:
+    hidden_layers: [16]
+    hidden_activation: 'relu'
+    output_dim: 16
+    output_activation: 'relu'
+    normalizer: 'batch_norm'
+    batch_norm_decay: 0.9
+
+  rnn_graph:
     graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
@@ -105,8 +116,9 @@ model:
       use_layer_norm: True
 
   output_graph: 
-    graph_type: 'fc'
-    use_batch_norm: True
+    hidden_layers: [16]
+    hidden_activation: 'relu'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
  
 #################################################
@@ -124,15 +136,15 @@ planning:
     control_cost:
       des: [0., 2.] # TODO: hard-coded order: steering then speed
       cost: square # square
-      weight: [0.0, 10.]     
+      weight: [0., 1.]     
 
   # Planner
   planner_type: 'random' # random / cem / random_policy
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-15., 2.]
-    upper: [15., 2.]
+    lower: [-15.,  2.]
+    upper: [ 15.,  2.]
 
   random:
     K: 4096 # number of actions to sample from
@@ -152,20 +164,19 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-15., 2.]
-      upper: [15., 2.]
-    endpoints: []
-    endpoints: [[0, 1.0], [1200, 0.0]]
-    outside_value: 0.0
+      lower: [-15.,  2.]
+      upper: [ 15.,  2.]
+    endpoints: [[0, 1.0],  [240, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
+    outside_value: 0.01
 
   control_noise:
-    endpoints: [[0, 1.0], [1200, 0.0]]
-    outside_value: 0.0
+    endpoints: [[0, 1.0],  [1.e+4, 0.2], [3.e+4, 0.02]]
+    outside_value: 0.02
 
     type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [3.0, 0.0]
+      std: [7.5, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
