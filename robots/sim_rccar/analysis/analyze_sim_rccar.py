@@ -10,6 +10,10 @@ from config import params
 
 class AnalyzeSimRCcar(Analyze):
 
+    def __init__(self, on_replay=False, save_dir=None, value_heat_map=False):
+        self._value_heat_map = value_heat_map
+        Analyze.__init__(self, on_replay=on_replay, save_dir=save_dir)
+
     #######################
     ### Data processing ###
     #######################
@@ -241,10 +245,11 @@ class AnalyzeSimRCcar(Analyze):
             self._plot_statistics(times=times, testing=True)
         except:
             self._logger.info('No testing trajectoreis were loaded to analyze')
-        try:
-            self._generate_value_heat_map()
-        except:
-            self._logger.info('Unable to generate value heat maps')
+        if self._value_heat_map:
+            try:
+                self._generate_value_heat_map()
+            except:
+                self._logger.info('Unable to generate value heat maps')
 
     def run_testing(self):
         try:

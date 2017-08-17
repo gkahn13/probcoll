@@ -664,7 +664,8 @@ class ProbcollModel:
                             dtype=self.dtype,
                             is_training=is_training,
                             scope="action_graph_b{0}".format(b),
-                            reuse=reuse)
+                            reuse=reuse,
+                            T=self.T)
                         
                         d_action = params['model']['action_graph']['output_dim']
 
@@ -733,7 +734,8 @@ class ProbcollModel:
                         dtype=self.dtype,
                         is_training=is_training,
                         scope="output_graph_b{0}".format(b),
-                        reuse=reuse)
+                        reuse=reuse,
+                        T=self.T)
 
                     output_mat_b = tf.reshape(output_mat_b, [batch_size, self.T, self.doutput])
                     # TODO not general because it assumes doutput = 1
@@ -802,7 +804,8 @@ class ProbcollModel:
                             dtype=self.dtype,
                             is_training=False,
                             scope="action_graph_b{0}".format(b),
-                            reuse=reuse)
+                            reuse=reuse,
+                            T=self.T)
                        
                         d_action = params['model']['action_graph']['output_dim']
 
@@ -903,7 +906,8 @@ class ProbcollModel:
                         dtype=self.dtype,
                         is_training=False,
                         scope="output_graph_b{0}".format(b),
-                        reuse=reuse)
+                        reuse=reuse,
+                        T=self.T)
 
                     output_mat_b = tf.reshape(output_mat_b, [batch_size, self.T, self.doutput])
                     # TODO not general because it assumes doutput = 1

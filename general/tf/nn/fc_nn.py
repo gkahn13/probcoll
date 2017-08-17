@@ -10,7 +10,8 @@ def fcnn(
         data_format='NCHW',
         scope='fcnn',
         reuse=False,
-        is_training=True):
+        is_training=True,
+        T=None):
     
     if 'hidden_activation' not in params:
         hidden_activation = None
@@ -66,7 +67,8 @@ def fcnn(
                         'fused': True,
                         'decay': params.get('batch_norm_decay', 0.999),
                         'zero_debias_moving_mean': True,
-                        'scale': scale,
+                        'scale': True,
+#                        'scale': scale,
                         'center': True
                     }
             elif normalizer == 'layer_norm':
@@ -82,16 +84,29 @@ def fcnn(
             else:
                 raise NotImplementedError(
                     'Normalizer {0} is not valid'.format(normalizer))
-            next_layer_input = tf.contrib.layers.fully_connected(
-                inputs=next_layer_input,
-                num_outputs=dim,
-                activation_fn=activation,
-                normalizer_fn=normalizer_fn,
-                normalizer_params=normalizer_params,
-                weights_initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
-                biases_initializer=tf.constant_initializer(0., dtype=dtype),
-                weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),
-                trainable=True)
+            
+            if T is None or normalizer != 'batch_norm':   
+                next_layer_input = tf.contrib.layers.fully_connected(
+                    inputs=next_layer_input,
+                    num_outputs=dim,
+                    activation_fn=activation,
+                    normalizer_fn=normalizer_fn,
+                    normalizer_params=normalizer_params,
+                    weights_initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
+                    biases_initializer=tf.constant_initializer(0., dtype=dtype),
+                    weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),
+                    trainable=True)
+            else:
+                fc_out = tf.contrib.layers.fully_connected(
+                    inputs=next_layer_input,
+                    num_outputs=dim,
+                    activation_fn=activation,
+                    weights_initializer=tf.contrib.layers.xavier_initializer(dtype=dtype),
+                    weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),
+                    trainable=True)
+                fc_out_reshape = tf.reshape(fc_out, (-1, T * fc_out.get_shape()[1].value))
+                bn_out = tf.contrib.layers.batch_norm(fc_out_reshape, **normalizer_params)
+                next_layer_input = tf.reshape(bn_out, tf.shape(fc_out))
 
             if dropout is not None:
                 assert(type(dropout) is float and 0 < dropout and dropout <= 1.0)

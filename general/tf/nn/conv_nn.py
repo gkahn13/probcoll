@@ -57,6 +57,7 @@ def convnn(
                         'decay': params.get('batch_norm_decay', 0.999),
                         'zero_debias_moving_mean': True,
                         'scale': scale,
+#                        'scale': scale,
                         'center': True
                     }
             elif normalizer == 'layer_norm':

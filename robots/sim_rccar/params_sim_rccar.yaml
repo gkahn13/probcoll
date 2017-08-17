@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'cylinder_re_greg_batch'
+exp_name: 'cylinder_re_greg_batch_2'
 
 ##########################
 ### Probcoll algorithm ###
@@ -16,7 +16,7 @@ probcoll:
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
-  training_start_iter: 0
+  training_start_iter: 4
   is_training: True # EXPERIMENTAL
   asynchronous_training: False # EXPERIMENTAL
 
@@ -54,14 +54,14 @@ model:
   num_reading_threads: 4
 
   # Optimization
-  learning_rate: 1.e-3
+  learning_rate: 1.e-4
   grad_clip: 10.0 # Norm gradient clip
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
-  batch_size: 64
+  batch_size: 32
   pct_coll: 0.5 # rebalancing trajectories
-  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 0. # L2 regularization
+#  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-8 # L2 regularization
   
   # Train schedule
   steps: 500
@@ -96,14 +96,14 @@ model:
     hidden_activation: 'relu'
     output_dim: 128 # This is the hidden size of the rnn
     output_activation: 'relu'
-    normalizer: 'batch_norm'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
   action_graph:
     hidden_layers: [16]
     hidden_activation: 'relu'
     output_dim: 16
-    output_activation: 'relu'
+#    output_activation: 'relu'
     normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
@@ -118,12 +118,12 @@ model:
   output_graph: 
     hidden_layers: [16]
     hidden_activation: 'relu'
-    normalizer: 'batch_norm'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
  
 #################################################
 ### Planning objective and optimizer settings ###
-#################################################
+################################################
 
 planning:
   cost:
@@ -166,7 +166,7 @@ planning:
     control_range:
       lower: [-15.,  2.]
       upper: [ 15.,  2.]
-    endpoints: [[0, 1.0],  [240, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
+    endpoints: [[0, 1.0],  [1.e+3, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
     outside_value: 0.01
 
   control_noise:
