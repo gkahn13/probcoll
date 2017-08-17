@@ -49,22 +49,19 @@ def convnn(
                 activation = conv_activation
             if normalizer == 'batch_norm':
                 normalizer_fn = tf.contrib.layers.batch_norm
-                scale = not (activation == tf.nn.relu or activation is None) 
                 normalizer_params = {
                         'is_training': is_training,
                         'data_format': data_format,
                         'fused': True,
                         'decay': params.get('batch_norm_decay', 0.999),
                         'zero_debias_moving_mean': True,
-                        'scale': scale,
-#                        'scale': scale,
+                        'scale': True,
                         'center': True
                     }
             elif normalizer == 'layer_norm':
                 normalizer_fn = tf.contrib.layers.layer_norm
-                scale = not (activation == tf.nn.relu or activation is None) 
                 normalizer_params = {
-                        'scale': scale,
+                        'scale': True,
                         'center': True
                     }
             elif normalizer is None:

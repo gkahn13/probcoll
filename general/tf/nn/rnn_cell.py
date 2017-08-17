@@ -228,13 +228,23 @@ class DpMulintLSTMCell(DpLSTMCell):
             new = tf.nn.sigmoid(i) * self._activation(j)
             new_c = forget + new
 
-            if self._use_layer_norm:
-                new_c = tf_utils.layer_norm(new_c)
+#            if self._use_layer_norm:
+#                new_c = tf.contrib.layers.layer_norm(
+#                    new_c,
+#                    center=True,
+#                    scale=True)
 
             # TODO make sure this is correct
             if self._dropout_mask is not None:
                 new_c = new_c * self._dropout_mask
 
-            new_h = self._activation(new_c) * tf.nn.sigmoid(o)
+            if self._use_layer_norm:
+                norm_c = tf.contrib.layers.layer_norm(
+                    new_c,
+                    center=True,
+                    scale=True)
+                new_h = self._activation(norm_c) * tf.nn.sigmoid(o)
+            else:
+                new_h = self._activation(new_c) * tf.nn.sigmoid(o)
             new_state = tf.nn.rnn_cell.LSTMStateTuple(new_c, new_h)
         return new_h, new_state

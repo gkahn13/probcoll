@@ -86,7 +86,7 @@ class AnalyzeSimRCcar(Analyze):
                 plt.ylim([-22.5, 22.5])
                 plt.xlim([-22.5, 22.5])
                 plt.legend(handles=[blue_line, red_line], loc='center')
-            elif params['sim']['sim_env'] == 'cylinder':
+            elif params['sim']['sim_env'] == 'cylinder' or params['sim']['sim_env'] == 'small_cylinder':
                 plt.ylim([-7.5, 7.5])
                 plt.xlim([-4.5, 4.5])
                 plt.legend(handles=[blue_line, red_line], loc='center')
@@ -207,7 +207,11 @@ class AnalyzeSimRCcar(Analyze):
                 # TODO different orientations
                 ori = [0., 0., 3.14]
                 plt.figure()
-                if params['sim']['sim_env'] == 'cylinder':
+                if params['sim']['sim_env'] == 'cylinder' or params['sim']['sim_env'] == 'cylinder_small':
+                    if params['sim']['sim_env'] == 'cylinder':
+                        radius = 3.5
+                    elif params['sim']['sim_env'] == 'cylinder_small':
+                        radius = 2.0
                     plt.xlim([0, 18])
                     plt.ylim([0, 30])
                     values = np.zeros((30, 18))
@@ -216,7 +220,7 @@ class AnalyzeSimRCcar(Analyze):
                     for i in range(1, 18):
                         for j in range(2, 29):
                             pos = ((i - 9.) / 2., (j - 15.) / 2., 0.25)
-                            if pos[0] ** 2 + pos[1] ** 2 >= 16:
+                            if pos[0] ** 2 + pos[1] ** 2 >= radius ** 2:
                                 positions.append(pos)
                                 indices.append((j, i))
                 for pos, index in zip(positions, indices):# TODO

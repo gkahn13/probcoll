@@ -6,6 +6,7 @@ from general.state_info.sample import Sample
 from robots.sim_rccar.simulation.square_env import SquareEnv
 from robots.sim_rccar.simulation.square_banked_env import SquareBankedEnv
 from robots.sim_rccar.simulation.cylinder_env import CylinderEnv
+from robots.sim_rccar.simulation.cylinder_small_env import CylinderSmallEnv
 
 from config import params
 
@@ -20,6 +21,8 @@ class AgentSimRCcar(Agent):
             self.env = SquareBankedEnv(params['sim'])
         elif params['sim']['sim_env'] == 'cylinder':
             self.env = CylinderEnv(params['sim'])
+        elif params['sim']['sim_env'] == 'small_cylinder':
+            self.env = CylinderSmallEnv(params['sim'])
         else:
             raise NotImplementedError(
                 "Environment {0} is not valid".format(

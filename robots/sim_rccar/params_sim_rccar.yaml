@@ -68,9 +68,9 @@ model:
   reset_freq: 0 # 0 means no resetting
   reset_steps: 500
   display_steps: 50 
-  val_pct: 0.0 # Percent of the data stored as validation
-  val_freq: 1.0 # How often you compute validation (percentage)
-  val_steps: 5  # How many steps you do on validation 
+  val_pct: 0.1 # Percent of the data stored as validation
+  val_freq: 0.1 # How often you compute validation (percentage)
+  val_steps: 10  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
 
   # Model architecture
@@ -96,14 +96,14 @@ model:
     hidden_activation: 'relu'
     output_dim: 128 # This is the hidden size of the rnn
     output_activation: 'relu'
-#    normalizer: 'batch_norm'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
   action_graph:
     hidden_layers: [16]
     hidden_activation: 'relu'
     output_dim: 16
-#    output_activation: 'relu'
+    output_activation: 'relu'
     normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
@@ -113,7 +113,7 @@ model:
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
-      use_layer_norm: True
+      use_layer_norm: False
 
   output_graph: 
     hidden_layers: [16]
