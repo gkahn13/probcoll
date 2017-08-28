@@ -26,7 +26,7 @@ class Conditions(object):
             # fully uniform random sampling
             num_conds = np.prod([np.prod(val['num']) for val in range_params.values()])
             conds = []
-            for i in xrange(num_conds):
+            for i in range(num_conds):
                 x = np.nan * np.zeros(params['X']['dim'])
                 # set each substate as default or randomize
                 for substate, val in default_params.items():
@@ -42,7 +42,7 @@ class Conditions(object):
             substate_combos = []
             for substate, val in range_params.items():
                 lower, upper, num = val['min'], val['max'], val['num']
-                ranges = [np.linspace(lower[i], upper[i], num[i]) for i in xrange(len(num))]
+                ranges = [np.linspace(lower[i], upper[i], num[i]) for i in range(len(num))]
                 combos = [(substate, r) for r in list(itertools.product(*ranges))]
                 substate_combos.append(combos)
             all_combos = list(itertools.product(*substate_combos))
@@ -61,7 +61,7 @@ class Conditions(object):
                 conds.append(x)
 
         self.conds = conds
-        self.reps = {c: dict() for c in xrange(self.length)}
+        self.reps = {c: dict() for c in range(self.length)}
 
     @property
     def repeats(self):

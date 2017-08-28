@@ -61,8 +61,8 @@ class DepthSensor:
         zpoints = np.zeros((self.rays_phi, self.rays_theta,3))
         zbuffer = np.zeros((self.rays_phi, self.rays_theta))
 
-        for j in xrange(self.rays_phi):
-            for i in xrange(self.rays_theta):
+        for j in range(self.rays_phi):
+            for i in range(self.rays_theta):
                 if is_hits[j,i]:
                     zpoints[j,i,:] = hits[j,i,:3]
                 else:

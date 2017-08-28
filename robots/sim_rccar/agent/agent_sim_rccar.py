@@ -30,14 +30,14 @@ class AgentSimRCcar(Agent):
 
         self._curr_rollout_t = 0
         self._done = False
-        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in range(params['model']['num_O'])]
         self.reset()
 
     def sample_policy(self, policy, T=1, time_step=0, is_testing=False, only_noise=False):
         visualize = params['planning'].get('visualize', False)
         sample_noise = Sample(meta_data=params, T=T)
         sample_no_noise = Sample(meta_data=params, T=T)
-        for t in xrange(T):
+        for t in range(T):
             # Get observation and act
             o_t = self.get_observation()
             self.last_n_obs.pop(0)
@@ -66,9 +66,11 @@ class AgentSimRCcar(Agent):
             sample_noise.set_X(x_t, t=t)
             sample_noise.set_O(o_t, t=t)
             sample_noise.set_O([coll], t=t, sub_obs='collision')
+            sample_noise.set_X([coll], t=t, sub_state='collision')
             sample_no_noise.set_X(x_t, t=t)
             sample_no_noise.set_O(o_t, t=t)
             sample_no_noise.set_O([coll], t=t, sub_obs='collision')
+            sample_no_noise.set_X([coll], t=t, sub_state='collision')
 
             if not is_testing:
                 sample_noise.set_U(u_t, t=t)
@@ -96,7 +98,7 @@ class AgentSimRCcar(Agent):
     def reset(self, pos=None, ori=None, hard_reset=False, is_testing=False):
         self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset, random_reset=not is_testing)
         if self._done or hard_reset:
-            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in range(params['model']['num_O'])]
         self._done = False
 
     def get_observation(self):

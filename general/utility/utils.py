@@ -1,5 +1,9 @@
+import sys
 import time
-from Queue import PriorityQueue
+if sys.version_info.major == 2:
+    from Queue import PriorityQueue
+else:
+    from queue import PriorityQueue
 from collections import defaultdict
 
 import numpy as np
@@ -175,7 +179,7 @@ def poses_to_posquats(poses):
 
 def sample_to_poses(sample):
     poses = []
-    for t in xrange(sample._T):
+    for t in range(sample._T):
         pos = sample.get_X(t=t, sub_state='position')
         quat = sample.get_X(t=t, sub_state='orientation')
         poses.append(posquat_to_pose(pos, quat))
@@ -243,20 +247,20 @@ def to_hist(counts, num_counts):
     counts contains numbers [0, num_counts)
     returns histogram
     """
-    return np.array([np.sum(np.array(counts) == i) for i in xrange(num_counts)]) / float(len(counts))
+    return np.array([np.sum(np.array(counts) == i) for i in range(num_counts)]) / float(len(counts))
 
 def smooth(x, window_len, window='hanning'):
     if x.ndim != 1:
-        raise ValueError, "smooth only accepts 1 dimension arrays."
+        raise ValueError("smooth only accepts 1 dimension arrays.")
 
     if x.size < window_len:
-        raise ValueError, "Input vector needs to be bigger than window size."
+        raise ValueError("Input vector needs to be bigger than window size.")
 
     if window_len < 3:
         return x
 
     if window not in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
+        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
     if window == 'flat':
         w = np.ones(window_len, 'd')

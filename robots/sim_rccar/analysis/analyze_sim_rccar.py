@@ -22,7 +22,7 @@ class AnalyzeSimRCcar(Analyze):
         tot = len(samples)
         num_suc = 0.0
         for sample in samples:
-            num_suc += (1. - float(sample.get_O(t=-1, sub_obs='collision')))
+            num_suc += (1. - float(sample.get_X(t=-1, sub_state='collision')))
         return num_suc / tot
 
     #############
@@ -92,7 +92,7 @@ class AnalyzeSimRCcar(Analyze):
                 plt.legend(handles=[blue_line, red_line], loc='center')
             for s in samples:
                 pos = s.get_X(sub_state='position')
-                is_coll = s.get_O(t=-1, sub_obs='collision')
+                is_coll = s.get_X(t=-1, sub_state='collision')
                 pos_x, pos_y = pos[:, 0], pos[:, 1]
                 if is_coll:
                     plt.plot(pos_x, pos_y, color='r')
@@ -116,7 +116,7 @@ class AnalyzeSimRCcar(Analyze):
             for s, time in zip(samples, time_list):
                 for t in range(time):
                     speeds.append(s.get_U(t=t, sub_control='cmd_vel')[0])
-                    crashes.append(s.get_O(t=t, sub_obs='collision')[0])
+                    crashes.append(s.get_X(t=t, sub_state='collision')[0])
                     avg_speeds.append(float(sum(speeds[-1000:])) / len(speeds[-1000:]))
                     avg_crashes.append(float(sum(crashes[-1000:])) / (len(crashes[-1000:]) * params['probcoll']['dt']))
                     cumulative_crash_energy += crashes[-1] * (speeds[-1] ** 2)
@@ -159,7 +159,7 @@ class AnalyzeSimRCcar(Analyze):
             for s in samples:
                 speeds = s.get_U(sub_control='cmd_vel')
                 dists = speeds * params['probcoll']['dt'] 
-                crashes = s.get_O(sub_obs='collision')
+                crashes = s.get_X(sub_state='collision')
                 tot_speed += np.sum(speeds)
                 tot_crashes += np.sum(crashes)
                 tot_dists += np.sum(dists)

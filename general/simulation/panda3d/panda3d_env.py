@@ -94,7 +94,7 @@ class Panda3dEnv(ShowBase):
             im = rgb2gray(im)
             im = cv2.resize(im, (self.height, self.width), interpolation=cv2.INTER_AREA)
         else:
-            for i in xrange(3):
+            for i in range(3):
                 im[:,:,i] = cv2.imresize(im[:,:,i], (self.height, self.width), interpolation=cv2.INTER_AREA)
 
         im /= 255.

@@ -1,9 +1,12 @@
-from car_env import CarEnv
+import os
+from robots.sim_rccar.simulation.car_env import CarEnv
 
 class SquareBankedEnv(CarEnv):
 
     def __init__(self, params={}):
-        self._model_path = params.get('model_path', 'robots/sim_rccar/simulation/models/square_banked.egg')
+        self._model_path = params.get('model_path',
+                                      os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                   'models/square_banked.egg'))
         CarEnv.__init__(
             self,
             params=params)

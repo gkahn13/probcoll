@@ -213,12 +213,13 @@ sim:
 ######################################################
 
 X:
-  dim: 7
-  order: ['position', 'orientation', 'velocity']
+  dim: 8
+  order: ['position', 'orientation', 'velocity', 'collision']
 
   position: {idx: 0, dim: 3}
   orientation: {idx: 3, dim: 3}
   velocity: {idx: 6, dim: 1}
+  collision: {idx: 7, dim: 1, buffer: 0.0}
 U:
   dim: 2
   order: ['cmd_steer', 'cmd_vel']

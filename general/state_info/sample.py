@@ -20,7 +20,19 @@ class Sample(object):
 
         assert(self._X.shape == (self._T, self._xdim))
         assert(self._U.shape == (self._T, self._udim))
-        assert(self._O.shape == (self._T, self._odim))
+        assert((self._O.shape[0] == self._T) and ((self._O.shape[1] == self._odim) or (self._O.shape[1] == 0)))
+
+    @property
+    def xdim(self):
+        return self._xdim
+
+    @property
+    def udim(self):
+        return self._udim
+
+    @property
+    def odim(self):
+        return self._odim
 
     def set(self, xuo, val, t, sub_state=None):
         if xuo == 'X':
@@ -94,7 +106,7 @@ class Sample(object):
         pa.header.frame_id = 'world'
         pa.header.stamp = rospy.Time.now()
 
-        for t in xrange(self._T):
+        for t in range(self._T):
             pos = self.get_X(t=t, sub_state='position')
             quat_wxyz = self.get_X(t=t, sub_state='orientation')
 
@@ -198,19 +210,22 @@ class Sample(object):
         """
         assert(np.isfinite(self.get_X(t=0).all()))
         assert(np.isfinite(self.get_U().all()))
-        for t in xrange(self._T - 1):
+        for t in range(self._T - 1):
             x_t = self.get_X(t=t)
             u_t = self.get_U(t=t)
             x_tp1 = dynamics.evolve(x_t, u_t)
             self.set_X(x_tp1, t=t+1)
 
+    def __len__(self):
+        return self._T
+
     @staticmethod
-    def save(fname, samples):
+    def save(fname, samples, save_O=True):
         assert(os.path.splitext(fname)[-1] == '.npz')
         meta_datas = [s._meta_data for s in samples]
         Xs = [s.get_X() for s in samples]
         Us = [s.get_U() for s in samples]
-        Os = [s.get_O() for s in samples]
+        Os = [s.get_O() for s in samples] if save_O else [np.nan * np.ones((len(s), 0)) for s in samples]
         np.savez(fname, meta_datas=meta_datas, Xs=Xs, Us=Us, Os=Os)
 
     @staticmethod
