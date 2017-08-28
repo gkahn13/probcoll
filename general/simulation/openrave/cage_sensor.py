@@ -91,7 +91,7 @@ class CageSensor:
         zpoints = np.zeros((dim, 3))
         zbuffer = np.zeros(dim)
         
-        for i in xrange(dim):
+        for i in range(dim):
                 if is_hits[i]:
                     zpoints[i,:] = hits[i,:3]
                 else:

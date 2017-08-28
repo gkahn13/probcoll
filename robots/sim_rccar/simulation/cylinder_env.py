@@ -1,10 +1,13 @@
+import os
 import numpy as np
-from car_env import CarEnv
+from robots.sim_rccar.simulation.car_env import CarEnv
 
 class CylinderEnv(CarEnv):
 
     def __init__(self, params={}):
-        self._model_path = params.get('model_path', 'robots/sim_rccar/simulation/models/cylinder.egg')
+        self._model_path = params.get('model_path',
+                                      os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                   'models/cylinder.egg'))
         CarEnv.__init__(
             self,
             params=params)

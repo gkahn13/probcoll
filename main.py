@@ -88,7 +88,9 @@ if __name__ == '__main__':
         else:
             yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}'.format(robot), yaml_name)
     load_params(yaml_path)
-    params['yaml_path'] = yaml_path
+    with open(yaml_path, 'r') as f:
+        yaml_txt = ''.join(f.readlines())
+    params['yaml_txt'] = yaml_txt
 
     np.random.seed(params['random_seed'])
     random.seed(params['random_seed'])

@@ -331,10 +331,10 @@ class RaveEnv(object):
 
         print('Creating clusters')
         num_clusters = np.max(all_vertices_labels) + 1
-        indices_clusters = [[] for _ in xrange(num_clusters)]
-        vertices_clusters = [[] for _ in xrange(num_clusters)]
+        indices_clusters = [[] for _ in range(num_clusters)]
+        vertices_clusters = [[] for _ in range(num_clusters)]
         added_indices = set() # keep track of triangles that have already been added to a cluster
-        for c in xrange(num_clusters): # for each cluster
+        for c in range(num_clusters): # for each cluster
             print('Cluster {0} / {1}'.format(c+1, num_clusters))
 
             c_vertices_indices = (all_vertices_labels == c).nonzero()[0] # all vertices indices in cluster
@@ -350,7 +350,7 @@ class RaveEnv(object):
                 # indices_with_index = (all_indices_array == index).max(axis=1).nonzero()[0] # which triangle contain index
 
                 indices_with_index = set()
-                for i in xrange(3):
+                for i in range(3):
                     indices_with_index_i = (all_indices_array[:,i] == index).nonzero()[0]
                     indices_with_index.update(indices_with_index_i.tolist())
                 indices_with_index = list(indices_with_index)
@@ -371,7 +371,7 @@ class RaveEnv(object):
             c_indices_remapped = [] # new triangle indexing
             for indice in c_indices:
                 c_indices_remapped.append([c_remapping[old_index] for old_index in indice])
-            c_vertices_remapped = [None for _ in xrange(c_num_vertices)] # new vertex ordering
+            c_vertices_remapped = [None for _ in range(c_num_vertices)] # new vertex ordering
             for index in set(np.asarray(c_indices).flatten()):
                 assert(c_vertices_remapped[c_remapping[index]] is None)
                 c_vertices_remapped[c_remapping[index]] = all_vertices[index]

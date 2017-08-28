@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import sys
-from panda3d_camera_sensor import Panda3dCameraSensor
+from robots.sim_rccar.simulation.panda3d_camera_sensor import Panda3dCameraSensor
 from direct.showbase.DirectObject import DirectObject
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import loadPrcFileData
@@ -229,17 +229,17 @@ class CarEnv(DirectObject):
             ranges = self._params['position_ranges']
             num_pos = sefl._params['num_pos']
             if self._params.get('range_type', 'random') == 'random':
-                for _ in xrange(num_pos):
+                for _ in range(num_pos):
                     ran = ranges[np.random.randint(len(ranges))]
                     self._restart_pos.append(np.random.uniform(ran[0], ran[1]))
             elif self._params['range_type'] == 'fix_spacing':
                 num_ran = len(ranges)
                 num_per_ran = num_pos//num_ran
-                for i in xrange(num_ran):
+                for i in range(num_ran):
                     ran = ranges[i]
                     low = np.array(ran[0])
                     diff = np.array(ran[1]) - np.array(ran[0])
-                    for j in xrange(num_per_ran):
+                    for j in range(num_per_ran):
                         val = diff * ((j + 0.0)/num_per_ran) + low
                         self._restart_pos.append(val) 
         elif self._params.get('positions', None) is not None:
@@ -297,7 +297,7 @@ class CarEnv(DirectObject):
 
         if dt >= self._step:
             # TODO maybe change number of timesteps
-            for i in xrange(int(dt/self._step)):
+            for i in range(int(dt/self._step)):
                 if self._des_vel is not None:
                     vel = self._get_speed()
                     err = self._des_vel - vel
@@ -346,7 +346,7 @@ class CarEnv(DirectObject):
         
         self._vehicle_node.setLinearVelocity(Vec3(0.0, 0.0, 0.0))
         self._vehicle_node.setAngularVelocity(Vec3(0.0, 0.0, 0.0))
-        for i in xrange(self._vehicle.getNumWheels()):
+        for i in range(self._vehicle.getNumWheels()):
             wheel = self._vehicle.getWheel(i)
             wheel.setRotation(0.0)
         self._vehicle_node.clearForces()

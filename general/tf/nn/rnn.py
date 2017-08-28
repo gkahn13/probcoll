@@ -32,7 +32,7 @@ def rnn(
             states = tf.split(initial_state, 2 * num_cells, axis=1)
             num_units = states[0].get_shape()[1].value
             initial_state = []
-            for i in xrange(num_cells):
+            for i in range(num_cells):
                 initial_state.append(tf.nn.rnn_cell.LSTMStateTuple(states[i * 2], states[i * 2 + 1]))
             initial_state = tuple(initial_state)
     elif params['cell_type'] == 'mulint_lstm':
@@ -41,7 +41,7 @@ def rnn(
             states = tf.split(initial_state, 2 * num_cells, axis=1)
             num_units = states[0].get_shape()[1].value
             initial_state = []
-            for i in xrange(num_cells):
+            for i in range(num_cells):
                 initial_state.append(tf.nn.rnn_cell.LSTMStateTuple(states[i * 2], states[i * 2 + 1]))
             initial_state = tuple(initial_state)
     else:
@@ -60,7 +60,7 @@ def rnn(
     cells = []
 
     with tf.variable_scope(scope, reuse=reuse):
-        for i in xrange(num_cells):
+        for i in range(num_cells):
             if dropout is not None:
                 assert(type(dropout) is float and 0 < dropout and dropout <= 1.0)
                 if dp_masks is not None:

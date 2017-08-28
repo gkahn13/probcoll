@@ -53,7 +53,7 @@ class AnalyzeAggPerSimRCcar(AnalyzeSimRCcar):
         return next_d
 
     def _get_percentages(self, params_list, data):
-        cnt = [[] for _ in xrange(len(params_list))]
+        cnt = [[] for _ in range(len(params_list))]
         for (d, samples) in data:
             success = self._success_percentage(samples)
             for i, ps in enumerate(params_list):

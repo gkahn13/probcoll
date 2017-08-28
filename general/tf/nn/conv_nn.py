@@ -42,7 +42,7 @@ def convnn(
     normalizer = params.get('normalizer', None)
     next_layer_input = inputs
     with tf.variable_scope(scope, reuse=reuse):
-        for i in xrange(len(kernels)):
+        for i in range(len(kernels)):
             if i == len(kernels) - 1:
                 activation = output_activation
             else:

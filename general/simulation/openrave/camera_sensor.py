@@ -58,8 +58,8 @@ class CameraSensor:
         hits = hits.reshape((self.width,self.height,6))
         intensity = np.zeros((self.width,self.height))
 
-        for i in xrange(self.height):
-            for j in xrange(self.width):
+        for i in range(self.height):
+            for j in range(self.width):
                 if is_hits[j,i]:
                     normal = hits[j,i,3:]
                     norm = np.linalg.norm(normal) * np.linalg.norm(light_dir)
@@ -73,8 +73,8 @@ class CameraSensor:
         dirs = dirs.reshape((self.width,self.height,3))
         zpoints = np.zeros((self.width,self.height,3))
 
-        for i in xrange(self.height):
-            for j in xrange(self.width):
+        for i in range(self.height):
+            for j in range(self.width):
                 if is_hits[j,i]:
                     zpoints[j,i,:] = hits[j,i,:3]
                 else:
@@ -117,7 +117,7 @@ class CameraSensor:
         directions = np.zeros((N,3))
 
         p_cam = np.eye(4)
-        for i in xrange(N):
+        for i in range(N):
             p_cam[:3,3] = points_cam[i,:]
             p_world_pos = np.dot(ref_from_world, p_cam)[0:3,3]
 

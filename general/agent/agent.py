@@ -26,7 +26,7 @@ class Agent(object):
         policy_sample = Sample(meta_data=params, T=T)
         policy_sample.set_X(x0, t=0)
         policy_sample_no_noise = Sample(meta_data=params, T=T)
-        for t in xrange(T):
+        for t in range(T):
             # get observation and act
             x_t = policy_sample.get_X(t=t)
             o_t = self.get_observation(x_t)

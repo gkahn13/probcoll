@@ -35,7 +35,7 @@ class PolicyRandomPlanningSimRCcar(PolicyRandomPlanning):
                 
                 origin = np.array([0., 0., 0.])
                 angle = 0.
-                for t in xrange(T):
+                for t in range(T):
                     marker = vm.Marker()
                     marker.id = i * T + t
                     marker.header.frame_id = '/map'

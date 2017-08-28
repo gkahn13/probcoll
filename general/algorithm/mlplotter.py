@@ -70,10 +70,10 @@ class MLPlotter:
         plt.pause(0.01)
 
     def save(self, save_dir, suffix=""):
-        fig_name = "training_{0}.png".format(suffix)
+        fig_name = "training_{0}.jpg".format(suffix)
         pkl_name = "plotter_{0}.pkl".format(suffix)
-        self.f.savefig(os.path.join(save_dir, fig_name))
-        with open(os.path.join(save_dir, pkl_name), 'w') as f:
+        self.f.savefig(os.path.join(save_dir, fig_name), dpi=100.)
+        with open(os.path.join(save_dir, pkl_name), 'wb') as f:
             pickle.dump(dict([(k, (v.get_xdata(), v.get_ydata())) for k, v in self.train_lines.items()] +
                              [(k, (v.get_xdata(), v.get_ydata())) for k, v in self.val_lines.items()]),
                         f)

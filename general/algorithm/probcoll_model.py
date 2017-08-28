@@ -134,7 +134,7 @@ class ProbcollModel:
         for key in ('U', 'O'):
             d[key] = params[key]
 
-        return hashlib.md5(str(d)).hexdigest()
+        return hashlib.md5(str(d).encode('utf-8')).hexdigest()
 
     def get_train_itr(self):
         latest_file = tf.train.latest_checkpoint(
@@ -147,8 +147,13 @@ class ProbcollModel:
         return itr
 
     def _next_model_file(self):
-        num = self.get_train_itr()
-        next_num = num + 1 
+        if params['model']['save_checkpoints'] == 'all':
+            num = self.get_train_itr()
+            next_num = num + 1
+        elif params['model']['save_checkpoints'] == 'last':
+            next_num = 0
+        else:
+            raise Exception('Invalid save_checkpoints: {0}'.format(params['model']['save_checkpoints']))
         return os.path.join(
             self._checkpoints_dir,
             "{0:d}.ckpt".format(next_num)), next_num

@@ -28,7 +28,8 @@ class Probcoll:
         self.policy = self._create_mpc()
         new_yaml_path = os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name']))
         if not os.path.exists(new_yaml_path):
-            shutil.copy(params['yaml_path'], new_yaml_path)
+            with open(new_yaml_path, 'w') as f:
+                f.write(params.pop('yaml_txt'))
 
     @abc.abstractmethod
     def _setup(self):
@@ -67,6 +68,14 @@ class Probcoll:
     def _itr_save_samples(self, itr, samples, prefix=''):
         Sample.save(self._itr_samples_file(itr, prefix=prefix), samples)
 
+    def _itr_remove_O_from_samples(self, itr):
+        for prefix in ('', 'testing_'):
+            try:
+                samples = Sample.load(self._itr_samples_file(itr, prefix=prefix, create=False))
+                Sample.save(self._itr_samples_file(itr, prefix=prefix), samples, save_O=False)
+            except:
+                pass
+
     ###################
     ### Run methods ###
     ###################
@@ -84,7 +93,7 @@ class Probcoll:
             samples_start_itr = 0
             # Keeps track of how many rollouts have been done
             self._time_step = 0
-            for samples_start_itr in xrange(self._max_iter-1, -1, -1):
+            for samples_start_itr in range(self._max_iter-1, -1, -1):
                 sample_file = self._itr_samples_file(samples_start_itr, create=False)
                 if os.path.exists(sample_file):
                     samples_start_itr += 1
@@ -105,10 +114,12 @@ class Probcoll:
             start_itr = samples_start_itr
             self._time_step = self._num_timesteps * start_itr
             ### training loop
-            for itr in xrange(start_itr, self._max_iter):
+            for itr in range(start_itr, self._max_iter):
                 self._run_itr(itr)
                 self._run_training(itr)
                 self.run_testing(itr)
+                if not params['probcoll']['save_O']:
+                    self._itr_remove_O_from_samples(itr)
                 if not self.probcoll_model.sess.graph.finalized:
                     self.probcoll_model.sess.graph.finalize()
         finally:
@@ -192,7 +203,7 @@ class Probcoll:
             self.agent.reset()
             total_time = 0
             start = time.time()
-            for cond in xrange(params['probcoll']['testing']['num_rollout']):
+            for cond in range(params['probcoll']['testing']['num_rollout']):
                 _, sample_no_noise, t = self.agent.sample_policy(
                     self.policy,
                     T=T,
