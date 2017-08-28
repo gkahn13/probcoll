@@ -56,7 +56,8 @@ def convnn(
                         'decay': params.get('batch_norm_decay', 0.999),
                         'zero_debias_moving_mean': True,
                         'scale': True,
-                        'center': True
+                        'center': True,
+                        'updates_collections': None
                     }
             elif normalizer == 'layer_norm':
                 normalizer_fn = tf.contrib.layers.layer_norm

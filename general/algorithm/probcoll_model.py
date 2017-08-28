@@ -622,6 +622,7 @@ class ProbcollModel:
             reuse=False, tf_debug={}):
         assert(name == 'train' or name == 'val')
         is_training = name == 'train'
+#        is_training = True
         num_bootstrap = params['model']['num_bootstrap']
         bootstrap_output_mats = []
         bootstrap_output_preds = []

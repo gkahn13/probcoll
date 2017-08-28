@@ -1,8 +1,8 @@
 # contains all needed parameters for all files
 
 random_seed: 'sweep'
-exp_dir: '/home/avillaflor/probcoll/experiments/sim_rccar/sweep/bn7'
-exp_name: 'square_image'
+exp_dir: '/home/adam/probcoll/experiments/sim_rccar/sweep/cylinder_time'
+exp_name: 'time_sweep'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,31 +10,30 @@ exp_name: 'square_image'
 
 probcoll:
   dt: 0.25
-  T: 640 # timesteps per trajectory
-  logger: 'fatal' # debug/info/fatal what level to log
-  max_iter: 20
+  T: 240  # timesteps per trajectory
+  logger: 'info' # debug/info/fatal what level to log
+  max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   
   # Training
-  training_start_iter: 0
+  training_start_iter: 4
   is_training: True # EXPERIMENTAL
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-#  num_rollouts: 20
-  num_timesteps: 640 
+  num_timesteps: 240
 
   testing:
     num_rollout: 20
-    itr_freq: 4
+    itr_freq: 2
 
 ######################
 ### Probcoll model ###
 ######################
     
 model:
-  T: 8 # how many timesteps to predict
-  logger: 'fatal' # debug/info/warning/fatal what level to log
+  T: 'sweep' # how many timesteps to predict
+  logger: 'info' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
@@ -42,40 +41,41 @@ model:
   O_vec_order: []
   output_order: ['collision'] # taken from observations O
   num_O: 4
-  data_format: 'NCHW'
 
   # Normalize input  
   center_O_im: False 
   control_range:
     lower: [-45., -4.]
-    upper: [45., 4.]
+    upper: [ 45.,  4.]
   
   # Device
   device: 0
   gpu_fraction: 0.8
+  num_reading_threads: 4
 
   # Optimization
-  learning_rate: 1.e-3
-  grad_clip: 10. # Norm gradient clip
-  beta1: 0.9 # For avillaflor
-  beta2: 0.999 # For avillaflor
-  batch_size: 64
-  pct_coll: 0.75 # rebalancing trajectories
-  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-5 # L2 regularization
+  learning_rate: 1.e-4
+  grad_clip: 10.0 # Norm gradient clip
+  beta1: 0.9 # For ADAM
+  beta2: 0.999 # For ADAM
+  batch_size: 32
+  pct_coll: 0.5 # rebalancing trajectories
+#  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-8 # L2 regularization
   
   # Train schedule
   steps: 500
   reset_freq: 0 # 0 means no resetting
-  reset_steps: 5000
+  reset_steps: 500
   display_steps: 50 
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
-  val_steps: 5  # How many steps you do on validation 
+  val_steps: 10  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
 
   # Model architecture
   dtype: 'float32' # only float32 is currently implemented
+  data_format: 'NCHW'
   num_bootstrap: 1 # EXPERIMENTAL
   prob_coll_strictly_increasing: True # True / False 
   mask: 'all' # all / last
@@ -86,57 +86,68 @@ model:
     kernels: [8, 4, 3]
     strides: [4, 2, 1]
     padding: 'SAME' 
-    use_batch_norm: True
-    batch_norm_decay: 0.9
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax 
+    normalizer: 'batch_norm'
+    batch_norm_decay: 0.9
   
   observation_graph:
-    use_batch_norm: True
-    batch_norm_decay: 0.9
-    output_activation: 'tanh'
+    hidden_layers: [256]
+    hidden_activation: 'relu'
     output_dim: 128 # This is the hidden size of the rnn
-  
+    output_activation: 'relu'
+    normalizer: 'batch_norm'
+    batch_norm_decay: 0.9
+
   action_graph:
+    hidden_layers: [16]
+    hidden_activation: 'relu'
+    output_dim: 16
+    output_activation: 'relu'
+    normalizer: 'batch_norm'
+    batch_norm_decay: 0.9
+
+  rnn_graph:
     graph_type: 'rnn'
     num_cells: 1
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
-      use_layer_norm: True
+      use_layer_norm: False
 
   output_graph: 
+    hidden_layers: [16]
+    hidden_activation: 'relu'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
-    use_batch_norm: True
-    graph_type: 'fc'
  
 #################################################
 ### Planning objective and optimizer settings ###
-#################################################
+################################################
 
 planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [0., 10.] 
+      weight: [0., 1.] 
       std_weight: 0.0 # EXPERIMENTAL
       pre_activation: True # EXPERIMENTAL wether std is before or after activation (sigmoid)
     
     control_cost:
       des: [0., 2.] # TODO: hard-coded order: steering then speed
       cost: square # square
-      weight: [0.0, 1.0]     
+      weight: [0., 1.]     
 
   # Planner
   planner_type: 'random' # random / cem / random_policy
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-30., 2.]
-    upper: [30., 2.]
+    lower: [-15.,  2.]
+    upper: [ 15.,  2.]
 
   random:
-    K: 2048 # number of actions to sample from
+    K: 4096 # number of actions to sample from
 
   cem:
     init_M: 2048 # number of actions to sample from
@@ -152,17 +163,20 @@ planning:
 
   # Noise / exploration
   epsilon_greedy:
-    endpoints: 'sweep'
-    outside_value: 0.0
+    control_range:
+      lower: [-15.,  2.]
+      upper: [ 15.,  2.]
+    endpoints: [[0, 1.0],  [1.e+3, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
+    outside_value: 0.01
 
   control_noise:
-#    endpoints: 'sweep'
-#    outside_value: 0.0
+    endpoints: [[0, 1.0],  [1.e+4, 0.2], [3.e+4, 0.02]]
+    outside_value: 0.02
 
     type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [3.0, 0.0]
+      std: [7.5, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
@@ -178,7 +192,7 @@ planning:
 ###################
 
 sim:
-  sim_env: 'square' # square / cylinder
+  sim_env: 'cylinder' # square / cylinder / cyliner_small
   visualize: False
   use_vel: True
   use_back_cam: True
@@ -188,10 +202,10 @@ sim:
   p: 1.25
   d: 0.0
 
-  do_back_up: True
+  do_back_up: False
   back_up:
     steer: [-5., 5.]
-    vel: -2.
+    vel: -1.
     duration: 3.0
 
 ######################################################

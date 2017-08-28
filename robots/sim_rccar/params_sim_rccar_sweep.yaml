@@ -1,8 +1,4 @@
 random_seed: [0, 1, 2]
 
 model:
-  reset_freq: [0, 2, 4]
-  
-planning:
-  epsilon_greedy:
-    endpoints: [[[0, 1.0], [6400, 0.0]], [[0, 1.0], [3200, 0.0]], [[0, 1.0], [1600, 0.0]]]
+  T: [8, 10, 12] # how many timesteps to predict
