@@ -1,6 +1,4 @@
 import os
-import subprocess
-import signal
 import time
 import numpy as np
 import paramiko
@@ -29,15 +27,16 @@ class ProbcollRCcarPC(Probcoll):
         ### load prediction neural net
         self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)
 #        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
-        self._ssh = SSHClient()
+        # TODO maybe move yaml
+        self._ssh = paramiko.SSHClient()
         self._ssh.load_system_host_keys()
         self._ssh.connect(server, username=username, password=password)
-        self._sftp = shh.open_sftp()
+        self._sftp = self._ssh.open_sftp()
+        self._ssh.exec_command("python3", python_main_file, "probcoll", "rccar")
 
     ###################
     ### Run methods ###
     ###################
-    
     def _run_itr(self, itr):
         self._run_rollout(itr)
 
@@ -45,14 +44,14 @@ class ProbcollRCcarPC(Probcoll):
         for p in self._jobs:
             p.kill()
         self.probcoll_model.close()
-        self._ssh.close()
         self._sftp.close()
-
+        self._ssh.close()
+    
     def _run_training(self, itr):
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
-#                self.probcoll_model.recover()
-                if not self._async_on:
+                if self._asynchronous:
+#                    self.probcoll_model.recover()
                     self._async_training()
                     self._async_on = True
 
@@ -60,13 +59,13 @@ class ProbcollRCcarPC(Probcoll):
         self.probcoll_model.train_loop()
 
     def _run_rollout(self, itr):
-        # TODO scp
-        for f in self._sftp.listdir(remote_dir):
-            local_file = os.path.join(local_dir, f)
-            remote_file = os.path.join(remtoe_dir, f)
+        for f in self._sftp.listdir(remote_data_dir):
+            local_file = os.path.join(local_data_dir, f)
+            remote_file = os.path.join(remote_data_dir, f)
             self._sftp.get(remote_file, local_file)
             self._sftp.remove(remote_file)
-        for f in os.lisdir(local_ckpt_dir):
+
+        for f in os.listdir(local_ckpt_dir):
             local_file = os.path.join(local_ckpt_dir, f)
             remote_file = os.path.join(remote_ckpt_dir, f)
             self._sftp.put(local_file, remote_file)
@@ -84,9 +83,10 @@ class ProbcollRCcarPC(Probcoll):
         if self._planner_type == 'random_policy':
             mpc_policy = RandomPolicy()
         elif self._planner_type == 'random':
-            mpc_policy = PolicyRandomPlannin(self.probcoll_model, params['planning'])
+            mpc_policy = PolicyRandomPlanning(self.probcoll_model, params['planning'])
         elif self._planner_type == 'cem':
             mpc_policy = PolicyCem(self.probcoll_model, params['planning'])
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))
+
         return mpc_policy
