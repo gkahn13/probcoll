@@ -270,11 +270,11 @@ class ProbcollModelReplayBuffer(ProbcollModel):
     def _graph_inputs_outputs_from_placeholders(self):
         with tf.variable_scope('feed_input'):
             b = self.num_bootstrap
-            u_ph = tf.placeholder(self.dtype, [b, self.batch_size, self.T, self.dU])
-            o_im_ph = tf.placeholder(tf.uint8, [b, self.batch_size, self.dO_im])
-            o_vec_ph = tf.placeholder(self.dtype, [b, self.batch_size, self.dO_vec])
-            output_ph = tf.placeholder(tf.uint8, [b, self.batch_size, self.T, self.doutput])
-            length_ph = tf.placeholder(tf.int32, [b, self.batch_size])
+            u_ph = tf.placeholder(self.dtype, [b, self.batch_size, self.T, self.dU], name='U_placeholder')
+            o_im_ph = tf.placeholder(tf.uint8, [b, self.batch_size, self.dO_im], name='O_im_placeholder')
+            o_vec_ph = tf.placeholder(self.dtype, [b, self.batch_size, self.dO_vec], name='O_vec_placeholder')
+            output_ph = tf.placeholder(tf.uint8, [b, self.batch_size, self.T, self.doutput], name='Output_placeholder')
+            length_ph = tf.placeholder(tf.int32, [b, self.batch_size], name='length_placeholder')
         return u_ph, o_im_ph, o_vec_ph, output_ph, length_ph 
 
     def _get_bootstrap_batch_feed_dict(

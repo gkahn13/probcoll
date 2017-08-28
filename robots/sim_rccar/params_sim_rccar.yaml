@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'cylinder_re_greg_batch_2'
+exp_name: 'square_testing'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,7 +10,7 @@ exp_name: 'cylinder_re_greg_batch_2'
 
 probcoll:
   dt: 0.25
-  T: 240  # timesteps per trajectory
+  T: 320  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
   max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -32,7 +32,7 @@ probcoll:
 ######################
     
 model:
-  T: 12 # how many timesteps to predict
+  T: 8 # how many timesteps to predict
   logger: 'info' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
@@ -46,7 +46,7 @@ model:
   center_O_im: False 
   control_range:
     lower: [-45., -4.]
-    upper: [45., 4.]
+    upper: [ 45.,  4.]
   
   # Device
   device: 0
@@ -58,19 +58,19 @@ model:
   grad_clip: 10.0 # Norm gradient clip
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
-  batch_size: 32
+  batch_size: 64
   pct_coll: 0.5 # rebalancing trajectories
-#  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-8 # L2 regularization
+  coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
+  reg: 1.e-6 # L2 regularization
   
   # Train schedule
   steps: 500
   reset_freq: 0 # 0 means no resetting
   reset_steps: 500
   display_steps: 50 
-  val_pct: 0.1 # Percent of the data stored as validation
+  val_pct: 0.5 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
-  val_steps: 10  # How many steps you do on validation 
+  val_steps: 50  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
 
   # Model architecture
@@ -113,12 +113,12 @@ model:
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
-      use_layer_norm: False
+      use_layer_norm: True
 
   output_graph: 
     hidden_layers: [16]
     hidden_activation: 'relu'
-#    normalizer: 'batch_norm'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
  
 #################################################
@@ -143,8 +143,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-15.,  2.]
-    upper: [ 15.,  2.]
+    lower: [-30.,  2.]
+    upper: [ 30.,  2.]
 
   random:
     K: 4096 # number of actions to sample from
@@ -164,8 +164,8 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-15.,  2.]
-      upper: [ 15.,  2.]
+      lower: [-30.,  2.]
+      upper: [ 30.,  2.]
     endpoints: [[0, 1.0],  [1.e+3, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
     outside_value: 0.01
 
@@ -176,7 +176,7 @@ planning:
     type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [7.5, 0.0]
+      std: [3.0, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
@@ -192,7 +192,7 @@ planning:
 ###################
 
 sim:
-  sim_env: 'cylinder' # square / cylinder
+  sim_env: 'square' # square / cylinder / cyliner_small
   visualize: False
   use_vel: True
   use_back_cam: True
@@ -202,7 +202,7 @@ sim:
   p: 1.25
   d: 0.0
 
-  do_back_up: False
+  do_back_up: True
   back_up:
     steer: [-5., 5.]
     vel: -1.

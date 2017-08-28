@@ -21,7 +21,7 @@ class AgentSimRCcar(Agent):
             self.env = SquareBankedEnv(params['sim'])
         elif params['sim']['sim_env'] == 'cylinder':
             self.env = CylinderEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'small_cylinder':
+        elif params['sim']['sim_env'] == 'cylinder_small':
             self.env = CylinderSmallEnv(params['sim'])
         else:
             raise NotImplementedError(
