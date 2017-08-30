@@ -6,10 +6,11 @@ import rospy
 from std_msgs.msg import Empty
 import sensor_msgs.msg as sensor_msgs
 import std_msgs.msg as std_msgs
+from nav_msgs.msg import Odometry
 import geometry_msgs.msg as geometry_msgs
 import visualization_msgs.msg as visualization_msgs
 import cv_bridge
-
+from bebop_msgs.msg import CommonCommonStateBatteryStateChanged, Ardrone3PilotingStateAltitudeChanged
 from general.agent.agent import Agent
 import general.ros.ros_utils as ros_utils
 from general.state_info.sample import Sample
@@ -20,6 +21,7 @@ class AgentBebop2d(Agent):
 
     def __init__(self):
         self.is_teleop = params['planning']['teleop']
+        self.target_height = params['planning']['target_height']
         self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         self._logger = get_logger(
             self.__class__.__name__,
@@ -29,8 +31,15 @@ class AgentBebop2d(Agent):
         # self._ros_start_rollout = ros_utils.RosCallbackEmpty(params['bebop']['topics']['start_rollout'], std_msgs.Empty)
         self._ros_start_rollout = rospy.Subscriber(params['bebop']['topics']['start_rollout'], Empty, self.start)
         self._ros_takeoff = rospy.Subscriber('/bebop/takeoff', Empty, self.takeoff)
+        self._ros_height = rospy.Subscriber('/bebop/states/ARDrone3/PilotingState/AltitudeChanged',
+                                            Ardrone3PilotingStateAltitudeChanged, self.update_height)
         self._ros_land = rospy.Subscriber('/bebop/land', Empty, self.land)
+        self._ros_battery_percentage = rospy.Subscriber('/bebop/states/common/CommonState/BatteryStateChanged',
+                                                        CommonCommonStateBatteryStateChanged, self.battery_update)
         self._ros_pub_start = rospy.Publisher(params['bebop']['topics']['start_rollout'], Empty, queue_size=10)
+        self._ros_pub_reset = rospy.Publisher('/bebop/resetloop', Empty, queue_size=10)
+        self._ros_pub_takeoff = rospy.Publisher('/bebop/takeoff', Empty, queue_size=1)
+        self._ros_pub_land = rospy.Publisher('/bebop/land', Empty, queue_size=1)
         self._ros_teleop = rospy.Subscriber(params['bebop']['topics']['cmd_vel'], geometry_msgs.Twist, self.receive_teleop)
         self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
         rospy.init_node('DaggerPredictionBebop2d', anonymous=True)
@@ -38,6 +47,7 @@ class AgentBebop2d(Agent):
         self.just_crashed = False
         self.stopped = False
         self.airborne = False
+        self.battery_percentage = 100
         ### subscribers
         # import IPython; IPython.embed()embed()
         self.image_callback = ros_utils.RosCallbackAll(bebop_topics['image'], sensor_msgs.Image,
@@ -56,11 +66,15 @@ class AgentBebop2d(Agent):
         self._info = dict()
         self.reset()
         self.cur_teleop_command = None
+        self.height = -1
+
+        self.noise_vx = params['planning']['control_noise']['uniform']['upper'][0]
+        self.noise_vy = params['planning']['control_noise']['uniform']['upper'][1]
         # self._info['linearvel'] = np.array([0.0, 0.0, 0.0])
 
     def start(self, msg):
         self.just_crashed = False
-        self._logger.info('Starting')
+        self._logger.info('Received starting command')
 
     def takeoff(self, msg):
         self.airborne = True
@@ -69,6 +83,9 @@ class AgentBebop2d(Agent):
     def land(self, msg):
         self.airborne = False
         self._logger.info('Landing')
+
+    def battery_update(self, msg):
+        self.battery_percentage = msg.percent
 
     def receive_teleop(self, msg):
         self.cur_teleop_command = np.array([msg.linear.x, msg.linear.y, msg.angular.z], dtype='float32')
@@ -83,12 +100,14 @@ class AgentBebop2d(Agent):
             self._logger.info('Press take off')
             while not self.airborne and not rospy.is_shutdown():
                 rospy.sleep(0.1)
-            self._logger.info('Press start again after drone stablizes')
-            self.just_crashed = True
-            while self.just_crashed and not rospy.is_shutdown():
-                rospy.sleep(0.1)
+            time.sleep(10)
+        #     self._logger.info('Press start again after drone stablizes')
+        #     self.jusrt_cashed = True
+        #     while self.just_crashed and not rospy.is_shutdown():
+        #         rospy.sleep(0.1)
         while self.is_teleop and self.cur_teleop_command is None:
             r.sleep()
+        self._ros_pub_reset.publish(Empty())
         for t in xrange(T):
             # Get observation and act
             o_t = self.get_observation()
@@ -120,8 +139,8 @@ class AgentBebop2d(Agent):
                     visualize=visualize)
                 if not self.is_teleop:
                     # print 'executed act: {0}'.format(u_t_no_noise)
-                    print u_t_no_noise
-                    self.act(u_t_no_noise)
+                    print 'u_t: {0}, u_t_no_noise: {1}'.format(u_t, u_t_no_noise)
+                    self.act(u_t)
                     self._info['linearvel'] = u_t
                 else:
                     # print self.cur_teleop_command
@@ -259,6 +278,81 @@ class AgentBebop2d(Agent):
             # import IPython; IPython.embed()
         return sample_noise, sample_no_noise, t
 
+    def back_up(self):
+        if self.just_crashed:
+            r = rospy.Rate(1.0/params['probcoll']['dt'])
+            twist_msg = geometry_msgs.Twist(
+                linear=geometry_msgs.Point(-0.5, 0, 0.),
+                angular=geometry_msgs.Point(0., 0., 0)
+            )
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            twist_msg.linear.x = 0
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            twist_msg.angular.z = 1.5
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            # self.cmd_vel_pub.publish(twist_msg)
+            # r.sleep()
+            twist_msg.angular.z = 0
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+        else:
+            r = rospy.Rate(1.0 / params['probcoll']['dt'])
+            twist_msg = geometry_msgs.Twist(
+                linear=geometry_msgs.Point(-0.5, 0, 0.),
+                angular=geometry_msgs.Point(0., 0., 0)
+            )
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            twist_msg.linear.x = 0
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+            self.cmd_vel_pub.publish(twist_msg)
+
+    def update_height(self, msg):
+        self.height =msg.altitude
+
+
+    def maintain_height(self):
+        self.height = 0
+        while self.height == 0:
+            time.sleep(0.1)
+        twist_msg = geometry_msgs.Twist(
+            linear=geometry_msgs.Point(0, 0, 0.),
+            angular=geometry_msgs.Point(0., 0., 0)
+        )
+        r = rospy.Rate(1.0 / params['probcoll']['dt'])
+        while abs(self.target_height - self.height) > 0.15:
+            c = 0.25*(self.target_height - self.height)
+            if c > 0:
+                c = min(1.0, c)
+            else:
+                c = max(-1.0, c)
+            twist_msg.linear.z = c
+            self.cmd_vel_pub.publish(twist_msg)
+            r.sleep()
+        self._logger.info('height adjustment complete')
     def reset(self, pos=None, ori=None, hard_reset=False):
         # self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
         self.act(None)  # stop bebop
@@ -289,19 +383,21 @@ class AgentBebop2d(Agent):
             r.sleep()
             self.cmd_vel_pub.publish(twist_msg)
             r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
+            # self.cmd_vel_pub.publish(twist_msg)
+            # r.sleep()
             twist_msg.angular.z = 0
             self.cmd_vel_pub.publish(twist_msg)
             r.sleep()
             self.cmd_vel_pub.publish(twist_msg)
-        if self.just_crashed:
-            self._logger.info('Press start')
-            while self.just_crashed and not rospy.is_shutdown():
-                rospy.sleep(0.1)
+        # if self.just_crashed:
+        #     self._logger.info('Press start')
+        #     while self.just_crashed and not rospy.is_shutdown():
+        #         rospy.sleep(0.1)
         self.coll_callback.get()
         self.coll = False
         self.stopped = False
+        # self._logger.info('reset: publish start command')
+        # self._ros_pub_start.publish(Empty())
         if hard_reset:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
 
@@ -345,12 +441,11 @@ class AgentBebop2d(Agent):
                                     interpolation=cv2.INTER_AREA) # TODO how does this deal with aspect ratio
 
         return im
-
     def act(self, u):
         if u is not None:
-            if u[0] == 0 and u[1]== 0:
+            if u[0] <= self.noise_vx and abs(u[1]) <= self.noise_vy:
                 twist_msg = geometry_msgs.Twist(
-                    linear=geometry_msgs.Point(0., 0., 0.),
+                    linear=geometry_msgs.Point(u[0], u[1], 0.),
                     angular=geometry_msgs.Point(0., 0., 0)
                 )
                 self.cmd_vel_pub.publish(None)

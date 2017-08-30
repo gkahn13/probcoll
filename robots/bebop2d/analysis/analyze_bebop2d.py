@@ -132,7 +132,6 @@ class AnalyzeBebop2d(Analyze):
             for fname in fnames:
                 prediction._logger.info('\t{0}'.format(fname))
                 prediction.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
-
         ### if any data and haven't trained on it already, train on it
         if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != prediction._max_iter):
             prediction._run_training(samples_start_itr)
@@ -140,31 +139,34 @@ class AnalyzeBebop2d(Analyze):
         # import IPython; IPython.embed()
         num_O = params['model']['num_O']
         visualized = params['planning']['visualize']
+        if_plot = params['analyze']['plot']
         for itr, samples in samples_itrs:
             for n, s in enumerate(samples):
                 if len(s.get_O()) >= num_O:
                     for i in xrange(len(s.get_O()) - num_O + 1):
-                        _, u_t_no_noise = prediction._mpc_policy.act(
+                        u_t, u_t_no_noise = prediction._mpc_policy.act(
                             s.get_O()[i:i+num_O],
                             0,
                             0,
                             only_noise=False,
-                            only_no_noise=True,
+                            only_no_noise=False,
                             visualize=visualized)
-                        f = plt.figure()
-                        for j in xrange(num_O):
-                            # import IPython; IPython.embed()
-                            # if s.get_O()[i:i+num_O][-1][-1] == 1 and j==num_O - 1:
+                        # print 'u_t: {0}; u_t_no_noise: {1}'.format(u_t, u_t_no_noise)
+                        if if_plot:
+                            f = plt.figure()
+                            for j in xrange(num_O):
+                                # import IPython; IPython.embed()
+                                # if s.get_O()[i:i+num_O][-1][-1] == 1 and j==num_O - 1:
+                                #     import IPython; IPython.embed()
+                                img = np.reshape(s.get_O()[i + j][:-1], [16, 16])
+                                a = f.add_subplot(2, np.ceil(num_O/2.0), j + 1)
+                                plt.imshow(img, cmap='gray', vmin=0, vmax=255)
+                                a.set_title(j)
+                            # if s.get_O()[i:i+num_O][-1][-1] == 1:
                             #     import IPython; IPython.embed()
-                            img = np.reshape(s.get_O()[i + j][:-1], [16, 16])
-                            a = f.add_subplot(2, np.ceil(num_O/2.0), j + 1)
-                            plt.imshow(img, cmap='gray', vmin=0, vmax=255)
-                            a.set_title(j)
-                        # if s.get_O()[i:i+num_O][-1][-1] == 1:
-                        #     import IPython; IPython.embed()
-                        f.suptitle(str(u_t_no_noise) + str(s.get_O()[i:i+num_O][-1][-1]))
-                        plt.savefig(params['exp_dir'] + '/'+
-                                    params['exp_name'] + '/' + 'plots/' + 'itr_'+ str(itr)+'_sample_'+str(n)+'_act_'+str(i) + '.jpg')
+                            f.suptitle(str(u_t) + str(u_t_no_noise) + str(s.get_O()[i:i+num_O][-1][-1]))
+                            plt.savefig(params['exp_dir'] + '/'+
+                                        params['exp_name'] + '/' + 'plots/' + 'itr_'+ str(itr)+'_sample_'+str(n)+'_act_'+str(i) + '.jpg')
 
 
     ###########

@@ -1,7 +1,10 @@
 *~
 *.pyc
 *experiments
+experiments*
 *#
 .idea
 *.swp
 *.DS_Store
+init*
+*.npy

@@ -70,6 +70,7 @@ class ProbcollModel:
             allow_soft_placement=True)
         # config.intra_op_parallelism_threads = 1
         # config.inter_op_parallelism_threads = 1
+        self.label_shift_num = params['model']['label_shift']
         print('creating session')
         with self.graph.as_default():
             self.sess = tf.Session(config=config)
@@ -240,6 +241,12 @@ class ProbcollModel:
         In case you want to pre-process the sample before adding it
         :return: Sample
         """
+        if self.label_shift_num > 0:
+            cols = sample.get_O(sub_obs='collision')
+            if cols[-1][0] == 1:
+                total_time = len(cols)
+                for i in xrange(self.label_shift_num):
+                    sample.set_O([1], t=total_time-i-2, sub_obs='collision')
         return [sample]
 
     def _load_samples(self, npz_fnames):

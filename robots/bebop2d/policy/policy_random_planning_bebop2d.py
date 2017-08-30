@@ -33,8 +33,16 @@ class PolicyRandomPlanningBebop2d(PolicyRandomPlanning):
                     control_range['lower'],
                     control_range['upper'])
                 u_samples = tf.cast(u_distribution.sample(sample_shape=(k, self.probcoll_model.T)), self.dtype)
-                stop_command = tf.constant([0., 0., 0.0], dtype='float32', shape=[1, self.probcoll_model.T, 3])
-                u_samples = tf.concat([u_samples, stop_command], axis=0)
+                # stop_command = tf.constant([0., 0., 0.0], dtype='float32', shape=[1, self.probcoll_model.T, 3])
+                temp_command_sequence = [[[0.0, 0.0, 0.0]] * self.probcoll_model.T]
+                command_list = [u_samples,
+                                tf.constant(temp_command_sequence, dtype='float32', shape=[1, self.probcoll_model.T, 3])]
+                for i in xrange(self.probcoll_model.T):
+                    # temp_command_sequence[0][i] = self.params['cost']['control_cost']['des']
+                    temp_command_sequence[0][i] = [np.random.uniform(low=0.6, high=1.0),
+                                                   np.random.uniform(low=-0.2, high=0.2), 0]
+                    command_list.append(tf.constant(temp_command_sequence, dtype='float32', shape=[1, self.probcoll_model.T, 3]))
+                u_samples = tf.concat(command_list, axis=0)
                 O_im_input = self.probcoll_model.d_eval['O_im_input']
                 O_vec_input = self.probcoll_model.d_eval['O_vec_input']
                 stack_u = tf.concat([u_samples] * self.params['num_dp'], axis=0)
@@ -61,11 +69,10 @@ class PolicyRandomPlanningBebop2d(PolicyRandomPlanning):
                     tf.split(output_mat_mean, self.params['num_dp'], axis=0), axis=0)
 
                 control_cost_fn = CostDesired(self.params['cost']['control_cost'])
+                # print 'weight for collision: {0}'.format(self.params['cost']['coll_cost']['weight'])
                 coll_cost_fn = CostColl(self.params['cost']['coll_cost'])
-
                 control_costs = control_cost_fn.eval(u_samples)
                 coll_costs = coll_cost_fn.eval(u_samples, pred_mean, mat_mean, pred_std, mat_std)
-
                 total_cost = control_costs + coll_costs
                 index = tf.cast(tf.argmin(total_cost, axis=0), tf.int32)
                 action = u_samples[index, 0]
@@ -78,7 +85,7 @@ class PolicyRandomPlanningBebop2d(PolicyRandomPlanning):
             action_noisy,
             coll_costs,
             control_costs):
-        print 'action: {0}'.format(action)
-        # print 'action_considered: {0}'.format(actions_considered)
+        # print 'action: {0}'.format(action)
+        print 'action_considered: {0}'.format(actions_considered)
         print 'coll_costs: {0}'.format(coll_costs)
         print 'control_costs: {0}'.format(control_costs)

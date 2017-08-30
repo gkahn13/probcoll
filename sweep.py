@@ -86,7 +86,6 @@ def run_exp(args):
             exp_yaml = os.path.join(
                 exp_dir,
                 "params_{0}.yaml".format(robot))
-            param['sim']['config_file'] = exp_yaml
             with open(exp_yaml, 'w') as yaml_file:
                 yaml.dump(param, yaml_file, default_flow_style=False)
 

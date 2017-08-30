@@ -5,7 +5,7 @@ import matplotlib.cm as cm
 import matplotlib
 
 from general.analysis.analyze import Analyze
-
+from robots.bebop2d.analysis.train_bebop2d import TrainBebop2d
 from config import params
 
 class AnalyzeSimRCcar(Analyze):

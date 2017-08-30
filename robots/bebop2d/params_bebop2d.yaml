@@ -8,7 +8,7 @@ exp_name: 'arena'
 ##########################
 
 probcoll:
-  dt: 0.25
+  dt: 0.4
   T: 40 # timesteps per trajectory
   logger: 'debug'
   max_iter: 20
@@ -25,7 +25,7 @@ probcoll:
   testing:
     num_rollout: 4
     itr_freq: 40
-#  init_data: /home/bding/Desktop/code/probcoll/init_data
+#  init_data: /home/bding/Desktop/code/probcoll/init_ar
 
 
 
@@ -151,6 +151,7 @@ model:
 
   output_graph:
     graph_type: 'fc'
+  label_shift: 1
 
 
 #################################################
@@ -161,7 +162,7 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [20., 0., 0.] # TODO
+      weight: [10., 0., 0.] # TODO
       std_weight: 0.0
       pre_activation: True
     
@@ -176,14 +177,14 @@ planning:
   planner_type: 'random' # random / primitives / cem
   
   control_range:
-    lower: [0.0, -1, 0]
-    upper: [1.0, 1, 0]
+    lower: [0.6, -0.6, 0]
+    upper: [1.0, 0.6, 0]
 
   random:
-    K: 512 # number of actions to sample from
+    K: 8192 # number of actions to sample from
 
   epsilon_greedy:
-    endpoints: [[0, 1.0], [6, 1.0], [12, 0.5], [18, 0.0]]
+    endpoints: [[0, 1.0], [6, 0.25], [18, 0.0]]
     outside_value: 0.01
 
   control_noise:
@@ -191,15 +192,13 @@ planning:
 
     zero: {}
     gaussian:
-      std: [0.1, 0.1, 0.1]
+      std: [0.1, 0.1, 0.0]
     uniform:
-      lower: [0.0, 0.0, 0.0]
-      upper: [0.0, 0.0, 0.0]
-      lower: [0.0, 0.0, 0.0]
-      upper: [0.0, 0.0, 0.0]
-
+      lower: [0, -0.1, 0.0]
+      upper: [0.1, 0.1, 0.0]
   visualize: False
   teleop: False
+  target_height: 0.85
 
 ######################################################
 ########### States, controls, observations ###########
@@ -237,6 +236,8 @@ O:
     num_channels: 1
   collision: {idx: 256, dim: 1, buffer: 0.0}
 
+analyze:
+  plot: True
 ##################
 ### ros topics ###
 ##################

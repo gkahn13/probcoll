@@ -44,11 +44,12 @@ class Policy(object):
                 elif noise_type == 'uniform':
                     noise = UniformNoise(
                         self.params['control_noise']['uniform'],
-                        dtype=self.dtype) 
+                        dtype=self.dtype)
                 else:
                     raise NotImplementedError(
                         "Noise type {0} is not valid".format(noise_type))
                 return action + noise
+                # return noise
             # Epsilon greedy 
             self.eps_schedule = schedules.PiecewiseSchedule(
                 endpoints=self.params['epsilon_greedy']['endpoints'],

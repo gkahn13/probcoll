@@ -4,6 +4,7 @@ import numpy as np
 import multiprocessing
 from general.algorithm.probcoll_model import ProbcollModel
 from config import params
+from std_msgs.msg import Empty
 import tensorflow as tf
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
@@ -118,6 +119,14 @@ class Probcoll:
         self._logger.info('')
         self._logger.info('=== Itr {0}'.format(itr))
         self._logger.info('')
+        if self._agent.battery_percentage < 10:
+            self._logger.info('Please swap the battery and then restart the code to continue')
+            while self._agent.battery_percentage < 10:
+                time.sleep(2)
+        # if itr == 2:
+        #     print 'weight changed'
+        #     params['planning']['cost']['coll_cost']['weight'] = params['planning']['cost']['coll_cost']['weight_a']
+        #     self._mpc_policy = self._create_mpc()
         self._logger.info('Itr {0} running'.format(itr))
         self._run_rollout(itr)
         self._logger.info('Itr {0} adding data'.format(itr))
@@ -185,8 +194,11 @@ class Probcoll:
             self._agent.reset()
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
-
         samples = []
+        self._agent._ros_pub_takeoff.publish(Empty())
+        time.sleep(8)
+        self._agent.maintain_height()
+        time.sleep(5)
         for cond in xrange(self._num_rollouts):
             self._agent.reset()
             self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
@@ -209,5 +221,7 @@ class Probcoll:
                 elapsed,
                 t*params['probcoll']['dt']/elapsed))
             self._rollout_num += 1
+        self._agent.back_up()
+        self._agent._ros_pub_land.publish(Empty())
         # self._agent.act(None)
         self._itr_save_samples(itr, samples)

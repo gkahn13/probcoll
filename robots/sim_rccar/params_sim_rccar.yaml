@@ -10,7 +10,7 @@ exp_name: 'cylinder_depth'
 
 probcoll:
   dt: 0.25
-  T: 48 # timesteps per trajectory
+  T: 40 # timesteps per trajectory
   logger: 'debug' # debug/info/fatal what level to log
   max_iter: 20
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
@@ -26,13 +26,13 @@ probcoll:
   testing:
     num_rollout: 20
     itr_freq: 4
-
+  init_data: /home/bding/Desktop/code/probcoll/init_car
 ######################
 ### Probcoll model ###
 ######################
     
 model:
-  T: 12 # how many timesteps to predict
+  T: 8 #how many timesteps to predict
   logger: 'info' # debug/info/warning/fatal what level to log
   
   # What to use as input to prediction model
@@ -129,7 +129,7 @@ planning:
     upper: [15., 1.]
 
   random:
-    K: 2048 # number of actions to sample from
+    K: 32 # number of actions to sample from
 
   cem:
     init_M: 2048 # number of actions to sample from
@@ -159,7 +159,7 @@ planning:
       upper: [5., 0.]
   
   # Visualization
-  visualize: False # EXPERIMENTAL
+  visualize: True # EXPERIMENTAL
   topics:
     debug_cost: 'debug_cost' # visualization_msgs/MarkerArray
     debug_cost_probcoll: 'debug_cost_probcoll' # visualization_msgs/MarkerArray
