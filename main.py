@@ -21,8 +21,9 @@ except:
 
 try:
     from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-    from robots.rccar.analysis.analyze_rccar import AnalyzeRCcar
-    from robots.rccar.analysis.train_rccar import TrainRCcar
+    from robots.rccar.algorithm.probcoll_rccar_pc import ProbcollRCcarPC
+#    from robots.rccar.analysis.analyze_rccar import AnalyzeRCcar
+#    from robots.rccar.analysis.train_rccar import TrainRCcar
 except:
     print('main.py: not importing RC car')
 try:
@@ -105,6 +106,8 @@ if __name__ == '__main__':
             prediction = ProbcollBebop2d()
         elif robot == 'rccar':
             prediction = ProbcollRCcar()
+        elif robot == 'rccar_pc':
+            prediction = ProbcollRCcarPC()
         elif robot == 'sim_rccar':
             prediction = ProbcollSimRCcar()
         else:
