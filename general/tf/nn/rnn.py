@@ -16,6 +16,7 @@ def rnn(
     inputs is shape [batch_size x T x features].
     """
     num_cells = params['num_cells']
+    cell_args = params.get('cell_args', {})
     if params['cell_type'] == 'rnn':
         cell_type = rnn_cell.DpRNNCell
         if initial_state is not None:
@@ -27,7 +28,11 @@ def rnn(
             initial_state = tuple(tf.split(initial_state, num_cells, axis=1))
             num_units = initial_state[0].get_shape()[1].value
     elif params['cell_type'] == 'lstm':
-        cell_type = rnn_cell.DpLSTMCell
+        if 'use_layer_norm' in cell_args and cell_args['use_layer_norm']:
+            cell_type = tf.contrib.rnn.LayerNormBasicLSTMCell
+        else:
+            cell_type = rnn_cell.DpLSTMCell
+        cell_args = dict([(k, v) for k, v in cell_args.items() if k != 'use_layer_norm'])
         if initial_state is not None:
             states = tf.split(initial_state, 2 * num_cells, axis=1)
             num_units = states[0].get_shape()[1].value
@@ -51,7 +56,6 @@ def rnn(
     if initial_state is None:
         num_units = params['num_units']
     dropout = params.get('dropout', None)
-    cell_args = params.get('cell_args', {})
     if dp_masks is not None or dropout is None:
         dp_return_masks = None
     else:
@@ -83,13 +87,16 @@ def rnn(
                 num_inputs = inputs.get_shape()[-1]
             else:
                 num_inputs = num_units
-            cell = cell_type(
-                num_units,
-                dropout_mask=dp,
-                dtype=dtype,
-                num_inputs=num_inputs,
-                weights_scope='{0}_{1}'.format(params['cell_type'], i),
-                **cell_args)
+            if cell_type == tf.contrib.rnn.LayerNormBasicLSTMCell:
+                cell = cell_type(num_units, **cell_args)
+            else:
+                cell = cell_type(
+                    num_units,
+                    dropout_mask=dp,
+                    dtype=dtype,
+                    num_inputs=num_inputs,
+                    weights_scope='{0}_{1}'.format(params['cell_type'], i),
+                    **cell_args)
             
             cells.append(cell)
             
