@@ -1,5 +1,6 @@
 from general.tf import tf_utils
 import tensorflow as tf
+from general.tf.nn.weight_norm import conv2d_weight_norm
 
 def convnn(
         inputs,
@@ -8,7 +9,8 @@ def convnn(
         dtype=tf.float32,
         data_format='NHWC',
         reuse=False,
-        is_training=True):
+        is_training=True,
+        global_step_tensor=None):
 
     if params['conv_activation'] == 'relu':
         conv_activation = tf.nn.relu
@@ -65,26 +67,51 @@ def convnn(
                         'scale': True,
                         'center': True
                     }
+            elif normalizer == 'weight_norm':
+                normalizer_fn = None
+                normalizer_params = None
+
+                if i == 0 and data_format != 'NHWC':
+                    if data_format == 'NCHW':
+                        next_layer_input = tf.transpose(next_layer_input, (0, 2, 3, 1))
+                    else:
+                        raise Exception('weight norm and data format, fix it')
+                    data_format = 'NHWC'
+
             elif normalizer is None:
                 normalizer_fn = None
                 normalizer_params = None
             else:
                 raise NotImplementedError(
                     'Normalizer {0} is not valid'.format(normalizer))
-            next_layer_input = tf.contrib.layers.conv2d(
-                inputs=next_layer_input,
-                num_outputs=filters[i],
-                data_format=data_format,
-                kernel_size=kernels[i],
-                stride=strides[i],
-                padding=padding,
-                activation_fn=activation,
-                normalizer_fn=normalizer_fn,
-                normalizer_params=normalizer_params,
-                weights_initializer=tf.contrib.layers.xavier_initializer_conv2d(dtype=dtype),
-                weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),
-                biases_initializer=tf.constant_initializer(0., dtype=dtype),
-                trainable=True)
+
+            if normalizer == 'weight_norm':
+                next_layer_input = conv2d_weight_norm(
+                    inputs=next_layer_input,
+                    num_outputs=filters[i],
+                    data_format=data_format,
+                    kernel_size=kernels[i],
+                    stride=strides[i],
+                    padding=padding,
+                    activation_fn=activation,
+                    trainable=True,
+                    global_step_tensor=global_step_tensor
+                )
+            else:
+                next_layer_input = tf.contrib.layers.conv2d(
+                    inputs=next_layer_input,
+                    num_outputs=filters[i],
+                    data_format=data_format,
+                    kernel_size=kernels[i],
+                    stride=strides[i],
+                    padding=padding,
+                    activation_fn=activation,
+                    normalizer_fn=normalizer_fn,
+                    normalizer_params=normalizer_params,
+                    weights_initializer=tf.contrib.layers.xavier_initializer_conv2d(dtype=dtype),
+                    weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),
+                    biases_initializer=tf.constant_initializer(0., dtype=dtype),
+                    trainable=True)
 
     output = next_layer_input
     # TODO

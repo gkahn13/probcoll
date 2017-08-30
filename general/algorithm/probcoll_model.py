@@ -207,6 +207,7 @@ class ProbcollModel:
     ############
     ### Data ###
     ############
+
     def U_idxs(self, p=None, without=[]):
         if p is None: p = params
         return list(itertools.chain(*[range(p['U'][ord]['idx'],
@@ -608,7 +609,8 @@ class ProbcollModel:
             data_format=self.data_format,
             scope=scope,
             reuse=reuse,
-            is_training=is_training)
+            is_training=is_training,
+            global_step_tensor=self.global_step)
         if len(im_output.get_shape()) > 2:
             im_output = tf.contrib.layers.flatten(im_output)
         output, _ = fcnn(
@@ -617,7 +619,9 @@ class ProbcollModel:
             dtype=self.dtype,
             scope=scope,
             reuse=reuse,
-            is_training=is_training)
+            is_training=is_training,
+            global_step_tensor=self.global_step
+        )
         if obs_batch == 1:
             output = tf.tile(output, [batch_size, 1])
         return output
@@ -741,7 +745,9 @@ class ProbcollModel:
                         is_training=is_training,
                         scope="output_graph_b{0}".format(b),
                         reuse=reuse,
-                        T=self.T)
+                        T=self.T,
+                        global_step_tensor=self.global_step
+                    )
 
                     output_mat_b = tf.reshape(output_mat_b, [batch_size, self.T, self.doutput])
                     # TODO not general because it assumes doutput = 1
@@ -913,7 +919,9 @@ class ProbcollModel:
                         is_training=False,
                         scope="output_graph_b{0}".format(b),
                         reuse=reuse,
-                        T=self.T)
+                        T=self.T,
+                        global_step_tensor=self.global_step
+                    )
 
                     output_mat_b = tf.reshape(output_mat_b, [batch_size, self.T, self.doutput])
                     # TODO not general because it assumes doutput = 1
@@ -1041,7 +1049,7 @@ class ProbcollModel:
             for (g, var) in grad:
                 if g is not None:
                     clipped_grad.append((tf.clip_by_norm(g, self.grad_clip), var))
-            optimizers.append(opt.apply_gradients(clipped_grad))
+            optimizers.append(opt.apply_gradients(clipped_grad, global_step=self.global_step))
             grads += clipped_grad
 
         vars_after = tf.global_variables()
@@ -1078,6 +1086,7 @@ class ProbcollModel:
             self.d_train = dict()
             self.d_val = dict()
             self.d_eval = dict()
+            self.global_step = tf.Variable(0, trainable=False, name='global_step')
 
             ### prepare for training
             for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
@@ -1160,7 +1169,6 @@ class ProbcollModel:
                     self._no_coll_val_fnames_ph : self.tfrecords_no_coll_train_fnames,
                     self._coll_val_fnames_ph : self.tfrecords_coll_train_fnames
                 })
-
 
     def _flush_queue(self):
         # Flush file name queues

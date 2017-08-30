@@ -13,10 +13,10 @@ from rllab.misc.instrument import run_experiment_lite
 from rllab.misc import logger
 from botocore.exceptions import ClientError
 
-try:
-    from robots.sim_rccar.algorithm.probcoll_sim_rccar import ProbcollSimRCcar
-except:
-    print('main.py: not import sim RC car')
+# try:
+from robots.sim_rccar.algorithm.probcoll_sim_rccar import ProbcollSimRCcar
+# except:
+#     print('main.py: not import sim RC car')
 
 def run_ec2(variant):
     from config import set_params, params
@@ -55,7 +55,7 @@ if __name__ == '__main__':
             'key_name': 'rllab-us-east-1',
             'image_id': 'ami-36828f4d',
             'region_name': 'us-east-1',
-            'subnet_id': 'subnet-95cc71dd',  # TODO
+            'subnet_id': 'subnet-ef4c648a',  # TODO
             'security_group_ids': ['sg-9e9e00e0']
         })
     elif args.region == 'us-east-2':
