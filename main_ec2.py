@@ -55,7 +55,7 @@ if __name__ == '__main__':
             'key_name': 'rllab-us-east-1',
             'image_id': 'ami-36828f4d',
             'region_name': 'us-east-1',
-            'subnet_id': 'subnet-95cc71dd',  # TODO
+            'subnet_id': 'subnet-ef4c648a',  # TODO
             'security_group_ids': ['sg-9e9e00e0']
         })
     elif args.region == 'us-east-2':

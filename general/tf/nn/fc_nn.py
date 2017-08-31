@@ -1,5 +1,6 @@
 from general.tf import tf_utils
 import tensorflow as tf
+from general.tf.nn.weight_norm import fully_connected_weight_norm
 
 def fcnn(
         inputs,
@@ -11,7 +12,8 @@ def fcnn(
         scope='fcnn',
         reuse=False,
         is_training=True,
-        T=None):
+        T=None,
+        global_step_tensor=None):
     
     if 'hidden_activation' not in params:
         hidden_activation = None
@@ -76,6 +78,9 @@ def fcnn(
                         'scale': True,
                         'center': True
                     }
+            elif normalizer == 'weight_norm':
+                normalizer_fn = None
+                normalizer_params = None
             elif normalizer is None:
                 normalizer_fn = None
                 normalizer_params = None
@@ -94,6 +99,14 @@ def fcnn(
                     biases_initializer=tf.constant_initializer(0., dtype=dtype),
                     weights_regularizer=tf.contrib.layers.l2_regularizer(0.5),
                     trainable=True)
+            elif normalizer == 'weight_norm':
+                next_layer_input = fully_connected_weight_norm(
+                    inputs=next_layer_input,
+                    num_outputs=dim,
+                    activation_fn=activation,
+                    trainable=True,
+                    global_step_tensor=global_step_tensor
+                )
             else:
                 fc_out = tf.contrib.layers.fully_connected(
                     inputs=next_layer_input,

@@ -66,6 +66,7 @@ if __name__ == '__main__':
     parser_analyze.add_argument('--plot_samples', action='store_true')
     parser_analyze.add_argument('--plot_groundtruth', action='store_true')
     parser_analyze.add_argument('--value_heat_map', action='store_true')
+    parser_analyze.add_argument('-save_dir', type=str, default=None)
 
     parser_train.add_argument('--plot_dir', type=str, default=None)
     parser_train.add_argument('--data_dirs', type=str, default=None)
@@ -122,8 +123,7 @@ if __name__ == '__main__':
         elif robot == 'rccar':
             analyze = AnalyzeRCcar(on_replay=args.on_replay)
         elif robot == 'sim_rccar':
-            analyze = AnalyzeSimRCcar(value_heat_map=args.value_heat_map
-                    )
+            analyze = AnalyzeSimRCcar(value_heat_map=args.value_heat_map, save_dir=args.save_dir)
         else:
             raise Exception('Cannot run {0} for robot {1}'.format(run, robot))
 

@@ -98,6 +98,7 @@ class ProbcollModelReplayBuffer(ProbcollModel):
         self.tf_debug = {}
         self._graph_setup()
 
+
     ############
     ### Data ###
     ############
@@ -285,7 +286,9 @@ class ProbcollModelReplayBuffer(ProbcollModel):
             o_vec_ph,
             output_ph,
             length_ph):
-        list_data = [replay_buffer.sample(self.batch_size) for _ in range(self.num_bootstrap)]
+        # batch_size = self.batch_size if tf.train.global_step(self.sess, self.global_step) > 0 else 5096 # TODO: can't do b/c batch size fixed
+        batch_size = self.batch_size
+        list_data = [replay_buffer.sample(batch_size) for _ in range(self.num_bootstrap)]
         u_b, o_im_b, o_vec_b, output_b, length_b = zip(*list_data) 
         feed_dict = {
                 u_ph: u_b,
@@ -302,6 +305,7 @@ class ProbcollModelReplayBuffer(ProbcollModel):
             self.d_train = dict()
             self.d_val = dict()
             self.d_eval = dict()
+            self.global_step = tf.Variable(0, trainable=False, name='global_step')
 
             ### prepare for training
             for i, (name, d) in enumerate((('train', self.d_train), ('val', self.d_val))):
