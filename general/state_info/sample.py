@@ -1,7 +1,5 @@
 import os.path
 import numpy as np
-from general.utility.utils import posquats_to_poses
-
 from config import params as meta_data
 
 class Sample(object):
@@ -123,19 +121,6 @@ class Sample(object):
             pa.poses.append(pose)
 
         pub.publish(pa)
-
-    def plot_rave(self, rave_env, t=None, color=(1,0,0), scale=0.4):
-        if t is None: t = slice(0, self._T)
-        positions = self.get_X(t=t, sub_state='position')
-        orientations = self.get_X(t=t, sub_state='orientation')
-
-        if len(positions.shape) == 1: positions = np.array([positions])
-        if len(orientations.shape) == 1: orientations = np.array([orientations])
-
-        poses = posquats_to_poses(positions, orientations)
-        rave_env.robot.SetTransform(poses[0])
-        for pose in poses:
-            rave_env.plot_arrow(pose, color=color, s=scale)
 
     def get_X_dim(self, sub_state):
         x_idxs = self.get_X_idxs(sub_state=sub_state)

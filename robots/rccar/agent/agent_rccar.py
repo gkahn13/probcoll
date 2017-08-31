@@ -7,20 +7,20 @@ from robots.rccar.env.rccar_env import RCcarEnv
 
 from config import params
 
-class AgentSimRCcar(Agent):
+class AgentRCcar(Agent):
 
     def __init__(self):
-        self._env = RCcarEnv()
+        self._env = RCcarEnv(params['env'])
         self._curr_rollout_t = 0
         self._done = False
-        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+        self.last_n_obs = [np.zeros(params['O']['dim']) for _ in range(params['model']['num_O'])]  
         self.reset()
 
     def sample_policy(self, policy, T=1, time_step=0, is_testing=False, only_noise=False):
         visualize = params['planning'].get('visualize', False)
         sample_noise = Sample(meta_data=params, T=T)
         sample_no_noise = Sample(meta_data=params, T=T)
-        for t in xrange(T):
+        for t in range(T):
             # Get observation and act
             o_t = self.get_observation()
             self.last_n_obs.pop(0)
@@ -68,9 +68,9 @@ class AgentSimRCcar(Agent):
 
         return sample_noise, sample_no_noise, t 
 
-    def reset(self, hard_reset=False, is_testing=False):
-        self._obs = self.env.reset(hard_reset=hard_reset, random_reset=not is_testing)
-        if self._done or hard_reset:
+    def reset(self):
+        self._obs = self._env.reset()
+        if self._done:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
         self._done = False
 
@@ -102,7 +102,7 @@ class AgentSimRCcar(Agent):
         return im
 
     def act(self, u=[0.0, 0.0]):
-        self._obs, _, self._done, self._info = self.env.step(u)
+        self._obs, _, self._done, self._info = self._env.step(u)
  
     def close(self):
         self._env.close()

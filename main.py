@@ -19,13 +19,16 @@ try:
 except:
     print('main.py: not importing Bebop2d')
 
-#try:
-from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-from robots.rccar.algorithm.probcoll_rccar_remote import ProbcollRCcarRemote
-#    from robots.rccar.analysis.analyze_rccar import AnalyzeRCcar
-#    from robots.rccar.analysis.train_rccar import TrainRCcar
-#except:
-#    print('main.py: not importing RC car')
+try:
+    from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
+except:
+    print('main.py: not importing RC car')
+
+try:
+    from robots.rccar.algorithm.probcoll_rccar_remote import ProbcollRCcarRemote
+except:
+    print('main.py: not importing RC car remote')
+
 try:
     from robots.sim_rccar.algorithm.probcoll_sim_rccar import ProbcollSimRCcar
     from robots.sim_rccar.analysis.analyze_sim_rccar import AnalyzeSimRCcar

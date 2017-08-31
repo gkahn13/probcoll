@@ -8,19 +8,19 @@ class RCcarEnv:
         self._sensors = SensorsHandler()
         self._collision = False
         self._params = params
-        self._do_back_up = back_up
+        self._do_back_up = params['do_back_up']
         self._next_time = None
 
     # Helper functions
 
-    def _do_action(self, action, time, vel_control=False):
+    def _do_action(self, action, t, vel_control=False):
         if self._next_time is not None:
             time.sleep(self._next_time - time.time())
         if vel_control:
             self._sensors.set_vel_cmd(action)
         else:
             self._sensors.set_motor_cmd(action)
-        self._next_time = time.time() + time
+        self._next_time = time.time() + t
 
     def _back_up(self):
         back_up_vel = self._params['back_up'].get('vel', -2.0) 
@@ -42,8 +42,8 @@ class RCcarEnv:
 
     def _get_info(self):
         info = {}
-        info['crashed'] = self._sensors.get_crash()
-        info['flipped'] = self._sensors.get_flipped()
+        info['coll'] = self._sensors.get_crash()
+        info['flipped'] = self._sensors.get_flip()
         info['steer'] = self._sensors.get_motor_data()[1]
         info['motor'] = self._sensors.get_motor_data()[2]
         info['vel'] = self._sensors.get_motor_data()[3]
@@ -53,6 +53,9 @@ class RCcarEnv:
 
     # Environment functions
 
+    def close(self):
+        self._sensors.close()
+
     def reset(self):
         if self._do_back_up:
             if self._sensors.get_crash():
@@ -61,7 +64,7 @@ class RCcarEnv:
         return self._get_observation()
 
     def step(self, action):
-        self._do_action(action, time=params['dt'], vel_control=params['vel_control'])
+        self._do_action(action, t=self._params['dt'], vel_control=self._params['use_vel'])
         observation = self._get_observation()
         reward = self._get_reward()
         done = self._get_done()

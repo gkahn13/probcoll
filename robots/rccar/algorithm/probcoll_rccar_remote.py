@@ -11,7 +11,7 @@ from general.state_info.sample import Sample
 from general.policy.random_policy import RandomPolicy
 from general.policy.policy_cem import PolicyCem
 from general.policy.policy_random_planning import PolicyRandomPlanning
-from robots.sim_rccar.agent.agent_sim_rccar import AgentSimRCcar
+from robots.rccar.agent.agent_rccar import AgentRCcar
 
 from config import params
 
@@ -23,7 +23,7 @@ class ProbcollRCcarRemote(Probcoll):
     def _setup(self):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
-        self.agent = AgentSimRCcar()
+        self.agent = AgentRCcar()
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
         self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)

@@ -1,7 +1,7 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/adam/probcoll/experiments/rccar'
+exp_dir: '/home/ubuntu/probcoll/experiments/rccar'
 exp_dir_car: '/home/ubuntu/probcoll/experiments/rccar'
 remote_main: '/home/ubuntu/probcoll/main.py'
 exp_name: 'testing'
@@ -53,7 +53,7 @@ model:
   
   # Device
   device: 0
-  gpu_fraction: 0.8
+  gpu_fraction: 0.9
   num_reading_threads: 4
 
   # Optimization
@@ -91,7 +91,7 @@ model:
     padding: 'SAME' 
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax 
-    normalizer: 'batch_norm'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
   
   observation_graph:
@@ -99,7 +99,7 @@ model:
     hidden_activation: 'relu'
     output_dim: 128 # This is the hidden size of the rnn
     output_activation: 'relu'
-    normalizer: 'batch_norm'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
   action_graph:
@@ -107,7 +107,7 @@ model:
     hidden_activation: 'relu'
     output_dim: 16
     output_activation: 'relu'
-    normalizer: 'batch_norm'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
   rnn_graph:
@@ -116,12 +116,12 @@ model:
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
-      use_layer_norm: True
+      use_layer_norm: False
 
   output_graph: 
     hidden_layers: [16]
     hidden_activation: 'relu'
-    normalizer: 'batch_norm'
+#    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
  
 #################################################
@@ -142,7 +142,7 @@ planning:
       weight: [0., 1.]     
 
   # Planner
-  planner_type: 'random' # random / cem / random_policy
+  planner_type: 'random_policy' # random / cem / random_policy
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
@@ -194,18 +194,27 @@ planning:
 ### Environment ###
 ###################
 
-sim:
-  sim_env: 'square' # square / cylinder / cyliner_small
-  visualize: False
-  use_vel: True
-  use_back_cam: True
-  use_depth: False
-  accelClamp: 2.0
-  mass: 10.0
-  p: 1.25
-  d: 0.0
+#sim:
+#  sim_env: 'square' # square / cylinder / cyliner_small
+#  visualize: False
+#  use_vel: True
+#  use_back_cam: True
+#  use_depth: False
+#  accelClamp: 2.0
+#  mass: 10.0
+#  p: 1.25
+#  d: 0.0
+#
+#  do_back_up: True
+#  back_up:
+#    steer: [-5., 5.]
+#    vel: -1.
+#    duration: 3.0
 
+env:
+  use_vel: True
   do_back_up: True
+  dt: 0.25
   back_up:
     steer: [-5., 5.]
     vel: -1.

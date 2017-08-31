@@ -20,7 +20,7 @@ class SensorsHandler:
         self._default_steer_motor = None
         self._default_imu_data = None
         self._crashed = False
-        self._flipped = False
+        self._flip = False
 
         self._cam = None
         self._image = None
@@ -69,7 +69,9 @@ class SensorsHandler:
                 self._cam.set(13, 50)
                 print('Camera found')
                 break
-        assert(self._imu_ser is not None and self._motor_ser is not None and self._cam is not None)
+        assert(self._imu_ser is not None)
+        assert(self._motor_ser is not None)
+        assert(self._cam is not None)
         print('Starting Threads')
         self._threads.append(threading.Thread(target=self._motor_thread))
         self._threads.append(threading.Thread(target=self._imu_thread))
@@ -104,14 +106,14 @@ class SensorsHandler:
                     last_motor_diff = self._last_motor_data[2] - self._default_steer_motor[1]
                     if self._imu_data[2] + self._default_imu_data[2] < 1.0:
                         self._crashed = True
-                        self._flipped = True
+                        self._flip = True
                     elif motor_diff > 5 and \
                             self._last_motor_data[3] > self._motor_data[3] and \
                             self._imu_data[0] < -6.0:
                         self._crashed = True
-                        self._flipped = False
+                        self._flip = False
                     else:
-                        self._flipped = False
+                        self._flip = False
                     
                     self._last_motor_data = self._motor_data
                     
