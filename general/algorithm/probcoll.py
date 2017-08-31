@@ -21,16 +21,16 @@ class Probcoll:
             self._save_dir = save_dir
         self._samples_dir = os.path.join(self._save_dir, "samples")
         self._data_dir = data_dir
-        self._setup()
-        self._logger = get_logger(
-            self.__class__.__name__,
-            params['probcoll']['logger'],
-            os.path.join(self._save_dir, 'dagger.txt'))
-        self.policy = self._create_mpc()
         new_yaml_path = os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name']))
         if not os.path.exists(new_yaml_path):
             with open(new_yaml_path, 'w') as f:
                 f.write(params.pop('yaml_txt'))
+        self._logger = get_logger(
+            self.__class__.__name__,
+            params['probcoll']['logger'],
+            os.path.join(self._save_dir, 'dagger.txt'))
+        self._setup()
+        self.policy = self._create_mpc()
 
     @abc.abstractmethod
     def _setup(self):

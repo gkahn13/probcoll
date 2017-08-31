@@ -19,13 +19,13 @@ try:
 except:
     print('main.py: not importing Bebop2d')
 
-try:
-    from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
-    from robots.rccar.algorithm.probcoll_rccar_pc import ProbcollRCcarPC
+#try:
+from robots.rccar.algorithm.probcoll_rccar import ProbcollRCcar
+from robots.rccar.algorithm.probcoll_rccar_remote import ProbcollRCcarRemote
 #    from robots.rccar.analysis.analyze_rccar import AnalyzeRCcar
 #    from robots.rccar.analysis.train_rccar import TrainRCcar
-except:
-    print('main.py: not importing RC car')
+#except:
+#    print('main.py: not importing RC car')
 try:
     from robots.sim_rccar.algorithm.probcoll_sim_rccar import ProbcollSimRCcar
     from robots.sim_rccar.analysis.analyze_sim_rccar import AnalyzeSimRCcar
@@ -48,12 +48,16 @@ if __name__ == '__main__':
     
     ### arguments common to all
     for subparser in (parser_probcoll, parser_analyze, parser_replay_probcoll, parser_train):
-        subparser.add_argument('robot', type=str, choices=('pointquad', 'bebop2d', 'rccar', 'sim_rccar'),
+        subparser.add_argument('robot', type=str, choices=('pointquad', 'bebop2d', 'rccar_remote', 'rccar', 'sim_rccar'),
                                help='robot type')
         subparser.add_argument('-exp_name', type=str, default=None,
                                 help='experiment name')
         subparser.add_argument('-yaml', type=str, default=None,
                                help='yaml path relative to robot, defaults to params_<robot>.yaml')
+
+    parser_probcoll.add_argument('--server', type=str, default=None)
+    parser_probcoll.add_argument('--username', type=str, default=None)
+    parser_probcoll.add_argument('--password', type=str, default=None)
 
     ### replay specific arguments
     parser_replay_probcoll.add_argument('-itr', type=int, default=None,
@@ -105,9 +109,9 @@ if __name__ == '__main__':
         elif robot == 'bebop2d':
             prediction = ProbcollBebop2d()
         elif robot == 'rccar':
-            prediction = ProbcollRCcar()
-        elif robot == 'rccar_pc':
-            prediction = ProbcollRCcarPC()
+            prediction = ProbcollRCcar(server=args.server, username=args.username, password=args.password)
+        elif robot == 'rccar_remote':
+            prediction = ProbcollRCcarRemote()
         elif robot == 'sim_rccar':
             prediction = ProbcollSimRCcar()
         else:

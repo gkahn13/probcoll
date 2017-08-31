@@ -16,7 +16,8 @@ probcoll:
   logger: 'info' # debug/info/fatal what level to log
   max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-  
+  save_O: True
+
   # Training
   training_start_iter: 4
   is_training: True # EXPERIMENTAL
