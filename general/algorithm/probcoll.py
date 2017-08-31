@@ -19,6 +19,7 @@ class Probcoll:
             self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
             self._save_dir = save_dir
+        self._samples_dir = os.path.join(self._save_dir, "samples")
         self._data_dir = data_dir
         self._setup()
         self._logger = get_logger(
@@ -52,17 +53,10 @@ class Probcoll:
     ### Save methods ###
     ####################
 
-    def _itr_dir(self, itr, create=True):
-        assert(type(itr) is int)
-        dir = os.path.join(self._save_dir, 'itr{0}'.format(itr))
-        if not create:
-            return dir
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        return dir
-
     def _itr_samples_file(self, itr, prefix='', create=True):
-        return os.path.join(self._itr_dir(itr, create=create),
+        if not os.path.exists(self._samples_dir):
+            os.mkdir(self._samples_dir)
+        return os.path.join(self._samples_dir,
                             '{0}samples_itr_{1}.npz'.format(prefix, itr))
 
     def _itr_save_samples(self, itr, samples, prefix=''):
@@ -200,7 +194,7 @@ class Probcoll:
                 self.probcoll_model.recover()
             T = params['probcoll']['T']
             samples = []
-            self.agent.reset()
+            self.agent.reset(is_testing=True)
             total_time = 0
             start = time.time()
             for cond in range(params['probcoll']['testing']['num_rollout']):

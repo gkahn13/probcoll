@@ -1178,7 +1178,8 @@ class ProbcollModel:
 
     def train(self, reset=False, **kwargs):
         if len(self.tfrecords_no_coll_train_fnames) == 0 and len(self.tfrecords_coll_train_fnames) == 0:
-            self._logger.info('Training skipped due to lack of data')
+#            self._logger.info('Training skipped due to lack of data')
+            pass
         else:
             self.graph.as_default()
             num_files = len(self.tfrecords_no_coll_train_fnames)
@@ -1386,10 +1387,13 @@ class ProbcollModel:
     ### Load/save/reset/close ###
     #############################
 
+    def get_latest_checkpoint(self):
+        return tf.train.latest_checkpoint(
+            self._checkpoints_dir)
+
     def recover(self):
         try:
-            latest_file = tf.train.latest_checkpoint(
-                self._checkpoints_dir)
+            latest_file = self.get_latest_checkpoint()
             self.load(latest_file)
             self._logger.info("Found checkpoint file")
         except:

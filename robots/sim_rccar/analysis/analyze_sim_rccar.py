@@ -259,4 +259,4 @@ class AnalyzeSimRCcar(Analyze):
         try:
             self._plot_statistics(testing=True)
         except:
-            self._logger.info('No testing trajectoreis were loaded to analyze')
+            self._logger.info('No testing trajectories were loaded to analyze')

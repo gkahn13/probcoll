@@ -19,7 +19,7 @@ class SensorsHandler:
         self._is_calibrated = False
         self._default_steer_motor = None
         self._default_imu_data = None
-        self._crash = False
+        self._crashed = False
         self._flipped = False
 
         self._cam = None
@@ -89,32 +89,35 @@ class SensorsHandler:
                     motor_data = data[1:-3].split(",")
                     if len(motor_data) == 4:
                         self._motor_data = np.array(motor_data, dtype=np.float32)
+                        if self._is_calibrated:
+                            steer_diff, motor_diff = self._motor_data[1:3] - self._default_steer_motor
+                            if motor_diff == 0:
+                                motor_sign = 0
+                            else:
+                                motor_sign = abs(motor_diff) / motor_diff
+                            self._motor_data[1] = steer_diff
+                            self._motor_data[2] = motor_diff
+                            self._motor_data[3] = self._motor_data[3] * motor_sign
 
                 if self._is_calibrated and self._motor_data is not self._last_motor_data:
                     motor_diff = self._motor_data[2] - self._default_steer_motor[1]
                     last_motor_diff = self._last_motor_data[2] - self._default_steer_motor[1]
-                    if self._imu_data is not None and self._imu_data[2] + self._default_imu_data[2] < 1.0:
-                        self._crash = True
+                    if self._imu_data[2] + self._default_imu_data[2] < 1.0:
+                        self._crashed = True
                         self._flipped = True
                     elif motor_diff > 5 and \
                             self._last_motor_data[3] > self._motor_data[3] and \
-                            self._imu_data is not None and self._imu_data[0] < -6.0:
-                        self._crash = True
+                            self._imu_data[0] < -6.0:
+                        self._crashed = True
                         self._flipped = False
                     else:
-                        self._crash = False
                         self._flipped = False
                     
                     self._last_motor_data = self._motor_data
                     
                     if self._vel_cmd is not None:
                         steer, vel = self._vel_cmd
-                        motor_diff = self._motor_data[2] - self._default_steer_motor[1]
-                        if motor_diff == 0:
-                            motor_sign = 0
-                        else:
-                            motor_sign = abs(motor_diff) / motor_diff
-                        enc = motor_sign * self._motor_data[3]
+                        enc = self._motor_data[3]
                         err = vel - enc
                         self._dt += time.time() - self._pd_time
                         d_err = (err - self._last_err) / self._dt
@@ -178,7 +181,7 @@ class SensorsHandler:
         return self._image
 
     def get_crash(self):
-        return self._crash
+        return self._crashed
 
     def get_flip(self):
         return self._flip
@@ -195,6 +198,9 @@ class SensorsHandler:
     def set_pd(self, p, d):
         self._p = p
         self._d = d
+
+    def reset_crash(self):
+        self._crashed = False
 
     # Utility functions
 
@@ -235,24 +241,23 @@ class SensorsHandler:
         
         if self._is_plotting:
             if self._is_calibrated:
-                if self._motor_data is not None and self._imu_data is not None:
-                    self._times.append(time.time() - self._start_time)
-                    self._steer_values.append(self._motor_data[1])
-                    self._motor_values.append(self._motor_data[2])
-                    self._encoder_values.append(self._motor_data[3])
-                    
-                    self._times = self._times[-100:]
-                    self._steer_values = self._steer_values[-100:]
-                    self._motor_values = self._motor_values[-100:]
-                    self._encoder_values = self._encoder_values[-100:]
-               
-                    self._x_values.append(self._imu_data[0])
-                    self._y_values.append(self._imu_data[1])
-                    self._z_values.append(self._imu_data[2])
-                    
-                    self._x_values = self._x_values[-100:]
-                    self._y_values = self._y_values[-100:]
-                    self._z_values = self._z_values[-100:]
+                self._times.append(time.time() - self._start_time)
+                self._steer_values.append(self._motor_data[1])
+                self._motor_values.append(self._motor_data[2])
+                self._encoder_values.append(self._motor_data[3])
+                
+                self._times = self._times[-100:]
+                self._steer_values = self._steer_values[-100:]
+                self._motor_values = self._motor_values[-100:]
+                self._encoder_values = self._encoder_values[-100:]
+           
+                self._x_values.append(self._imu_data[0])
+                self._y_values.append(self._imu_data[1])
+                self._z_values.append(self._imu_data[2])
+                
+                self._x_values = self._x_values[-100:]
+                self._y_values = self._y_values[-100:]
+                self._z_values = self._z_values[-100:]
 
                 
                 if len(self._times) > 0:
@@ -290,13 +295,11 @@ class SensorsHandler:
 
     def calibrate(self):
         input('When you are done calibrating press Enter')
-        while self._motor_data is None and self._imu_data is None:
+        while self._motor_data is None or self._imu_data is None:
             pass
         self._default_steer_motor = np.array(self._motor_data[1:3])
         self._default_imu_data = self._imu_data
         self._imu_data = self._imu_data - self._default_imu_data
-        print(self._default_steer_motor)
-        print(self._default_imu_data)
         self._start_time = time.time()
         self._is_calibrated = True
 

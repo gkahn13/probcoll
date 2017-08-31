@@ -3,31 +3,14 @@ import cv2
 import os
 from general.agent.agent import Agent
 from general.state_info.sample import Sample
-from robots.sim_rccar.simulation.square_env import SquareEnv
-from robots.sim_rccar.simulation.square_banked_env import SquareBankedEnv
-from robots.sim_rccar.simulation.cylinder_env import CylinderEnv
-from robots.sim_rccar.simulation.cylinder_small_env import CylinderSmallEnv
+from robots.rccar.env.rccar_env import RCcarEnv
 
 from config import params
 
 class AgentSimRCcar(Agent):
 
     def __init__(self):
-        # To keep the seed consistent
-        params['sim']['random_seed'] = params['random_seed']
-        if params['sim']['sim_env'] == 'square':
-            self.env = SquareEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'square_banked':
-            self.env = SquareBankedEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'cylinder':
-            self.env = CylinderEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'cylinder_small':
-            self.env = CylinderSmallEnv(params['sim'])
-        else:
-            raise NotImplementedError(
-                "Environment {0} is not valid".format(
-                    params['sim']['sim_env']))
-
+        self._env = RCcarEnv()
         self._curr_rollout_t = 0
         self._done = False
         self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
@@ -85,57 +68,26 @@ class AgentSimRCcar(Agent):
 
         return sample_noise, sample_no_noise, t 
 
-    def get_value(self, policy, pos=None, ori=None):
-        self.reset(pos=pos, ori=ori, hard_reset=True)
-        o_t = self.get_observation()
-        self.last_n_obs.pop(0)
-        self.last_n_obs.append(o_t)
-        val = policy.get_value(obs_frame=self.last_n_obs)
-        return val
-
-    def reset(self, pos=None, ori=None, hard_reset=False, is_testing=False):
-        self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset, random_reset=not is_testing)
+    def reset(self, hard_reset=False, is_testing=False):
+        self._obs = self.env.reset(hard_reset=hard_reset, random_reset=not is_testing)
         if self._done or hard_reset:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
         self._done = False
 
     def get_observation(self):
         obs_sample = Sample(meta_data=params, T=1)
-        front_im, back_im = np.split(self._obs, 2, axis=2)
-        if params['sim'].get('use_depth', False):
-            im = AgentSimRCcar.process_depth(front_im)
-            back_im = AgentSimRCcar.process_depth(back_im)
-        else:
-            im = AgentSimRCcar.process_image(front_im)
-            back_im = AgentSimRCcar.process_image(back_im)
-
+        im = AgentRCcar.process_image(self._obs)
         obs_sample.set_O(im.ravel(), t=0, sub_obs='camera')
-        obs_sample.set_O(back_im.ravel(), t=0, sub_obs='back_camera')
         return obs_sample.get_O(t=0)
 
     def get_state(self):
         state_sample = Sample(meta_data=params, T=1)
-        pos = self._info['pos']
-        ori = self._info['hpr']
         vel = [self._info['vel']]
-        state_sample.set_X(pos, t=0, sub_state='position')
-        state_sample.set_X(ori, t=0, sub_state='orientation')
         state_sample.set_X(vel, t=0, sub_state='velocity')
         return state_sample.get_X(t=0)
 
     def get_coll(self):
         return self._info['coll']
-
-    def get_pos_ori(self):
-        return self._info['pos'], self._info['hpr']
-
-    @staticmethod
-    def process_depth(image):
-        im = np.reshape(image, (image.shape[0], image.shape[1]))
-        model_shape = (params['O']['camera']['height'], params['O']['camera']['width'])
-        if im.shape != model_shape:
-            im = cv2.resize(im, model_shape, interpolation=cv2.INTER_AREA)
-        return im.astype(np.uint8)
 
     @staticmethod
     def process_image(image):
@@ -153,4 +105,4 @@ class AgentSimRCcar(Agent):
         self._obs, _, self._done, self._info = self.env.step(u)
  
     def close(self):
-        pass
+        self._env.close()

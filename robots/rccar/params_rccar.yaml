@@ -1,8 +1,10 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'square_16_asynch'
+exp_dir: '/home/adam/probcoll/experiments/rccar'
+exp_dir_car: '/home/ubuntu/probcoll/experiments/rccar'
+remote_main: '/home/ubuntu/probcoll/main.py'
+exp_name: 'testing'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,22 +12,21 @@ exp_name: 'square_16_asynch'
 
 probcoll:
   dt: 0.25
-  T: 320  # timesteps per trajectory
+  T: 40  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
   max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
-  save_O: True
-
+  
   # Training
   training_start_iter: 4
   is_training: True # EXPERIMENTAL
-  asynchronous_training: True # EXPERIMENTAL
+  asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
   num_timesteps: 240
 
   testing:
-    num_rollout: 4
+    num_rollout: 20
     itr_freq: 2
 
 ######################
@@ -33,10 +34,9 @@ probcoll:
 ######################
     
 model:
-  T: 16 # how many timesteps to predict
+  T: 8 # how many timesteps to predict
   logger: 'info' # debug/info/warning/fatal what level to log
-  save_checkpoints: 'all'
-
+  
   # What to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
   O_im_order: ['camera'] # 'camera' / 'back_camera'
@@ -63,7 +63,7 @@ model:
   batch_size: 64
   pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-3 # L2 regularization
+  reg: 1.e-6 # L2 regularization
   
   # Train schedule
   steps: 500
@@ -90,15 +90,15 @@ model:
     padding: 'SAME' 
     conv_activation: 'relu'
     output_activation: 'relu' # relu / tanh/ spatial_softmax 
-#    normalizer: 'batch_norm'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
   
   observation_graph:
     hidden_layers: [256]
     hidden_activation: 'relu'
     output_dim: 128 # This is the hidden size of the rnn
-    output_activation: 'tanh'
-#    normalizer: 'batch_norm'
+    output_activation: 'relu'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
   action_graph:
@@ -106,7 +106,7 @@ model:
     hidden_activation: 'relu'
     output_dim: 16
     output_activation: 'relu'
-#    normalizer: 'batch_norm'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
 
   rnn_graph:
@@ -115,12 +115,12 @@ model:
     cell_type: 'mulint_lstm' # rnn / mulint_rnn / lstm / mulint_lstm
 #    dropout: 0.8 # pct keep
     cell_args: # If you need to pass variables to cells 
-      use_layer_norm: False
+      use_layer_norm: True
 
   output_graph: 
     hidden_layers: [16]
     hidden_activation: 'relu'
-#    normalizer: 'batch_norm'
+    normalizer: 'batch_norm'
     batch_norm_decay: 0.9
  
 #################################################
@@ -141,7 +141,7 @@ planning:
       weight: [0., 1.]     
 
   # Planner
-  planner_type: 'cem' # random / cem / random_policy
+  planner_type: 'random' # random / cem / random_policy
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
@@ -152,7 +152,7 @@ planning:
     K: 4096 # number of actions to sample from
 
   cem:
-    init_M: 4096 # number of actions to sample from
+    init_M: 2048 # number of actions to sample from
     M: 256
     K: 16 # top actions you select
     num_additional_iters: 3 # does not include first sample    
@@ -178,7 +178,7 @@ planning:
     type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [7.5, 0.0]
+      std: [3.0, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
@@ -198,13 +198,13 @@ sim:
   visualize: False
   use_vel: True
   use_back_cam: True
-  use_depth: True
+  use_depth: False
   accelClamp: 2.0
   mass: 10.0
   p: 1.25
   d: 0.0
 
-  do_back_up: False
+  do_back_up: True
   back_up:
     steer: [-5., 5.]
     vel: -1.

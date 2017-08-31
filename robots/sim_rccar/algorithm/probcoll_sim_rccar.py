@@ -3,7 +3,6 @@ import subprocess
 import signal
 import time
 import numpy as np
-import paramiko
 
 from general.algorithm.probcoll import Probcoll
 from general.algorithm.probcoll_model import ProbcollModel
@@ -11,12 +10,12 @@ from general.algorithm.probcoll_model_replay_buffer import ProbcollModelReplayBu
 from general.state_info.sample import Sample
 from general.policy.random_policy import RandomPolicy
 from general.policy.policy_cem import PolicyCem
-from general.policy.policy_random_planning import PolicyRandomPlanning
+from robots.sim_rccar.policy.policy_random_planning_sim_rccar import PolicyRandomPlanningSimRCcar
 from robots.sim_rccar.agent.agent_sim_rccar import AgentSimRCcar
 
 from config import params
 
-class ProbcollRCcarPC(Probcoll):
+class ProbcollSimRCcar(Probcoll):
 
     def __init__(self, save_dir=None, data_dir=None):
         Probcoll.__init__(self, save_dir=save_dir, data_dir=data_dir)
@@ -24,55 +23,24 @@ class ProbcollRCcarPC(Probcoll):
     def _setup(self):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
-#        self.agent = AgentSimRCcar()
+        self.agent = AgentSimRCcar()
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
         self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)
 #        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
-        self._ssh = SSHClient()
-        self._ssh.load_system_host_keys()
-        self._ssh.connect(server, username=username, password=password)
-        self._sftp = shh.open_sftp()
 
-    ###################
-    ### Run methods ###
-    ###################
-    
-    def _run_itr(self, itr):
-        self._run_rollout(itr)
-
-    def close(self):
-        for p in self._jobs:
-            p.kill()
-        self.probcoll_model.close()
-        self._ssh.close()
-        self._sftp.close()
-
-    def _run_training(self, itr):
-        if itr >= params['probcoll']['training_start_iter']:
-            if params['probcoll']['is_training']:
-#                self.probcoll_model.recover()
-                if not self._async_on:
-                    self._async_training()
-                    self._async_on = True
+    ##########################
+    ### Threaded Functions ###
+    ##########################
 
     def _async_training(self):
-        self.probcoll_model.train_loop()
-
-    def _run_rollout(self, itr):
-        # TODO scp
-        for f in self._sftp.listdir(remote_dir):
-            local_file = os.path.join(local_dir, f)
-            remote_file = os.path.join(remtoe_dir, f)
-            self._sftp.get(remote_file, local_file)
-            self._sftp.remove(remote_file)
-        for f in os.lisdir(local_ckpt_dir):
-            local_file = os.path.join(local_ckpt_dir, f)
-            remote_file = os.path.join(remote_ckpt_dir, f)
-            self._sftp.put(local_file, remote_file)
-
-    def run_testing(self, itr):
-        pass
+        try:
+            p = subprocess.Popen(
+                ["python", "main.py", "train", "sim_rccar", "--asynch"])
+            self._jobs.append(p)
+        except Exception as e:
+            self._logger.warning('Error starting async training!')
+            self._logger.warning(e)
 
     #########################
     ### Create controller ###
@@ -84,9 +52,10 @@ class ProbcollRCcarPC(Probcoll):
         if self._planner_type == 'random_policy':
             mpc_policy = RandomPolicy()
         elif self._planner_type == 'random':
-            mpc_policy = PolicyRandomPlannin(self.probcoll_model, params['planning'])
+            mpc_policy = PolicyRandomPlanningSimRCcar(self.probcoll_model, params['planning'])
         elif self._planner_type == 'cem':
             mpc_policy = PolicyCem(self.probcoll_model, params['planning'])
         else:
             raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))
+
         return mpc_policy
