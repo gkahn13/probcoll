@@ -47,7 +47,7 @@ class SensorsHandler:
 
         serial_ports = glob.glob('/dev/ttyACM*')
         sers = [serial.Serial(port, 115200, timeout=timeout) for port in serial_ports]
-        print('Finding Serial Ports')
+        print('Found {0} Serial Ports'.format(len(sers)))
         for ser in sers:
             data = self._read_ser(ser)
             while len(data) == 0 or data[0] != '(' or data[-3] != ')':
@@ -306,6 +306,8 @@ class SensorsHandler:
         self._is_calibrated = True
 
     def close(self):
+        for t in self._threads:
+            t.join()
         if self._motor_ser is not None:
             self._send_motor_cmd()
             self._motor_ser.close()

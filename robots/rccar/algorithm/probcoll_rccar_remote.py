@@ -26,7 +26,7 @@ class ProbcollRCcarRemote(Probcoll):
         self.agent = AgentRCcar()
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
-        self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)
+#        self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)
 #        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
 
     #########################
@@ -50,6 +50,12 @@ class ProbcollRCcarRemote(Probcoll):
     ###################
     ### Run methods ###
     ###################
-
+    
+    def close(self):
+        self.agent.close()
+    
+    def _run_training(self, itr):
+        pass
+    
     def run_testing(self, itr):
         pass

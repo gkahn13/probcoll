@@ -102,7 +102,8 @@ class Probcoll:
                 fnames = [fname for fname in os.listdir(init_data_folder) if ext in fname]
                 for fname in fnames:
                     self._logger.info('\t{0}'.format(fname))
-                self.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
+                if hasattr(self, 'probcoll_model'):
+                    self.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
 
             ### if any data and haven't trained on it already, train on it
             if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
@@ -111,25 +112,23 @@ class Probcoll:
             self._time_step = self._num_timesteps * start_itr
             ### training loop
             for itr in range(start_itr, self._max_iter):
-                self._run_itr(itr)
+#                self._run_itr(itr)
+                self._run_rollout(itr)
                 self._run_training(itr)
                 self.run_testing(itr)
                 if not params['probcoll']['save_O']:
                     self._itr_remove_O_from_samples(itr)
-                if not self.probcoll_model.sess.graph.finalized:
+                if hasattr(self, 'probcoll_model') and not self.probcoll_model.sess.graph.finalized:
                     self.probcoll_model.sess.graph.finalize()
         finally:
             self.close()
 
-    def _run_itr(self, itr):
-        self._logger.info('')
-        self._logger.info('=== Itr {0}'.format(itr))
-        self._logger.info('')
-        self._logger.info('Itr {0} running'.format(itr))
-        self._run_rollout(itr)
-        self._logger.info('Itr {0} adding data'.format(itr))
-        self.probcoll_model.add_data([self._itr_samples_file(itr)])
-        self._logger.info('Itr {0} training probability of collision'.format(itr))
+#    def _run_itr(self, itr):
+#        self._logger.info('')
+#        self._logger.info('=== Itr {0}'.format(itr))
+#        self._logger.info('')
+#        self._logger.info('Itr {0} running'.format(itr))
+#        self._run_rollout(itr)
 
     def close(self):
         for p in self._jobs:
@@ -138,6 +137,9 @@ class Probcoll:
         self.probcoll_model.close()
     
     def _run_training(self, itr):
+        self._logger.info('Itr {0} adding data'.format(itr))
+        self.probcoll_model.add_data([self._itr_samples_file(itr)])
+        self._logger.info('Itr {0} training probability of collision'.format(itr))
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
                 if self._asynchronous:
@@ -153,6 +155,10 @@ class Probcoll:
         pass
 
     def _run_rollout(self, itr):
+        self._logger.info('')
+        self._logger.info('=== Itr {0}'.format(itr))
+        self._logger.info('')
+        self._logger.info('Itr {0} running'.format(itr))
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
         self._logger.info('\t\tStarting itr {0}'.format(itr))

@@ -91,10 +91,11 @@ if __name__ == '__main__':
     if yaml_name is None:
         yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}/params_{0}.yaml'.format(robot))
     else:
-        if yaml_name[0] == "/":
-            yaml_path = yaml_name
-        else:
-            yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}'.format(robot), yaml_name)
+        yaml_path = yaml_name
+#        if yaml_name[0] == "/":
+#            yaml_path = yaml_name
+#        else:
+#            yaml_path = os.path.join(os.path.dirname(__file__), 'robots/{0}'.format(robot), yaml_name)
     load_params(yaml_path)
     with open(yaml_path, 'r') as f:
         yaml_txt = ''.join(f.readlines())
