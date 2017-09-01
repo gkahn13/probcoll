@@ -112,7 +112,6 @@ class Probcoll:
             self._time_step = self._num_timesteps * start_itr
             ### training loop
             for itr in range(start_itr, self._max_iter):
-#                self._run_itr(itr)
                 self._run_rollout(itr)
                 self._run_training(itr)
                 self.run_testing(itr)
@@ -122,13 +121,6 @@ class Probcoll:
                     self.probcoll_model.sess.graph.finalize()
         finally:
             self.close()
-
-#    def _run_itr(self, itr):
-#        self._logger.info('')
-#        self._logger.info('=== Itr {0}'.format(itr))
-#        self._logger.info('')
-#        self._logger.info('Itr {0} running'.format(itr))
-#        self._run_rollout(itr)
 
     def close(self):
         for p in self._jobs:

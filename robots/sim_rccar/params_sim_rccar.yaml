@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'square_16_cem_small_replay'
+exp_name: 'square_16_cem_train_extra'
 
 ##########################
 ### Probcoll algorithm ###
@@ -25,8 +25,8 @@ probcoll:
   num_timesteps: 240
 
   testing:
-    num_rollout: 4
-    itr_freq: 2
+    num_rollout: 20
+    itr_freq: 4
 
 ######################
 ### Probcoll model ###
@@ -66,7 +66,7 @@ model:
   reg: 1.e-3 # L2 regularization
   
   # Train schedule
-  steps: 500
+  steps: 1000
   reset_freq: 0 # 0 means no resetting
   reset_steps: 500
   display_steps: 50 

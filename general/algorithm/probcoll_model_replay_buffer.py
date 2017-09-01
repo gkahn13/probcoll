@@ -58,7 +58,7 @@ class ProbcollModelReplayBuffer(ProbcollModel):
         self.dropout = params["model"]["action_graph"].get("dropout", None)
         
         self.train_replay_buffer = SplitReplayBuffer(
-            int(1e3),
+            int(5e5),
             self.T,
             self.dU,
             self.dO_im,
@@ -67,7 +67,7 @@ class ProbcollModelReplayBuffer(ProbcollModel):
             self.pct_coll)
 
         self.val_replay_buffer = SplitReplayBuffer(
-            int(1e3),
+            int(5e5),
             self.T,
             self.dU,
             self.dO_im,
