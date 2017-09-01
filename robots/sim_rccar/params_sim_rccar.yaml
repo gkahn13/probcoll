@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'square_16_asynch'
+exp_name: 'square_16_cem_small_replay'
 
 ##########################
 ### Probcoll algorithm ###
@@ -19,7 +19,7 @@ probcoll:
   # Training
   training_start_iter: 4
   is_training: True # EXPERIMENTAL
-  asynchronous_training: True # EXPERIMENTAL
+  asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
   num_timesteps: 240
@@ -60,7 +60,7 @@ model:
   grad_clip: 10.0 # Norm gradient clip
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
-  batch_size: 64
+  batch_size: 32
   pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
   reg: 1.e-3 # L2 regularization

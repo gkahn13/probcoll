@@ -19,6 +19,8 @@ class Probcoll:
             self._save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
             self._save_dir = save_dir
+        if not os.path.exists(self._save_dir):
+            os.mkdir(self._save_dir)
         self._samples_dir = os.path.join(self._save_dir, "samples")
         self._data_dir = data_dir
         new_yaml_path = os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name']))

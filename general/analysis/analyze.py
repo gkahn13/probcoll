@@ -119,10 +119,10 @@ class Analyze:
                 sorted_files.append(f)
         sorted_files = sorted(sorted_files, key=lambda x: int(x[12:-4]))
         for itr, f in enumerate(sorted_files):
-                fname = os.path.join(self._samples_dir(), f)
-                samples, time = Sample.load_with_time(fname)
-                samples_itrs.append((itr, samples))
-                times.append(time)
+            fname = os.path.join(self._samples_dir(), f)
+            samples, time = Sample.load_with_time(fname)
+            samples_itrs.append((itr, samples))
+            times.append(time)
         self._logger.info('Loaded {0} iteration of samples'.format(len(samples_itrs)))
         return samples_itrs, times
 
@@ -136,11 +136,12 @@ class Analyze:
             if f[:7] == 'testing':
                 sorted_files.append(f)
         sorted_files = sorted(sorted_files, key=lambda x: int(x[20:-4]))
-        for itr, f in enumerate(sorted_files):
-                fname = os.path.join(self._samples_dir(), f)
-                samples, time = Sample.load_with_time(fname)
-                samples_itrs.append((itr, samples))
-                times.append(time)
+        for f in sorted_files:
+            itr = int(f[20:-4]) 
+            fname = os.path.join(self._samples_dir(), f)
+            samples, time = Sample.load_with_time(fname)
+            samples_itrs.append((itr, samples))
+            times.append(time)
         self._logger.info('Loaded {0} testing iteration of samples'.format(len(samples_itrs)))
         return samples_itrs, times
     
