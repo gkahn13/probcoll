@@ -61,7 +61,7 @@ class AgentRCcar(Agent):
 
             if self._done:
                 self._curr_rollout_t = 0
-                self.reset(is_testing=is_testing)
+                self.reset()
                 break
             else:
                 self._curr_rollout_t += 1
@@ -71,7 +71,7 @@ class AgentRCcar(Agent):
     def reset(self):
         self._obs = self._env.reset()
         if self._done:
-            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]  
+            self.last_n_obs = [np.zeros(params['O']['dim']) for _ in range(params['model']['num_O'])]  
         self._done = False
 
     def get_observation(self):
@@ -83,7 +83,9 @@ class AgentRCcar(Agent):
     def get_state(self):
         state_sample = Sample(meta_data=params, T=1)
         vel = [self._info['vel']]
+        coll = [self._info['coll']]
         state_sample.set_X(vel, t=0, sub_state='velocity')
+        state_sample.set_X(vel, t=0, sub_state='collision')
         return state_sample.get_X(t=0)
 
     def get_coll(self):

@@ -122,30 +122,6 @@ class Probcoll:
         finally:
             self.close()
 
-    def close(self):
-        for p in self._jobs:
-            p.kill()
-        self.agent.close()
-        self.probcoll_model.close()
-    
-    def _run_training(self, itr):
-        self._logger.info('Itr {0} adding data'.format(itr))
-        self.probcoll_model.add_data([self._itr_samples_file(itr)])
-        self._logger.info('Itr {0} training probability of collision'.format(itr))
-        if itr >= params['probcoll']['training_start_iter']:
-            if params['probcoll']['is_training']:
-                if self._asynchronous:
-                    self.probcoll_model.recover()
-                    if not self._async_on:
-                        self._async_training()
-                        self._async_on = True
-                else:
-                    start = time.time()
-                    self.probcoll_model.train()
-
-    def _async_training(self):
-        pass
-
     def _run_rollout(self, itr):
         self._logger.info('')
         self._logger.info('=== Itr {0}'.format(itr))
@@ -184,6 +160,24 @@ class Probcoll:
             self._num_timesteps*params['probcoll']['dt']/elapsed))
         self._itr_save_samples(itr, samples)
 
+    def _run_training(self, itr):
+        self._logger.info('Itr {0} adding data'.format(itr))
+        self.probcoll_model.add_data([self._itr_samples_file(itr)])
+        self._logger.info('Itr {0} training probability of collision'.format(itr))
+        if itr >= params['probcoll']['training_start_iter']:
+            if params['probcoll']['is_training']:
+                if self._asynchronous:
+                    self.probcoll_model.recover()
+                    if not self._async_on:
+                        self._async_training()
+                        self._async_on = True
+                else:
+                    start = time.time()
+                    self.probcoll_model.train()
+
+    def _async_training(self):
+        pass
+
     def run_testing(self, itr):
         if itr >= params['probcoll']['training_start_iter']\
                 and ((itr == self._max_iter - 1 or itr == 0 \
@@ -217,3 +211,9 @@ class Probcoll:
                 total_time*params['probcoll']['dt']/elapsed))
             self._itr_save_samples(itr, samples, prefix='testing_')
 
+    def close(self):
+        for p in self._jobs:
+            p.kill()
+        self.agent.close()
+        self.probcoll_model.close()
+    

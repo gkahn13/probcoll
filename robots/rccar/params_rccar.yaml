@@ -225,13 +225,11 @@ env:
 ######################################################
 
 X:
-  dim: 8
-  order: ['position', 'orientation', 'velocity', 'collision']
+  dim: 2
+  order: ['velocity', 'collision']
 
-  position: {idx: 0, dim: 3}
-  orientation: {idx: 3, dim: 3}
-  velocity: {idx: 6, dim: 1}
-  collision: {idx: 7, dim: 1, buffer: 0.0}
+  velocity: {idx: 0, dim: 1}
+  collision: {idx: 1, dim: 1, buffer: 0.0}
 U:
   dim: 2
   order: ['cmd_steer', 'cmd_vel']
@@ -240,8 +238,8 @@ U:
   cmd_vel: {idx: 1, dim: 1}
 
 O:
-  dim: 4609
-  order: ['camera', 'back_camera', 'collision']
+  dim: 2305
+  order: ['camera', 'collision']
 
   camera:
     idx: 0
@@ -249,10 +247,4 @@ O:
     height: 64
     width: 36
     num_channels: 1
-  back_camera:
-    idx: 2304
-    dim: 2304
-    height: 64
-    width: 36
-    num_channels: 1
-  collision: {idx: 4608, dim: 1, buffer: 0.0}
+  collision: {idx: 2304, dim: 1, buffer: 0.0}

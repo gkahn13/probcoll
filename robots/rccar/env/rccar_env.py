@@ -8,7 +8,7 @@ class RCcarEnv:
         self._sensors = SensorsHandler()
         self._collision = False
         self._params = params
-        self._do_back_up = params['do_back_up']
+        self._do_back_up = params.get('do_back_up', True)
         self._next_time = None
 
     # Helper functions
@@ -24,11 +24,12 @@ class RCcarEnv:
 
     def _back_up(self):
         back_up_vel = self._params['back_up'].get('vel', -2.0) 
-        back_up_steer = self._params['back_up'].get('steer', (-5.0, 5.0))
-        self._steering = np.random.uniform(*back_up_steer)
+        back_up_steer_ran = self._params['back_up'].get('steer', (-5.0, 5.0))
+        back_up_steer = np.random.uniform(*back_up_steer_ran)
         duration = self._params['back_up'].get('duration', 1.0)
-        self._do_action((back_up_steer, back_up_vel), time=duration, vel_control=True)
-        self._do_action((0.0, 0.0), time=1.0, vel_control=False)
+        print(duration, back_up_steer, back_up_vel)
+        self._do_action((back_up_steer, back_up_vel), t=duration, vel_control=True)
+        self._do_action((0.0, 0.0), t=1.0, vel_control=False)
 
     def _get_observation(self):
         return self._sensors.get_image()
@@ -59,8 +60,8 @@ class RCcarEnv:
     def reset(self):
         if self._do_back_up:
             if self._sensors.get_crash():
+                self._sensors.reset_crash()
                 self._back_up()
-        self._sensors.reset_crash()
         return self._get_observation()
 
     def step(self, action):
