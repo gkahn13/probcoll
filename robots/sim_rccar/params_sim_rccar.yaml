@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'square_16_cem_train_extra'
+exp_name: 'square_python3'
 
 ##########################
 ### Probcoll algorithm ###
@@ -12,7 +12,7 @@ probcoll:
   dt: 0.25
   T: 320  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 80
+  max_iter: 320
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   save_O: True
 
@@ -22,11 +22,11 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_timesteps: 240
+  num_timesteps: 120
 
   testing:
     num_rollout: 20
-    itr_freq: 4
+    itr_freq: 8
 
 ######################
 ### Probcoll model ###
@@ -70,7 +70,7 @@ model:
   reset_freq: 0 # 0 means no resetting
   reset_steps: 500
   display_steps: 50 
-  val_pct: 0.5 # Percent of the data stored as validation
+  val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
   val_steps: 50  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
@@ -198,7 +198,7 @@ sim:
   visualize: False
   use_vel: True
   use_back_cam: True
-  use_depth: True
+  use_depth: False
   accelClamp: 2.0
   mass: 10.0
   p: 1.25

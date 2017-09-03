@@ -89,11 +89,6 @@ class Probcoll:
             samples_start_itr = 0
             # Keeps track of how many rollouts have been done
             self._time_step = 0
-            for samples_start_itr in range(self._max_iter-1, -1, -1):
-                sample_file = self._itr_samples_file(samples_start_itr, create=False)
-                if os.path.exists(sample_file):
-                    samples_start_itr += 1
-                    break
             ### load initial dataset
             init_data_folder = params['probcoll'].get('init_data', None)
             if init_data_folder is not None:
@@ -106,7 +101,19 @@ class Probcoll:
                     self.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
 
             ### if any data and haven't trained on it already, train on it
-            if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
+            for itr in range(self._max_iter):
+                sample_file = self._itr_samples_file(itr, create=False)
+                if os.path.exists(sample_file):
+                    self.probcoll_model.add_data([sample_file])
+                else:
+                    break
+            
+            samples_start_itr = itr - 1
+            
+            if samples_start_itr > 0: 
+                self.probcoll_model.recover()
+                self._run_training(samples_start_itr)
+            elif init_data_folder is not None:
                 self._run_training(samples_start_itr)
             start_itr = samples_start_itr
             self._time_step = self._num_timesteps * start_itr

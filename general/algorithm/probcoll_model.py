@@ -138,7 +138,7 @@ class ProbcollModel:
 
     def get_train_itr(self):
         latest_file = tf.train.latest_checkpoint(
-            self._checkpoints_dir)
+            self.checkpoints_dir)
         if latest_file is None:
             itr = -1
         else:
@@ -155,7 +155,7 @@ class ProbcollModel:
         else:
             raise Exception('Invalid save_checkpoints: {0}'.format(params['model']['save_checkpoints']))
         return os.path.join(
-            self._checkpoints_dir,
+            self.checkpoints_dir,
             "{0:d}.ckpt".format(next_num)), next_num
 
     ############
@@ -163,7 +163,7 @@ class ProbcollModel:
     ############
 
     @property
-    def _checkpoints_dir(self):
+    def checkpoints_dir(self):
         dir = os.path.join(self.save_dir, "model_checkpoints")
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -800,7 +800,6 @@ class ProbcollModel:
 
             for b in range(num_bootstrap):
                 concat_list = []
-#                concat_list = copy.copy(base_concat_list)
                 ### concatenate inputs
                 with tf.name_scope('inputs_b{0}'.format(b)):
                     
@@ -1397,7 +1396,7 @@ class ProbcollModel:
 
     def get_latest_checkpoint(self):
         return tf.train.latest_checkpoint(
-            self._checkpoints_dir)
+            self.checkpoints_dir)
 
     def recover(self):
         try:
@@ -1412,7 +1411,7 @@ class ProbcollModel:
 
     def load_itr(self, itr):
         f = os.path.join(
-            self._checkpoints_dir,
+            self.checkpoints_dir,
             "{0:d}.ckpt".format(itr))
         self.load(f)
         
