@@ -5,3 +5,4 @@
 .idea
 *.swp
 *.DS_Store
+robots/sim_rccar/simulation/models/blender

@@ -1,5 +1,5 @@
 import abc
-import os, pickle
+import os, pickle, copy
 
 from general.utility.logger import get_logger
 from general.state_info.sample import Sample
@@ -17,6 +17,7 @@ class Analyze:
         yaml_path = self._get_yaml(self._save_dir)
         load_params(yaml_path)
         params['yaml_path'] = yaml_path
+        self.params = copy.deepcopy(params)
         
         self.on_replay = on_replay
         if self.on_replay:

@@ -5,6 +5,7 @@ from general.agent.agent import Agent
 from general.state_info.sample import Sample
 from robots.sim_rccar.simulation.square_env import SquareEnv
 from robots.sim_rccar.simulation.square_banked_env import SquareBankedEnv
+from robots.sim_rccar.simulation.square_cluttered_env import SquareClutteredEnv
 from robots.sim_rccar.simulation.cylinder_env import CylinderEnv
 from robots.sim_rccar.simulation.cylinder_small_env import CylinderSmallEnv
 
@@ -19,6 +20,8 @@ class AgentSimRCcar(Agent):
             self.env = SquareEnv(params['sim'])
         elif params['sim']['sim_env'] == 'square_banked':
             self.env = SquareBankedEnv(params['sim'])
+        elif params['sim']['sim_env'] == 'square_cluttered':
+            self.env = SquareClutteredEnv(params['sim'])
         elif params['sim']['sim_env'] == 'cylinder':
             self.env = CylinderEnv(params['sim'])
         elif params['sim']['sim_env'] == 'cylinder_small':

@@ -55,7 +55,7 @@ if __name__ == '__main__':
             'key_name': 'rllab-us-east-1',
             'image_id': 'ami-36828f4d',
             'region_name': 'us-east-1',
-            'subnet_id': 'subnet-ef4c648a',  # TODO
+            'subnet_id': 'subnet-941746a8',  # TODO
             'security_group_ids': ['sg-9e9e00e0']
         })
     elif args.region == 'us-east-2':
@@ -64,7 +64,7 @@ if __name__ == '__main__':
             # 'key_name': 'rllab-us-east-2',
             'image_id': 'ami-c7f8dba2',
             'region_name': 'us-east-2',
-            'subnet_id': 'subnet-24ad045f',  # TODO
+            'subnet_id': 'subnet-1ebddc77',  # TODO
             'security_group_ids': ['sg-ee707e87']
         })
     else:

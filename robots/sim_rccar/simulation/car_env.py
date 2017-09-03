@@ -227,7 +227,7 @@ class CarEnv(DirectObject):
         self._restart_index = 0
         if self._params.get('position_ranges', None) is not None:
             ranges = self._params['position_ranges']
-            num_pos = sefl._params['num_pos']
+            num_pos = self._params['num_pos']
             if self._params.get('range_type', 'random') == 'random':
                 for _ in range(num_pos):
                     ran = ranges[np.random.randint(len(ranges))]
