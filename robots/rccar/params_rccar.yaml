@@ -1,7 +1,7 @@
 # contains all needed parameters for all files
 
 random_seed: 0
-exp_dir: '/home/ubuntu/probcoll/experiments/rccar'
+exp_dir: '/home/adam/probcoll/experiments/rccar'
 exp_dir_car: '/home/ubuntu/probcoll/experiments/rccar'
 remote_main: '/home/ubuntu/probcoll/main.py'
 exp_name: 'testing'

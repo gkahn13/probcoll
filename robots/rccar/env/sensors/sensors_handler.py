@@ -108,6 +108,7 @@ class SensorsHandler:
                 if self._is_calibrated:
                     if self._crashed or self._flip:
                         self._motor_cmd = (0.0, 0.0)
+                        self._vel_cmd = None
                     elif self._vel_cmd is not None:
 #                    elif self._vel_cmd is not None and self._motor_data is not self._last_motor_data:
                         steer, vel = self._vel_cmd

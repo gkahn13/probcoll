@@ -10,6 +10,7 @@ from general.state_info.sample import Sample
 from general.policy.random_policy import RandomPolicy
 from general.policy.policy_cem import PolicyCem
 from general.policy.policy_random_planning import PolicyRandomPlanning
+from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 
 from config import params
 
@@ -26,8 +27,7 @@ class ProbcollRCcar(Probcoll):
         self._max_iter = probcoll_params['max_iter']
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
-        self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)
-#        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
+        self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
         self._remote_save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
         self._remote_samples = os.path.join(self._remote_save_dir, "samples")
         self._remote_ckpt = os.path.join(self._remote_save_dir, "model_checkpoints")
