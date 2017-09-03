@@ -10,6 +10,7 @@ from general.state_info.sample import Sample
 from general.policy.random_policy import RandomPolicy
 from general.policy.policy_cem import PolicyCem
 from general.policy.policy_random_planning import PolicyRandomPlanning
+from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 
 from config import params
 

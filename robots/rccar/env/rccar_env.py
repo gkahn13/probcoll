@@ -15,7 +15,10 @@ class RCcarEnv:
 
     def _do_action(self, action, t, vel_control=False):
         if self._next_time is not None:
-            time.sleep(self._next_time - time.time())
+            sleep_time = self._next_time - time.time()
+            if sleep_time > 0:
+                time.sleep(self._next_time - time.time())
+                print(sleep_time)
         if vel_control:
             self._sensors.set_vel_cmd(action)
         else:

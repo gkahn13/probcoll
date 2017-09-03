@@ -5,19 +5,20 @@ import time
 import numpy as np
 
 from general.algorithm.probcoll import Probcoll
-from general.algorithm.probcoll_model import ProbcollModel
-from general.algorithm.probcoll_model_replay_buffer import ProbcollModelReplayBuffer
 from general.state_info.sample import Sample
 from general.policy.random_policy import RandomPolicy
 from general.policy.policy_cem import PolicyCem
 from general.policy.policy_random_planning import PolicyRandomPlanning
 from robots.rccar.agent.agent_rccar import AgentRCcar
+from robots.rccar.algorithm.probcoll_model_rccar import ProbcollModelRCcar
 
 from config import params
 
 class ProbcollRCcarRemote(Probcoll):
 
     def __init__(self, save_dir=None, data_dir=None):
+        if save_dir is None:
+            save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
         Probcoll.__init__(self, save_dir=save_dir, data_dir=data_dir)
 
     def _setup(self):
@@ -26,7 +27,8 @@ class ProbcollRCcarRemote(Probcoll):
         self.agent = AgentRCcar()
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
-        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
+        if self._planner_type != 'random_policy':
+            self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
 
     #########################
     ### Create controller ###
@@ -54,7 +56,8 @@ class ProbcollRCcarRemote(Probcoll):
         self.agent.close()
     
     def _run_training(self, itr):
-        pass
+        if hasattr(self, 'probcoll_model'):
+            self.probcoll_model.recover()
     
     def run_testing(self, itr):
         pass
