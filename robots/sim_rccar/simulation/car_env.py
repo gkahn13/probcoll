@@ -22,7 +22,6 @@ from panda3d.bullet import BulletRigidBodyNode
 from panda3d.bullet import ZUp
 
 class CarEnv(DirectObject):
-
     def __init__(self, params={}):
         self._params = params
         if 'random_seed' in self._params:
@@ -184,9 +183,15 @@ class CarEnv(DirectObject):
         from matplotlib import pyplot as plt
         image = self._camera_sensor.observe()[0]
         if self._use_depth:
-            plt.imshow(image[:,:,0], cmap='gray')
+            plt.imshow(image[:, :, 0], cmap='gray')
         else:
-            plt.imshow(image)
+            import cv2
+            def rgb2gray(rgb):
+                return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
+
+            image = rgb2gray(image)
+            im = cv2.resize(image, (64, 36), interpolation=cv2.INTER_AREA)  # TODO how does this deal with aspect ratio
+            plt.imshow(im.astype(np.uint8), cmap='Greys_r')
         plt.show()
 
     def _mark(self):
@@ -234,14 +239,14 @@ class CarEnv(DirectObject):
                     self._restart_pos.append(np.random.uniform(ran[0], ran[1]))
             elif self._params['range_type'] == 'fix_spacing':
                 num_ran = len(ranges)
-                num_per_ran = num_pos//num_ran
+                num_per_ran = num_pos // num_ran
                 for i in range(num_ran):
                     ran = ranges[i]
                     low = np.array(ran[0])
                     diff = np.array(ran[1]) - np.array(ran[0])
                     for j in range(num_per_ran):
-                        val = diff * ((j + 0.0)/num_per_ran) + low
-                        self._restart_pos.append(val) 
+                        val = diff * ((j + 0.0) / num_per_ran) + low
+                        self._restart_pos.append(val)
         elif self._params.get('positions', None) is not None:
             self._restart_pos = self._params['positions']
         else:

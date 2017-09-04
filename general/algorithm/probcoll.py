@@ -38,6 +38,7 @@ class Probcoll:
         self._asynchprobcoll_model = None
         self._max_iter = None
         self.agent = None
+        self.agent_testing = None
         raise NotImplementedError('Implement in subclass')
 
     #########################
@@ -204,7 +205,8 @@ class Probcoll:
             total_time = 0
             start = time.time()
             for cond in range(params['probcoll']['testing']['num_rollout']):
-                _, sample_no_noise, t = self.agent.sample_policy(
+                self.agent_testing.reset(hard_reset=True, is_testing=True)
+                _, sample_no_noise, t = self.agent_testing.sample_policy(
                     self.policy,
                     T=T,
                     is_testing=True)

@@ -64,7 +64,7 @@ if __name__ == '__main__':
             # 'key_name': 'rllab-us-east-2',
             'image_id': 'ami-c7f8dba2',
             'region_name': 'us-east-2',
-            'subnet_id': 'subnet-1ebddc77',  # TODO
+            'subnet_id': 'subnet-24ad045f',  # TODO
             'security_group_ids': ['sg-ee707e87']
         })
     else:

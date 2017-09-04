@@ -23,7 +23,8 @@ class ProbcollSimRCcar(Probcoll):
     def _setup(self):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
-        self.agent = AgentSimRCcar()
+        self.agent = AgentSimRCcar(params['sim'])
+        self.agent_testing = AgentSimRCcar(params['sim_testing'])
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
 #        self.probcoll_model = ProbcollModel(save_dir=self._save_dir, data_dir=self._data_dir)

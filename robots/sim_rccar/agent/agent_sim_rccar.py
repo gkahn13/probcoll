@@ -13,23 +13,24 @@ from config import params
 
 class AgentSimRCcar(Agent):
 
-    def __init__(self):
+    def __init__(self, sim_params):
         # To keep the seed consistent
-        params['sim']['random_seed'] = params['random_seed']
-        if params['sim']['sim_env'] == 'square':
-            self.env = SquareEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'square_banked':
-            self.env = SquareBankedEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'square_cluttered':
-            self.env = SquareClutteredEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'cylinder':
-            self.env = CylinderEnv(params['sim'])
-        elif params['sim']['sim_env'] == 'cylinder_small':
-            self.env = CylinderSmallEnv(params['sim'])
+        self._sim_params = sim_params
+        self._sim_params['random_seed'] = params['random_seed']
+        if self._sim_params['sim_env'] == 'square':
+            self.env = SquareEnv(self._sim_params)
+        elif self._sim_params['sim_env'] == 'square_banked':
+            self.env = SquareBankedEnv(self._sim_params)
+        elif self._sim_params['sim_env'] == 'square_cluttered':
+            self.env = SquareClutteredEnv(self._sim_params)
+        elif self._sim_params['sim_env'] == 'cylinder':
+            self.env = CylinderEnv(self._sim_params)
+        elif self._sim_params['sim_env'] == 'cylinder_small':
+            self.env = CylinderSmallEnv(self._sim_params)
         else:
             raise NotImplementedError(
                 "Environment {0} is not valid".format(
-                    params['sim']['sim_env']))
+                    self._sim_params['sim_env']))
 
         self._curr_rollout_t = 0
         self._done = False
@@ -107,7 +108,7 @@ class AgentSimRCcar(Agent):
     def get_observation(self):
         obs_sample = Sample(meta_data=params, T=1)
         front_im, back_im = np.split(self._obs, 2, axis=2)
-        if params['sim'].get('use_depth', False):
+        if self._sim_params.get('use_depth', False):
             im = AgentSimRCcar.process_depth(front_im)
             back_im = AgentSimRCcar.process_depth(back_im)
         else:
