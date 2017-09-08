@@ -2,7 +2,7 @@
 
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/sim_rccar'
-exp_name: 'square_python3'
+exp_name: 'extend_test'
 
 ##########################
 ### Probcoll algorithm ###
@@ -10,9 +10,9 @@ exp_name: 'square_python3'
 
 probcoll:
   dt: 0.25
-  T: 320  # timesteps per trajectory
+  T: 240  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 320
+  max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   save_O: True
 

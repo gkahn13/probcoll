@@ -31,7 +31,6 @@ class ProbcollRCcar(Probcoll):
         self._remote_save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
         self._remote_samples = os.path.join(self._remote_save_dir, "samples")
         self._remote_ckpt = os.path.join(self._remote_save_dir, "model_checkpoints")
-        self._remote_main = params['remote_main']
         self._ssh = paramiko.SSHClient()
         self._ssh.load_system_host_keys()
         self._ssh.connect(self._server, username=self._username, password=self._password)
@@ -107,22 +106,19 @@ class ProbcollRCcar(Probcoll):
         self._run_rollout(itr)
     
     def _run_rollout(self, itr):
-        try:
-            for f in self._sftp.listdir(self._remote_samples):
-                remote_file = os.path.join(self._remote_samples, f)
-                while True:
-                    try:
-                        local_file = self._itr_samples_file(itr)
-                        self._sftp.get(remote_file, local_file)
-                        Sample.load(local_file)
-                        break
-                    except:
-                        pass
-                self.probcoll_model.add_data([local_file])
-                self._sftp.remove(remote_file)
-                self._itr += 1
-        except:
-            self._logger.warning("Probcoll on RCcar not ready")
+        for f in self._sftp.listdir(self._remote_samples):
+            remote_file = os.path.join(self._remote_samples, f)
+            while True:
+                try:
+                    local_file = self._itr_samples_file(itr)
+                    self._sftp.get(remote_file, local_file)
+                    Sample.load(local_file)
+                    break
+                except:
+                    pass
+            self.probcoll_model.add_data([local_file])
+            self._sftp.remove(remote_file)
+            self._itr += 1
 
     def _run_training(self, itr):
         if itr >= params['probcoll']['training_start_iter']:

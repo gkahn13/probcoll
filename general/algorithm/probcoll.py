@@ -108,7 +108,7 @@ class Probcoll:
                 else:
                     break
             
-            samples_start_itr = itr - 1
+            samples_start_itr = itr
             
             if samples_start_itr > 0: 
                 self.probcoll_model.recover()

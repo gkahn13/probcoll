@@ -3,7 +3,6 @@
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/rccar'
 exp_dir_car: '/home/ubuntu/probcoll/experiments/rccar'
-remote_main: '/home/ubuntu/probcoll/main.py'
 exp_name: 'testing'
 
 ##########################
@@ -12,9 +11,9 @@ exp_name: 'testing'
 
 probcoll:
   dt: 0.25
-  T: 8  # timesteps per trajectory
+  T: 16  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 80
+  max_iter: 40
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   save_O: True
 
@@ -24,7 +23,7 @@ probcoll:
   asynchronous_training: True # EXPERIMENTAL
 
   # Conditions
-  num_timesteps: 24
+  num_timesteps: 120
 
   testing:
     num_rollout: 20
@@ -62,17 +61,17 @@ model:
   grad_clip: 10.0 # Norm gradient clip
   beta1: 0.9 # For ADAM
   beta2: 0.999 # For ADAM
-  batch_size: 64
+  batch_size: 32
   pct_coll: 0.5 # rebalancing trajectories
   coll_weight_pct: 0.5 # reweight collision and no collision samples in cost
-  reg: 1.e-6 # L2 regularization
+  reg: 1.e-8 # L2 regularization
   
   # Train schedule
   steps: 500
   reset_freq: 0 # 0 means no resetting
   reset_steps: 500
   display_steps: 50 
-  val_pct: 0.5 # Percent of the data stored as validation
+  val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
   val_steps: 50  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
@@ -147,11 +146,11 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-30.,  2.]
-    upper: [ 30.,  2.]
+    lower: [-45.,  3.0]
+    upper: [ 45.,  3.0]
 
   random:
-    K: 512 # number of actions to sample from
+    K: 1024 # number of actions to sample from
 
   cem:
     init_M: 2048 # number of actions to sample from
@@ -168,10 +167,9 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-30.,  2.]
-      upper: [ 30.,  2.]
-    endpoints: [[0, 0.0], [1, 0.0]]
-#    endpoints: [[0, 1.0],  [1.e+3, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
+      lower: [-45.,  3.0]
+      upper: [ 45.,  3.0]
+    endpoints: [[0, 1.0],  [1.e+3, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
     outside_value: 0.0
 
   control_noise:
@@ -181,7 +179,7 @@ planning:
     type: 'gaussian' # zero / gaussian / uniform
     zero: {}
     gaussian:
-      std: [3.0, 0.0]
+      std: [25.0, 0.0]
     uniform:
       lower: [-5., 0.]
       upper: [5., 0.]
@@ -196,27 +194,12 @@ planning:
 ### Environment ###
 ###################
 
-#sim:
-#  sim_env: 'square' # square / cylinder / cyliner_small
-#  visualize: False
-#  use_vel: True
-#  use_back_cam: True
-#  use_depth: False
-#  accelClamp: 2.0
-#  mass: 10.0
-#  p: 1.25
-#  d: 0.0
-#
-#  do_back_up: True
-#  back_up:
-#    steer: [-5., 5.]
-#    vel: -1.
-#    duration: 3.0
-
 env:
   use_vel: True
-  do_back_up: True
+  do_back_up: False
+  max_time_step: 16
   dt: 0.25
+  check_rollouts: True
   back_up:
     steer: [-5., 5.]
     vel: -1.
