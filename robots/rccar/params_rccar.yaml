@@ -3,7 +3,6 @@
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/rccar'
 exp_dir_car: '/home/ubuntu/probcoll/experiments/rccar'
-remote_main: '/home/ubuntu/probcoll/main.py'
 exp_name: 'testing'
 
 ##########################
@@ -146,8 +145,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-30.,  2.]
-    upper: [ 30.,  2.]
+    lower: [-30.,  1.5]
+    upper: [ 30.,  1.5]
 
   random:
     K: 4096 # number of actions to sample from
@@ -167,8 +166,8 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-30.,  2.]
-      upper: [ 30.,  2.]
+      lower: [-30.,  1.5]
+      upper: [ 30.,  1.5]
     endpoints: [[0, 1.0],  [1.e+3, 1.0], [1.e+4, 0.1], [2.e+4, 0.01]]
     outside_value: 0.01
 

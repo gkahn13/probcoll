@@ -18,53 +18,64 @@ class AgentRCcar(Agent):
 
     def sample_policy(self, policy, T=1, time_step=0, is_testing=False, only_noise=False):
         visualize = params['planning'].get('visualize', False)
-        sample_noise = Sample(meta_data=params, T=T)
-        sample_no_noise = Sample(meta_data=params, T=T)
-        for t in range(T):
-            # Get observation and act
-            o_t = self.get_observation()
-            self.last_n_obs.pop(0)
-            self.last_n_obs.append(o_t)
-            if is_testing:
-                u_t, u_t_no_noise = policy.act(
-                    self.last_n_obs,
-                    t,
-                    time_step=time_step + t,
-                    only_noise=only_noise,
-                    only_no_noise=is_testing,
-                    visualize=visualize)
-                self.act(u_t_no_noise)
-            else:
-                u_t, u_t_no_noise = policy.act(
-                    self.last_n_obs,
-                    self._curr_rollout_t,
-                    time_step=time_step + t,
-                    only_noise=only_noise,
-                    visualize=visualize)
-                self.act(u_t)
-            # TODO possibly determine state before
-            x_t = self.get_state()
-            coll = self.get_coll()
-            # Record
-            sample_noise.set_X(x_t, t=t)
-            sample_noise.set_O(o_t, t=t)
-            sample_noise.set_O([coll], t=t, sub_obs='collision')
-            sample_no_noise.set_X(x_t, t=t)
-            sample_no_noise.set_O(o_t, t=t)
-            sample_no_noise.set_O([coll], t=t, sub_obs='collision')
+        need_to_collect_sample=True
+        while need_to_collect_sample:
+            sample_noise = Sample(meta_data=params, T=T)
+            sample_no_noise = Sample(meta_data=params, T=T)
+            for t in range(T):
+                # Get observation and act
+                o_t = self.get_observation()
+                self.last_n_obs.pop(0)
+                self.last_n_obs.append(o_t)
+                if is_testing:
+                    u_t, u_t_no_noise = policy.act(
+                        self.last_n_obs,
+                        t,
+                        time_step=time_step + t,
+                        only_noise=only_noise,
+                        only_no_noise=is_testing,
+                        visualize=visualize)
+                    self.act(u_t_no_noise)
+                else:
+                    u_t, u_t_no_noise = policy.act(
+                        self.last_n_obs,
+                        self._curr_rollout_t,
+                        time_step=time_step + t,
+                        only_noise=only_noise,
+                        visualize=visualize)
+                    self.act(u_t)
+                # TODO possibly determine state before
+                x_t = self.get_state()
+                coll = self.get_coll()
+                # Record
+                sample_noise.set_X(x_t, t=t)
+                sample_noise.set_O(o_t, t=t)
+                sample_noise.set_O([coll], t=t, sub_obs='collision')
+                sample_no_noise.set_X(x_t, t=t)
+                sample_no_noise.set_O(o_t, t=t)
+                sample_no_noise.set_O([coll], t=t, sub_obs='collision')
 
-            if not is_testing:
-                sample_noise.set_U(u_t, t=t)
+                if not is_testing:
+                    sample_noise.set_U(u_t, t=t)
 
-            if not only_noise:
-                sample_no_noise.set_U(u_t_no_noise, t=t)
+                if not only_noise:
+                    sample_no_noise.set_U(u_t_no_noise, t=t)
 
-            if self._done:
-                self._curr_rollout_t = 0
+                if self._done:
+                    self._curr_rollout_t = 0
+                    self.reset()
+                    break
+                else:
+                    self._curr_rollout_t += 1
+            if params['env']['check_rollouts']:
+                text = input('Enter n if error during rollout, and anything else to save rollout')
+                if 'n' in text:
+                    need_to_collect_sample = True
+                else:
+                    need_to_collect_sample = False
                 self.reset()
-                break
             else:
-                self._curr_rollout_t += 1
+                need_to_collect_sample = False
 
         return sample_noise, sample_no_noise, t 
 

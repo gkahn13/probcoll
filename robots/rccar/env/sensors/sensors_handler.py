@@ -8,11 +8,11 @@ import cv2
 
 class SensorsHandler:
 
-    def __init__(self, p=50.0, d=1e-1, timeout=0.1, is_plotting=False):
+    def __init__(self, p=5.0, d=0.0, timeout=0.1, is_plotting=False):
         self._motor_ser = None
         self._imu_ser = None
         self._motor_data = np.array([0.0, 0.0, 0.0, 0.0]) # (state, steer, motor, encoder)
-        self._last_motor_data = self._motor_data # used for pid
+        self._last_motor_data = None # used for pid
         self._imu_data = None # (pos, hpr)
         self._motor_cmd = None # (steer, motor)
         self._vel_cmd = None # (steer, vel)
@@ -20,9 +20,9 @@ class SensorsHandler:
         self._default_defined = False
         self._default_steer_motor = None
         self._default_imu_data = None
-#        self._crashed = True
         self._crashed = False
         self._flip = False
+        self._new_vel_cmd = False
 
         self._cam = None
         self._image = None
@@ -109,8 +109,8 @@ class SensorsHandler:
                     if self._crashed or self._flip:
                         self._motor_cmd = (0.0, 0.0)
                         self._vel_cmd = None
-                    elif self._vel_cmd is not None:
-#                    elif self._vel_cmd is not None and self._motor_data is not self._last_motor_data:
+                    elif self._vel_cmd is not None and (self._new_vel_cmd or self._motor_data is not self._last_motor_data):
+                        self._new_vel_cmd = False
                         steer, vel = self._vel_cmd
                         enc = self._motor_data[3]
                         err = vel - enc
@@ -120,19 +120,21 @@ class SensorsHandler:
                         motor = self._p * err + self._d * d_err 
                         if vel > 0:
                             if enc < 0.1:
-                                motor = min(max(motor,  5),  15)
+                                motor = min(max(motor,  1),  15)
                             else:
-                                motor = min(max(motor,  5),  30)
+                                motor = min(max(motor,  1),  45)
                         elif vel < 0:
                             if enc > -0.1:
-                                motor = max(min(motor, -5), -15)
+                                motor = max(min(motor, -1), -15)
                             else:
-                                motor = max(min(motor, -5), -30)
+                                motor = max(min(motor, -1), -45)
                         self._motor_cmd = (steer, motor)
                         self._dt = 0
                     
-                    self._last_motor_data = self._motor_data
                     self._pd_time = time.time()
+                
+                    self._last_motor_data = self._motor_data
+
                 if self._is_calibrated and self._motor_cmd is not None:
                     self._send_motor_cmd(self._motor_cmd)
 #        except:
@@ -141,7 +143,7 @@ class SensorsHandler:
 #                self._motor_ser.close()
 
     def _imu_thread(self):
-#        try:
+        try:
             while self._imu_ser.is_open:
                 data = self._read_ser(self._imu_ser)
                 if len(data) > 0 and data[0] == '(' and data[-3] == ')':
@@ -163,9 +165,9 @@ class SensorsHandler:
                     else:
                         self._flip = False
 
-#        except:
-#            if self._imu_ser is not None and self._imu_ser.is_open:
-#                self._imu_ser.close()
+        except:
+            if self._imu_ser is not None and self._imu_ser.is_open:
+                self._imu_ser.close()
 
     def _video_thread(self):
         try:
@@ -201,6 +203,7 @@ class SensorsHandler:
 
     def set_vel_cmd(self, cmd):
         self._vel_cmd = cmd
+        self._new_vel_cmd = True
         self._pd_time = time.time()
 
     def set_pd(self, p, d):
@@ -305,9 +308,6 @@ class SensorsHandler:
         input('When you are done calibrating press Enter')
         while self._default_steer_motor is None or self._default_imu_data is None:
             pass
-#        self._default_steer_motor = np.array(self._pre_cal_motor_data[1:3])
-#        self._default_imu_data = self._pre_cal_imu_data
-#        self._imu_data = self._pre_cal_imu_data - self._default_imu_data
         self._default_defined = True
         while self._motor_data is None or self._imu_data is None:
             pass
@@ -316,8 +316,6 @@ class SensorsHandler:
         self._is_calibrated = True
 
     def close(self):
-#        for t in self._threads:
-#            t.join()
         if self._motor_ser is not None:
             self._send_motor_cmd()
             self._motor_ser.close()
@@ -329,24 +327,26 @@ if __name__ == '__main__':
     handler = SensorsHandler(is_plotting=False)
     start = cur_time = time.time()
 #    handler.set_motor_cmd((0., 10.))
-    handler.set_vel_cmd((0., -1.5))
+    handler.set_vel_cmd((0., 2.0))
     i = 0
-    while time.time() - start < 60:
-        if handler._is_plotting:
-            if time.time() - cur_time > 0.01:
-                cur_time = time.time()
-                handler.update_plot()
-        else:
-            if handler.get_crash():
-                print("crashed {0}".format(i))
-                i += 1
-                while handler.get_crash():
-                    pass
-##        image = handler.get_image()
-##        if image is not None:
-##            plt.imshow(image)
-##            plt.show()
-#            print(handler.get_motor_data()[3])
+    while time.time() - start < 2:
+#        if handler._is_plotting:
+#            if time.time() - cur_time > 0.01:
+#                cur_time = time.time()
+#                handler.update_plot()
+#        else:
+#            if handler.get_crash():
+#                print("crashed {0}".format(i))
+#                i += 1
+#                while handler.get_crash():
+#                    pass
+#        image = handler.get_image()
+#        if image is not None:
+#            plt.imshow(image)
+#            plt.show()
+        if time.time() - cur_time > 0.05:
+            cur_time = time.time()
+            print(handler.get_motor_data()[3])
 #        print(handler.get_imu_data())
 #        pass
     handler.close()
