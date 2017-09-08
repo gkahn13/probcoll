@@ -68,8 +68,8 @@ model:
   
   # Train schedule
   steps: 500
-  reset_freq: 0 # 0 means no resetting
-  reset_steps: 500
+  reset_freq: 1 # 0 means no resetting
+  reset_steps: 10000
   display_steps: 50 
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)

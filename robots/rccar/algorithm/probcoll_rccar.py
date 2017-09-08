@@ -2,6 +2,7 @@ import os
 import time
 import numpy as np
 import paramiko
+import threading
 
 from general.algorithm.probcoll import Probcoll
 from general.algorithm.probcoll_model import ProbcollModel
@@ -26,6 +27,7 @@ class ProbcollRCcar(Probcoll):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
         self._num_timesteps = params['probcoll']['num_timesteps']
+        self._threads = []
         ### load prediction neural net
         self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
         self._remote_save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
@@ -45,7 +47,6 @@ class ProbcollRCcar(Probcoll):
         self._sftp.put(local_yaml, remote_yaml)
         self._logger.info("Added yaml remotely")
         input("Press Enter once you start probcoll on rccar")
-        self._logger.info("Started probcoll on rccar")
 
     ###################
     ### Run methods ###
@@ -92,8 +93,8 @@ class ProbcollRCcar(Probcoll):
             self._itr = samples_start_itr
             self._time_step = self._num_timesteps * self._itr
             ### training loop
+            self._run_threads()
             while self._itr < self._max_iter:
-                self._run_itr(self._itr)
                 self._run_training(self._itr)
                 if not params['probcoll']['save_O']:
                     self._itr_remove_O_from_samples(itr)
@@ -101,30 +102,24 @@ class ProbcollRCcar(Probcoll):
                     self.probcoll_model.sess.graph.finalize()
         finally:
             self.close()
-    
+   
+    def _run_threads(self):
+        self._threads.append(threading.Thread(target=self._get_data))
+        for t in self._threads:
+            t.daemon = True
+            t.start()
+
     def _run_itr(self, itr):
-        self._run_rollout(itr)
-    
+        pass
+
     def _run_rollout(self, itr):
-        for f in self._sftp.listdir(self._remote_samples):
-            remote_file = os.path.join(self._remote_samples, f)
-            while True:
-                try:
-                    local_file = self._itr_samples_file(itr)
-                    self._sftp.get(remote_file, local_file)
-                    Sample.load(local_file)
-                    break
-                except:
-                    pass
-            self.probcoll_model.add_data([local_file])
-            self._sftp.remove(remote_file)
-            self._itr += 1
+        pass
 
     def _run_training(self, itr):
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
-                if self._asynchronous:
-                    self._async_training()
+                # TODO maybe add different training
+                self._async_training()
 
     def _async_training(self):
         self.probcoll_model.train()
@@ -138,6 +133,25 @@ class ProbcollRCcar(Probcoll):
 
     def run_testing(self, itr):
         pass
+
+    #########################
+    ### Threaded function ###
+    #########################
+
+    def _get_data(self):
+        for f in self._sftp.listdir(self._remote_samples):
+            remote_file = os.path.join(self._remote_samples, f)
+            while True:
+                try:
+                    local_file = self._itr_samples_file(itr)
+                    self._sftp.get(remote_file, local_file)
+                    Sample.load(local_file)
+                    break
+                except:
+                    pass
+            self.probcoll_model.add_data([local_file])
+            self._sftp.remove(remote_file)
+            self._itr += 1
 
     #########################
     ### Create controller ###

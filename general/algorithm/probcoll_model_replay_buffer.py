@@ -88,7 +88,6 @@ class ProbcollModelReplayBuffer(ProbcollModel):
         with self.graph.as_default():
             tf.set_random_seed(self.random_seed)
             self.sess = tf.Session(config=config)
-
         code_file_exists = os.path.exists(self._code_file)
         if code_file_exists:
             self._logger.info('Creating OLD graph')
