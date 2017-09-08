@@ -97,7 +97,7 @@ class AgentSimRCcar(Agent):
 
     def reset(self, pos=None, ori=None, hard_reset=False, is_testing=False):
         self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset, random_reset=not is_testing)
-        if self._done or hard_reset:
+        if self._done or hard_reset or not params['sim']['do_back_up']:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in range(params['model']['num_O'])]
         self._done = False
 

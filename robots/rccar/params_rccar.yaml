@@ -11,19 +11,19 @@ exp_name: 'testing'
 
 probcoll:
   dt: 0.25
-  T: 40  # timesteps per trajectory
+  T: 8  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
   max_iter: 80
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   save_O: True
 
   # Training
-  training_start_iter: 4
+  training_start_iter: 0
   is_training: True # EXPERIMENTAL
-  asynchronous_training: False # EXPERIMENTAL
+  asynchronous_training: True # EXPERIMENTAL
 
   # Conditions
-  num_timesteps: 240
+  num_timesteps: 24
 
   testing:
     num_rollout: 20
@@ -36,7 +36,8 @@ probcoll:
 model:
   T: 8 # how many timesteps to predict
   logger: 'info' # debug/info/warning/fatal what level to log
-  
+  save_checkpoints: 'last'
+
   # What to use as input to prediction model
   U_order: ['cmd_steer', 'cmd_vel']
   O_im_order: ['camera'] # 'camera' / 'back_camera'
@@ -141,7 +142,7 @@ planning:
       weight: [0., 1.]     
 
   # Planner
-  planner_type: 'random_policy' # random / cem / random_policy
+  planner_type: 'random' # random / cem / random_policy
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
@@ -149,7 +150,7 @@ planning:
     upper: [ 30.,  1.5]
 
   random:
-    K: 4096 # number of actions to sample from
+    K: 512 # number of actions to sample from
 
   cem:
     init_M: 2048 # number of actions to sample from

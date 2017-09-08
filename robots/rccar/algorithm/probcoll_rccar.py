@@ -27,7 +27,7 @@ class ProbcollRCcar(Probcoll):
         self._max_iter = probcoll_params['max_iter']
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
-        self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
+        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
         self._remote_save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
         self._remote_samples = os.path.join(self._remote_save_dir, "samples")
         self._remote_ckpt = os.path.join(self._remote_save_dir, "model_checkpoints")
@@ -40,13 +40,12 @@ class ProbcollRCcar(Probcoll):
         # Move yaml
         local_yaml = os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name']))
         remote_yaml = os.path.join(self._remote_save_dir, '{0}.yaml'.format(params['exp_name']))
-        self._ssh.exec_command("mkdir {0} -p".format(self._remote_save_dir))
+        self._ssh.exec_command("mkdir {0} -p".format(self._remote_ckpt))
         self._logger.info("Added experiments directory remotely")
+        time.sleep(0.1)
         self._sftp.put(local_yaml, remote_yaml)
         self._logger.info("Added yaml remotely")
-        self._ssh.exec_command("python3 {0} probcoll rccar_remote yaml {1}".format(
-            self._remote_main,
-            remote_yaml))
+        input("Press Enter once you start probcoll on rccar")
         self._logger.info("Started probcoll on rccar")
 
     ###################
@@ -75,14 +74,22 @@ class ProbcollRCcar(Probcoll):
                     self._logger.info('\t{0}'.format(fname))
                 self.probcoll_model.add_data([os.path.join(init_data_folder, fname) for fname in fnames])
             # Keeps track of how many rollouts have been done
-            for samples_start_itr in range(self._max_iter-1, -1, -1):
-                sample_file = self._itr_samples_file(samples_start_itr, create=False)
+            for itr in range(self._max_iter):
+                sample_file = self._itr_samples_file(itr, create=False)
                 if os.path.exists(sample_file):
-                    samples_start_itr += 1
+                    self.probcoll_model.add_data([sample_file])
+                else:
                     break
+
+            samples_start_itr = itr - 1
+            
             ### if any data and haven't trained on it already, train on it
-            if (samples_start_itr > 0 or init_data_folder is not None) and (samples_start_itr != self._max_iter):
+            if samples_start_itr > 0: 
+                self.probcoll_model.recover()
                 self._run_training(samples_start_itr)
+            elif init_data_folder is not None:
+                self._run_training(samples_start_itr)
+            
             self._itr = samples_start_itr
             self._time_step = self._num_timesteps * self._itr
             ### training loop
@@ -103,8 +110,15 @@ class ProbcollRCcar(Probcoll):
         try:
             for f in self._sftp.listdir(self._remote_samples):
                 remote_file = os.path.join(self._remote_samples, f)
-                local_file = self._itr_samples_file(itr)
-                self._sftp.get(remote_file, local_file)
+                while True:
+                    try:
+                        local_file = self._itr_samples_file(itr)
+                        self._sftp.get(remote_file, local_file)
+                        Sample.load(local_file)
+                        break
+                    except:
+                        pass
+                self.probcoll_model.add_data([local_file])
                 self._sftp.remove(remote_file)
                 self._itr += 1
         except:
@@ -114,16 +128,17 @@ class ProbcollRCcar(Probcoll):
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
                 if self._asynchronous:
-#                    self.probcoll_model.recover()
                     self._async_training()
-                    self._async_on = True
 
     def _async_training(self):
-#        self.probcoll_model.train_loop()
         self.probcoll_model.train()
-        local_file = self.probcoll_model.get_latest_checkpoint()
-        remote_file = os.path.join(self._remote_ckpt, os.path.split(local_file)[-1])
-        self._sftp.put(local_file, remote_file)
+        try:
+            for f in os.listdir(self.probcoll_model.checkpoints_dir):
+                local_file = os.path.join(self.probcoll_model.checkpoints_dir, f)
+                remote_file = os.path.join(self._remote_ckpt, f)
+                self._sftp.put(local_file, remote_file)
+        except:
+            self._logger.warning("Checkpoint file not updated")
 
     def run_testing(self, itr):
         pass
@@ -133,18 +148,7 @@ class ProbcollRCcar(Probcoll):
     #########################
 
     def _create_mpc(self):
-        """ Must initialize MPC """
-        self._logger.info('\t\t\tCreating MPC')
-        if self._planner_type == 'random_policy':
-            mpc_policy = RandomPolicy()
-        elif self._planner_type == 'random':
-            mpc_policy = PolicyRandomPlanning(self.probcoll_model, params['planning'])
-        elif self._planner_type == 'cem':
-            mpc_policy = PolicyCem(self.probcoll_model, params['planning'])
-        else:
-            raise NotImplementedError('planner_type {0} not implemented for rccar'.format(self._planner_type))
-
-        return mpc_policy
+        pass
 
     ###############
     ### Closing ###
