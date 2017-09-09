@@ -2,7 +2,6 @@ import os
 import time
 import numpy as np
 import paramiko
-import threading
 
 from general.algorithm.probcoll import Probcoll
 from general.algorithm.probcoll_model import ProbcollModel
@@ -27,9 +26,9 @@ class ProbcollRCcar(Probcoll):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
         self._num_timesteps = params['probcoll']['num_timesteps']
-        self._threads = []
         ### load prediction neural net
-        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
+        self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
+#        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
         self._remote_save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
         self._remote_samples = os.path.join(self._remote_save_dir, "samples")
         self._remote_ckpt = os.path.join(self._remote_save_dir, "model_checkpoints")
@@ -93,8 +92,8 @@ class ProbcollRCcar(Probcoll):
             self._itr = samples_start_itr
             self._time_step = self._num_timesteps * self._itr
             ### training loop
-            self._run_threads()
             while self._itr < self._max_iter:
+                self._get_data()
                 self._run_training(self._itr)
                 if not params['probcoll']['save_O']:
                     self._itr_remove_O_from_samples(itr)
@@ -103,13 +102,6 @@ class ProbcollRCcar(Probcoll):
         finally:
             self.close()
    
-    def _run_threads(self):
-        self._threads.append(threading.Thread(target=self._get_data))
-        for t in self._threads:
-            t.daemon = True
-            t.start()
-        self._logger.info('Started get data thread')
-
     def _run_itr(self, itr):
         pass
 
@@ -135,13 +127,10 @@ class ProbcollRCcar(Probcoll):
     def run_testing(self, itr):
         pass
 
-    #########################
-    ### Threaded function ###
-    #########################
-
     def _get_data(self):
         for f in self._sftp.listdir(self._remote_samples):
             remote_file = os.path.join(self._remote_samples, f)
+            self._logger.info('Found sample itr {0}'.format(self._itr+1))
             while True:
                 try:
                     local_file = self._itr_samples_file(self._itr)
@@ -153,7 +142,6 @@ class ProbcollRCcar(Probcoll):
             self.probcoll_model.add_data([local_file])
             self._sftp.remove(remote_file)
             self._itr += 1
-        time.sleep(1.0)
 
     #########################
     ### Create controller ###

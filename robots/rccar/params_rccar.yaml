@@ -20,7 +20,7 @@ probcoll:
   # Training
   training_start_iter: 0
   is_training: True # EXPERIMENTAL
-  asynchronous_training: True # EXPERIMENTAL
+  asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
   num_timesteps: 120
@@ -67,14 +67,14 @@ model:
   reg: 1.e-8 # L2 regularization
   
   # Train schedule
-  steps: 2500
+#  steps: 2500
 #  reset_freq: 4 # 0 means no resetting
+  ckpt_after_step:  10000
   reset_after_step: 20000  
-  reset_steps: 10000
+#  reset_steps: 10000
   display_steps: 100 
   val_pct: 0.1 # Percent of the data stored as validation
-  val_freq: 0.1 # How often you compute validation (percentage)
-  val_steps: 50  # How many steps you do on validation 
+  val_steps: 10  # How many steps you do on validation 
   val_dropout: True # Whether you use dropout during validation
 
   # Model architecture
@@ -147,8 +147,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-45.,  2.5]
-    upper: [ 45.,  2.5]
+    lower: [-45.,  3.0]
+    upper: [ 45.,  3.0]
 
   random:
     K: 1024 # number of actions to sample from
@@ -168,8 +168,8 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-45.,  2.5]
-      upper: [ 45.,  2.5]
+      lower: [-45.,  3.0]
+      upper: [ 45.,  3.0]
     endpoints: [[0, 1.0], [2400, 0.1], [3600, 0.01]]
     outside_value: 0.0
 
