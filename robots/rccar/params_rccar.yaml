@@ -67,10 +67,11 @@ model:
   reg: 1.e-8 # L2 regularization
   
   # Train schedule
-  steps: 500
-  reset_freq: 1 # 0 means no resetting
+  steps: 2500
+#  reset_freq: 4 # 0 means no resetting
+  reset_after_step: 20000  
   reset_steps: 10000
-  display_steps: 50 
+  display_steps: 100 
   val_pct: 0.1 # Percent of the data stored as validation
   val_freq: 0.1 # How often you compute validation (percentage)
   val_steps: 50  # How many steps you do on validation 
@@ -146,8 +147,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-45.,  3.0]
-    upper: [ 45.,  3.0]
+    lower: [-45.,  2.5]
+    upper: [ 45.,  2.5]
 
   random:
     K: 1024 # number of actions to sample from
@@ -167,9 +168,9 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-45.,  3.0]
-      upper: [ 45.,  3.0]
-      endpoints: [[0, 1.0], [2400, 0.1], [3600, 0.01]]
+      lower: [-45.,  2.5]
+      upper: [ 45.,  2.5]
+    endpoints: [[0, 1.0], [2400, 0.1], [3600, 0.01]]
     outside_value: 0.0
 
   control_noise:

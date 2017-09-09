@@ -81,7 +81,7 @@ class ProbcollRCcar(Probcoll):
                 else:
                     break
 
-            samples_start_itr = itr - 1
+            samples_start_itr = itr
             
             ### if any data and haven't trained on it already, train on it
             if samples_start_itr > 0: 
@@ -108,6 +108,7 @@ class ProbcollRCcar(Probcoll):
         for t in self._threads:
             t.daemon = True
             t.start()
+        self._logger.info('Started get data thread')
 
     def _run_itr(self, itr):
         pass
@@ -143,15 +144,16 @@ class ProbcollRCcar(Probcoll):
             remote_file = os.path.join(self._remote_samples, f)
             while True:
                 try:
-                    local_file = self._itr_samples_file(itr)
+                    local_file = self._itr_samples_file(self._itr)
                     self._sftp.get(remote_file, local_file)
                     Sample.load(local_file)
                     break
-                except:
-                    pass
+                except Exception as e:
+                    print(e)
             self.probcoll_model.add_data([local_file])
             self._sftp.remove(remote_file)
             self._itr += 1
+        time.sleep(1.0)
 
     #########################
     ### Create controller ###

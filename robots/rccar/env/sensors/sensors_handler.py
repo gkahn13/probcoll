@@ -155,7 +155,7 @@ class SensorsHandler:
                             self._default_imu_data = np.array(imu_data, dtype=np.float32)
                 
                 if self._is_calibrated:
-                    if self._imu_data[2] + self._default_imu_data[2] < 1.0:
+                    if self._imu_data[2] + self._default_imu_data[2] < 8.0:
                         self._crashed = True
                         self._flip = True
                     elif self._motor_data[2] >= 5 and \
@@ -327,19 +327,19 @@ if __name__ == '__main__':
     handler = SensorsHandler(is_plotting=False)
     start = cur_time = time.time()
 #    handler.set_motor_cmd((0., 10.))
-    handler.set_vel_cmd((0., 2.0))
+#    handler.set_vel_cmd((0., 2.0))
     i = 0
     while time.time() - start < 2:
-#        if handler._is_plotting:
-#            if time.time() - cur_time > 0.01:
-#                cur_time = time.time()
-#                handler.update_plot()
-#        else:
-#            if handler.get_crash():
-#                print("crashed {0}".format(i))
-#                i += 1
-#                while handler.get_crash():
-#                    pass
+        if handler._is_plotting:
+            if time.time() - cur_time > 0.01:
+                cur_time = time.time()
+                handler.update_plot()
+        else:
+            if handler.get_crash():
+                print("crashed {0}".format(i))
+                i += 1
+                while handler.get_crash():
+                    pass
 #        image = handler.get_image()
 #        if image is not None:
 #            plt.imshow(image)

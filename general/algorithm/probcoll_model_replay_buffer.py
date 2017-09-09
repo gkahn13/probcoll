@@ -354,8 +354,8 @@ class ProbcollModelReplayBuffer(ProbcollModel):
         else:
             self.graph.as_default()
             new_model_file, model_num  = self._next_model_file()
-            if self.reset_freq > 0:
-                reset = reset or (model_num % self.reset_freq == 0 and model_num != 0)
+            step = self.sess.run(self.global_step)
+            reset = reset or (step >= self.reset_step)
             if reset:
                 self._logger.debug('Resetting model')
                 self.graph_init_vars()
