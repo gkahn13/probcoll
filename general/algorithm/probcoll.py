@@ -108,7 +108,7 @@ class Probcoll:
                 else:
                     break
             
-            samples_start_itr = itr - 1
+            samples_start_itr = itr
             
             if samples_start_itr > 0: 
                 self.probcoll_model.recover()
@@ -174,12 +174,11 @@ class Probcoll:
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
                 if self._asynchronous:
-                    self.probcoll_model.recover()
+#                    self.probcoll_model.recover()
                     if not self._async_on:
                         self._async_training()
                         self._async_on = True
                 else:
-                    start = time.time()
                     self.probcoll_model.train()
 
     def _async_training(self):

@@ -68,6 +68,9 @@ class AgentRCcar(Agent):
                 else:
                     self._curr_rollout_t += 1
             if params['env']['check_rollouts']:
+                if self._done:
+                    self._logger.info('Trajectory finished')
+                self.reset()
                 text = input('Enter n if error during rollout, and anything else to save rollout')
                 if 'n' in text:
                     need_to_collect_sample = True
