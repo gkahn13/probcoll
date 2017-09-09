@@ -158,8 +158,8 @@ class SensorsHandler:
                     if self._imu_data[2] + self._default_imu_data[2] < 1.0:
                         self._crashed = True
                         self._flip = True
-                    elif self._motor_data[2] >= 5 and \
-                            self._imu_data[0] < -6.0:
+                    elif self._motor_data[2] >= 1 and \
+                            self._imu_data[0] < -8.0:
                         self._crashed = True
                         self._flip = False
                     else:
@@ -327,7 +327,7 @@ if __name__ == '__main__':
     handler = SensorsHandler(is_plotting=False)
     start = cur_time = time.time()
 #    handler.set_motor_cmd((0., 10.))
-    handler.set_vel_cmd((0., 2.0))
+    handler.set_vel_cmd((0., 2.5))
     i = 0
     while time.time() - start < 2:
 #        if handler._is_plotting:

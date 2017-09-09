@@ -11,8 +11,8 @@ class ProbcollModelRCcar(ProbcollModelReplayBuffer):
     #############################
 
     def get_latest_checkpoint(self):
-        ckpt_file = os.path.join(self._checkpoints_dir, "0.ckpt")
-        check_file = os.path.join(self._checkpoints_dir, "0.ckpt.index")
+        ckpt_file = os.path.join(self.checkpoints_dir, "0.ckpt")
+        check_file = os.path.join(self.checkpoints_dir, "0.ckpt.index")
         if os.path.exists(check_file):
             return ckpt_file
         else:
