@@ -29,7 +29,7 @@ class ProbcollModelReplayBuffer(ProbcollModel):
     ### Initializing ###
     ####################
 
-    def __init__(self, save_dir=None, data_dir=None):
+    def __init__(self, save_dir=None, data_dir=None, gpu_fraction=None):
         if save_dir is None:
             self.save_dir = os.path.join(params['exp_dir'], params['exp_name'])
         else:
@@ -78,7 +78,9 @@ class ProbcollModelReplayBuffer(ProbcollModel):
         self.threads = []
         self.graph = tf.Graph()
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.device)
-        if params['probcoll']['asynchronous_training']:
+        if gpu_fraction is not None:
+            self.gpu_fraction = gpu_fraction
+        elif params['probcoll']['asynchronous_training']:
             self.gpu_fraction = self.gpu_fraction / 2.0
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_fraction)
         config = tf.ConfigProto(

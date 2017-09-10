@@ -30,7 +30,7 @@ class ProbcollRCcarRemote(Probcoll):
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
         if self._planner_type != 'random_policy':
-            self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
+            self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir, gpu_fraction=0.4)
 
     ###################
     ### Run methods ###

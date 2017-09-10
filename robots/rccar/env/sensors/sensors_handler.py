@@ -8,14 +8,15 @@ import cv2
 
 class SensorsHandler:
 
-    def __init__(self, p=5.0, d=0.0, timeout=0.1, is_plotting=False):
+    def __init__(self, p=50.0, d=0.0, timeout=0.1, is_plotting=False):
         self._motor_ser = None
         self._imu_ser = None
         self._motor_data = None
-#        self._motor_data = np.array([0.0, 0.0, 0.0, 0.0]) # (state, steer, motor, encoder)
         self._last_motor_data = None # used for pid
         self._imu_data = None # (pos, hpr)
         self._motor_cmd = None # (steer, motor)
+        self._last_motor_cmd = None
+        self._max_vel = 0
         self._vel_cmd = None # (steer, vel)
         self._is_calibrated = False
         self._default_defined = False
@@ -102,11 +103,14 @@ class SensorsHandler:
                                 motor_sign = 0
                             else:
                                 motor_sign = abs(motor_diff) / motor_diff
-                            self._motor_data = [motor_data[0], steer_diff, motor_diff, motor_data[3]]
+                            self._motor_data = [motor_data[0], steer_diff, motor_diff, motor_data[3] * motor_sign]
                         else:
                             self._default_steer_motor = motor_data[1:3]
 
+                
                 if self._is_calibrated:
+                    self._max_vel = max(self._max_vel, self._motor_data[3])
+                    
                     if self._crashed or self._flip:
                         self._motor_cmd = (0.0, 0.0)
                         self._vel_cmd = None
@@ -123,12 +127,12 @@ class SensorsHandler:
                             if enc < 0.1:
                                 motor = min(max(motor,  5),  15)
                             else:
-                                motor = min(max(motor,  5),  45)
+                                motor = min(max(motor,  5),  20)
                         elif vel < 0:
                             if enc > -0.1:
                                 motor = max(min(motor, -5), -15)
                             else:
-                                motor = max(min(motor, -5), -45)
+                                motor = max(min(motor, -5), -20)
                         self._motor_cmd = (steer, motor)
                         self._dt = 0
                     
@@ -156,13 +160,19 @@ class SensorsHandler:
                             self._default_imu_data = np.array(imu_data, dtype=np.float32)
                 
                 if self._is_calibrated:
-                    if self._imu_data[2] + self._default_imu_data[2] < 9.2:
+                    if self._imu_data[2] + self._default_imu_data[2] < -9.0:
                         self._crashed = True
                         self._flip = True
+                        print("flip crash")
                     elif self._motor_data[2] >= 1 and \
-                            self._imu_data[0] < -8.0:
+                            self._imu_data[0] < -10.0:
                         self._crashed = True
                         self._flip = False
+                        print("jolt crash")
+                    elif self._motor_data[3] <= 0.7 and self._max_vel > 0.7 and self._motor_cmd is not None and self._motor_cmd[1] >= 5.0:
+                        self._crashed = True
+                        self._flip = False
+                        print("stuck crash")
                     else:
                         self._flip = False
 
@@ -213,15 +223,19 @@ class SensorsHandler:
 
     def reset_crash(self):
         self._crashed = False
+        self._max_vel = 0
 
     # Utility functions
 
     def _read_ser(self, ser):
         return ser.readline().decode("utf-8")
 
+
     def _send_motor_cmd(self, motor_cmd=0):
         # Default value is the calibrated zero values
-        if self._is_calibrated:
+        if self._is_calibrated and motor_cmd is not None and motor_cmd != self._last_motor_cmd:
+#            print(motor_cmd)
+            self._last_motor_cmd = motor_cmd
             steer, motor = 100 * np.clip(np.array(motor_cmd) + self._default_steer_motor, 0.0, 99.99)
             cmd_text = str.encode('(1{0:04.0f}{1:04.0f})'.format(steer, motor))
             self._motor_ser.write(cmd_text)
@@ -328,9 +342,9 @@ if __name__ == '__main__':
     handler = SensorsHandler(is_plotting=False)
     start = cur_time = time.time()
 #    handler.set_motor_cmd((0., 10.))
-#    handler.set_vel_cmd((0., 3.0))
+#    handler.set_vel_cmd((0., 1.0))
     i = 0
-    while time.time() - start < 60:
+    while time.time() - start < 120:
         if handler._is_plotting:
             if time.time() - cur_time > 0.01:
                 cur_time = time.time()
@@ -344,9 +358,10 @@ if __name__ == '__main__':
 #        if image is not None:
 #            plt.imshow(image)
 #            plt.show()
-#        if time.time() - cur_time > 0.05:
-#            cur_time = time.time()
-#            print(handler.get_motor_data())
-#        print(handler.get_imu_data())
+        if time.time() - cur_time > 0.025:
+            cur_time = time.time()
+#            print(handler.get_motor_data()[3])
+#            print(handler.get_imu_data()[3:])
 #        pass
+    handler.set_motor_cmd((0.0, 0.0))
     handler.close()

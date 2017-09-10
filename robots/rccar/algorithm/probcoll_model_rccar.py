@@ -10,8 +10,8 @@ from general.algorithm.probcoll_model_replay_buffer import ProbcollModelReplayBu
 
 class ProbcollModelRCcar(ProbcollModelReplayBuffer):
 
-    def __init__(self, save_dir=None, data_dir=None):
-        ProbcollModelReplayBuffer.__init__(self, save_dir=save_dir, data_dir=data_dir)
+    def __init__(self, save_dir=None, data_dir=None, gpu_fraction=None):
+        ProbcollModelReplayBuffer.__init__(self, save_dir=save_dir, data_dir=data_dir, gpu_fraction=gpu_fraction)
         self._setup_plotter()
 
     #############
