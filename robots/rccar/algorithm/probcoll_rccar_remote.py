@@ -26,7 +26,7 @@ class ProbcollRCcarRemote(Probcoll):
     def _setup(self):
         probcoll_params = params['probcoll']
         self._max_iter = probcoll_params['max_iter']
-        self.agent = AgentRCcar()
+        self.agent = AgentRCcar(logger=self._logger)
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
         if self._planner_type != 'random_policy':

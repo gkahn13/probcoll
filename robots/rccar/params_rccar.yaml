@@ -53,7 +53,7 @@ model:
   
   # Device
   device: 0
-  gpu_fraction: 0.9
+  gpu_fraction: 0.4
   num_reading_threads: 4
 
   # Optimization
@@ -147,8 +147,8 @@ planning:
   num_dp: 1 # number of dropout passes to average over during planning
   # control range for your planning algorithms
   control_range:
-    lower: [-45.,  3.0]
-    upper: [ 45.,  3.0]
+    lower: [-45.,  2.0]
+    upper: [ 45.,  2.0]
 
   random:
     K: 1024 # number of actions to sample from
@@ -168,8 +168,8 @@ planning:
   # Noise / exploration
   epsilon_greedy:
     control_range:
-      lower: [-45.,  3.0]
-      upper: [ 45.,  3.0]
+      lower: [-45.,  2.0]
+      upper: [ 45.,  2.0]
     endpoints: [[0, 1.0], [2400, 0.1], [3600, 0.01]]
     outside_value: 0.0
 

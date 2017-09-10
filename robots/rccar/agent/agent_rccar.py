@@ -9,12 +9,13 @@ from config import params
 
 class AgentRCcar(Agent):
 
-    def __init__(self):
+    def __init__(self, logger=None):
         self._env = RCcarEnv(params['env'])
         self._curr_rollout_t = 0
         self._done = False
         self.last_n_obs = [np.zeros(params['O']['dim']) for _ in range(params['model']['num_O'])]  
         self.reset()
+        self._logger = logger
 
     def sample_policy(self, policy, T=1, time_step=0, is_testing=False, only_noise=False):
         visualize = params['planning'].get('visualize', False)
@@ -63,7 +64,6 @@ class AgentRCcar(Agent):
 
                 if self._done:
                     self._curr_rollout_t = 0
-                    self.reset()
                     break
                 else:
                     self._curr_rollout_t += 1
