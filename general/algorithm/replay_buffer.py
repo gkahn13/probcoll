@@ -42,27 +42,6 @@ class SplitReplayBuffer(object):
     def can_sample(self):
         return self._curr_sizes[0] > 0 and self._curr_sizes[1] > 0
 
-#    def shuffle(self, partition):
-#        i = partition
-#        indices_pre = np.arange(self._bases[i], self._bases[i] + self._curr_sizes[i])
-#        indices_shuffle = np.arange(self._bases[i], self._bases[i] + self._curr_sizes[i])
-#        np.random.shuffle(indices_shuffle)
-#        self._actions[indices_pre] = self._actions[indices_shuffle]
-#        self._obs_ims[indices_pre] = self._obs_ims[indices_shuffle]
-#        self._obs_vecs[indices_pre] = self._obs_vecs[indices_shuffle]
-#        self._outputs[indices_pre] = self._outputs[indices_shuffle]
-#        self._lengths[indices_pre] = self._lengths[indices_shuffle]
-#   
-#    def _get_indices(self, batch_size, partition):
-#        indices = []
-#        for _ in range(batch_size):
-#            indices.append(self._next_item_indices[partition] + self._bases[partition])
-#            self._next_item_indices[partition] = (self._next_item_indices[partition] + 1) % self._curr_sizes[partition]
-#            if self._next_item_indices[partition] == 0:
-#                self.shuffle(partition)
-#        return indices
-
-    # TODO best way to shuffle
     def sample(self, batch_size):
         batch_size_1 = int(batch_size * self._partition_pct)
         batch_size_2 = batch_size - batch_size_1
@@ -73,7 +52,6 @@ class SplitReplayBuffer(object):
         output = []
         length = []
         for i in range(2):
-#            indices = self._get_indices(batch_sizes[i], i)
             indices = np.random.randint(self._bases[i], self._bases[i] + self._curr_sizes[i], batch_sizes[i])
             action.append(self._actions[indices])
             obs_im.append(self._obs_ims[indices])

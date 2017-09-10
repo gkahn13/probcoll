@@ -209,10 +209,6 @@ class ProbcollModelReplayBuffer(ProbcollModel):
                     replay_buffer.add_data_point(feature_u, feature_obs_im, feature_obs_vec, feature_output, feature_len, partition) 
 
     def add_data(self, npz_fnames):
-        tfrecords = self._get_tfrecords_fnames(npz_fnames[-1])
-        tfrecords_coll_train, tfrecords_no_coll_train, \
-            tfrecords_coll_val, tfrecords_no_coll_val = tfrecords
-        self._logger.debug('Saving tfrecords')
         no_coll_data, coll_data = self._load_samples(npz_fnames)
         no_coll_len = len(no_coll_data["U"])
         coll_len = len(coll_data["U"])
@@ -355,9 +351,9 @@ class ProbcollModelReplayBuffer(ProbcollModel):
             self.graph.as_default()
             new_model_file, model_num  = self._next_model_file()
             step = self.sess.run(self.global_step)
-            reset = reset or (step >= self.reset_step)
+            reset = reset or (step >= self.reset_after_step)
             if reset:
-                self._logger.debug('Resetting model')
+                self._logger.info('Resetting model')
                 self.graph_init_vars()
 
             ### create plotter
