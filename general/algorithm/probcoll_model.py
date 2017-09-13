@@ -246,7 +246,8 @@ class ProbcollModel:
             if cols[-1][0] == 1:
                 total_time = len(cols)
                 for i in xrange(self.label_shift_num):
-                    sample.set_O([1], t=total_time-i-2, sub_obs='collision')
+                    if total_time - i -2 >=0:
+                        sample.set_O([1], t=total_time-i-2, sub_obs='collision')
         return [sample]
 
     def _load_samples(self, npz_fnames):
@@ -697,7 +698,7 @@ class ProbcollModel:
                     # Outputgraph should always have output with self.doutput dimension
                     params["model"]["output_graph"]["output_dim"] = self.doutput
                     params["model"]["output_graph"]["dropout"] = None
-                    output_mat_b, _  = fcnn(
+                    output_mat_b, _= fcnn(
                         ag_output,
                         params["model"]["output_graph"],
                         dtype=self.dtype,

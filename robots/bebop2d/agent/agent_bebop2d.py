@@ -44,7 +44,7 @@ class AgentBebop2d(Agent):
         self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
         rospy.init_node('DaggerPredictionBebop2d', anonymous=True)
         bebop_topics = params['bebop']['topics']
-        self.just_crashed = False
+        self.just_crashed = True
         self.stopped = False
         self.airborne = False
         self.battery_percentage = 100
@@ -70,6 +70,7 @@ class AgentBebop2d(Agent):
 
         self.noise_vx = params['planning']['control_noise']['uniform']['upper'][0]
         self.noise_vy = params['planning']['control_noise']['uniform']['upper'][1]
+        # self.stop_vx = 0.5*(params['planning']['control_range']['lower'][0] + params['planning']['cost']['control_cost']['des'][0])
         # self._info['linearvel'] = np.array([0.0, 0.0, 0.0])
 
     def start(self, msg):
@@ -95,12 +96,13 @@ class AgentBebop2d(Agent):
         sample_noise = Sample(meta_data=params, T=T)
         sample_no_noise = Sample(meta_data=params, T=T)
         r = rospy.Rate(1.0/params['probcoll']['dt'])
-        self.just_crashed = False
-        if not self.airborne:
-            self._logger.info('Press take off')
-            while not self.airborne and not rospy.is_shutdown():
-                rospy.sleep(0.1)
-            time.sleep(10)
+        if params['probcoll']['autonomous']:
+            self.just_crashed = False
+            if not self.airborne:
+                self._logger.info('Press take off')
+                while not self.airborne and not rospy.is_shutdown():
+                    rospy.sleep(0.1)
+                time.sleep(10)
         #     self._logger.info('Press start again after drone stablizes')
         #     self.jusrt_cashed = True
         #     while self.just_crashed and not rospy.is_shutdown():
@@ -123,6 +125,8 @@ class AgentBebop2d(Agent):
                     only_no_noise=is_testing,
                     visualize=visualize)
                 if not self.is_teleop:
+                    if self.stop_algorithm(policy.ns):
+                        u_t_no_noise = np.array([0, 0, 0], dtype='float32')
                     self.act(u_t_no_noise)
                     self._info['linearvel'] = u_t_no_noise
                 else:
@@ -139,6 +143,9 @@ class AgentBebop2d(Agent):
                     visualize=visualize)
                 if not self.is_teleop:
                     # print 'executed act: {0}'.format(u_t_no_noise)
+                    if self.stop_algorithm(policy.ns):
+                        u_t = np.array([0, 0, 0], dtype='float32')
+                        u_t_no_noise = np.array([0, 0, 0], dtype='float32')
                     print 'u_t: {0}, u_t_no_noise: {1}'.format(u_t, u_t_no_noise)
                     self.act(u_t)
                     self._info['linearvel'] = u_t
@@ -282,47 +289,36 @@ class AgentBebop2d(Agent):
         if self.just_crashed:
             r = rospy.Rate(1.0/params['probcoll']['dt'])
             twist_msg = geometry_msgs.Twist(
-                linear=geometry_msgs.Point(-0.5, 0, 0.),
+                linear=geometry_msgs.Point(-params['model']['back_up_speed'][0], 0, 0.),
                 angular=geometry_msgs.Point(0., 0., 0)
             )
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
+            for _ in xrange(params['model']['back_up'][0]):
+                self.cmd_vel_pub.publish(twist_msg)
+                r.sleep()
             twist_msg.linear.x = 0
             self.cmd_vel_pub.publish(twist_msg)
             r.sleep()
-            twist_msg.angular.z = 1.5
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            # self.cmd_vel_pub.publish(twist_msg)
-            # r.sleep()
+            twist_msg.angular.z = params['model']['back_up_speed'][1]
+            # if np.random.uniform() > 0.5:
+            #     twist_msg.angular.z = params['model']['back_up_speed'][1]
+            # else:
+            #     twist_msg.angular.z = -params['model']['back_up_speed'][1]
+            for _ in xrange(params['model']['back_up'][1]):
+                self.cmd_vel_pub.publish(twist_msg)
+                r.sleep()
             twist_msg.angular.z = 0
             self.cmd_vel_pub.publish(twist_msg)
             r.sleep()
             self.cmd_vel_pub.publish(twist_msg)
         else:
-            r = rospy.Rate(1.0 / params['probcoll']['dt'])
+            r = rospy.Rate(1.0/params['probcoll']['dt'])
             twist_msg = geometry_msgs.Twist(
-                linear=geometry_msgs.Point(-0.5, 0, 0.),
+                linear=geometry_msgs.Point(-params['model']['back_up_speed'][0], 0, 0.),
                 angular=geometry_msgs.Point(0., 0., 0)
             )
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
+            for _ in xrange(params['model']['back_up'][0]):
+                self.cmd_vel_pub.publish(twist_msg)
+                r.sleep()
             twist_msg.linear.x = 0
             self.cmd_vel_pub.publish(twist_msg)
             r.sleep()
@@ -332,7 +328,6 @@ class AgentBebop2d(Agent):
 
     def update_height(self, msg):
         self.height =msg.altitude
-
 
     def maintain_height(self):
         self.height = 0
@@ -353,42 +348,46 @@ class AgentBebop2d(Agent):
             self.cmd_vel_pub.publish(twist_msg)
             r.sleep()
         self._logger.info('height adjustment complete')
+
+
     def reset(self, pos=None, ori=None, hard_reset=False):
         # self._obs = self.env.reset(pos=pos, hpr=ori, hard_reset=hard_reset)
         self.act(None)  # stop bebop
         self.cur_teleop_command = None
         # if self.just_crashed:
-        # while self.just_crashed and not rospy.is_shutdown():
-        if self.stopped or self.just_crashed:
-            r = rospy.Rate(1.0/params['probcoll']['dt'])
-            twist_msg = geometry_msgs.Twist(
-                linear=geometry_msgs.Point(-0.5, 0, 0.),
-                angular=geometry_msgs.Point(0., 0., 0)
-            )
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            twist_msg.linear.x = 0
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            twist_msg.angular.z = 1.5
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            # self.cmd_vel_pub.publish(twist_msg)
-            # r.sleep()
-            twist_msg.angular.z = 0
-            self.cmd_vel_pub.publish(twist_msg)
-            r.sleep()
-            self.cmd_vel_pub.publish(twist_msg)
+        if params['probcoll']['autonomous']:
+            if self.just_crashed or self.stopped:
+                r = rospy.Rate(1.0 / params['probcoll']['dt'])
+                twist_msg = geometry_msgs.Twist(
+                    linear=geometry_msgs.Point(-params['model']['back_up_speed'][0], 0, 0.),
+                    angular=geometry_msgs.Point(0., 0., 0)
+                )
+                for _ in xrange(params['model']['back_up'][0]):
+                    self.cmd_vel_pub.publish(twist_msg)
+                    r.sleep()
+                twist_msg.linear.x = 0
+                self.cmd_vel_pub.publish(twist_msg)
+                r.sleep()
+                twist_msg.angular.z = params['model']['back_up_speed'][1]
+                # if np.random.uniform() > 0.5:
+                #     twist_msg.angular.z = params['model']['back_up_speed'][1]
+                # else:
+                #     twist_msg.angular.z = -params['model']['back_up_speed'][1]
+                for _ in xrange(params['model']['back_up'][1]):
+                    self.cmd_vel_pub.publish(twist_msg)
+                    r.sleep()
+                twist_msg.angular.z = 0
+                self.cmd_vel_pub.publish(twist_msg)
+                r.sleep()
+                self.cmd_vel_pub.publish(twist_msg)
+        else:
+            self.just_crashed = True
+            r = rospy.Rate(20)
+            print 'Press start on joystick to start'
+            while self.just_crashed and not rospy.is_shutdown():
+                r.sleep()
+
+
         # if self.just_crashed:
         #     self._logger.info('Press start')
         #     while self.just_crashed and not rospy.is_shutdown():
@@ -400,6 +399,9 @@ class AgentBebop2d(Agent):
         # self._ros_pub_start.publish(Empty())
         if hard_reset:
             self.last_n_obs = [np.zeros(params['O']['dim']) for _ in xrange(params['model']['num_O'])]
+
+    def stop_algorithm(self, ns):
+        return ns[10] < 0.98
 
     def get_state(self):
         state_sample = Sample(meta_data=params, T=1)
@@ -443,11 +445,13 @@ class AgentBebop2d(Agent):
         return im
     def act(self, u):
         if u is not None:
-            if u[0] <= self.noise_vx and abs(u[1]) <= self.noise_vy:
-                twist_msg = geometry_msgs.Twist(
-                    linear=geometry_msgs.Point(u[0], u[1], 0.),
-                    angular=geometry_msgs.Point(0., 0., 0)
-                )
+            if params['planning']['stop_command'] and params['probcoll']['autonomous'] and u[0] <= self.noise_vx and abs(u[1]) <= self.noise_vy:
+                self.cmd_vel_pub.publish(None)
+                self.stopped = True
+            # elif not params['planning']['stop_command'] and params['probcoll']['autonomous'] and 0 < u[0] <= self.stop_vx:
+            #     self.cmd_vel_pub.publish(None)
+            #     self.stopped = True
+            elif u[0] == 0 and u[1] == 0:
                 self.cmd_vel_pub.publish(None)
                 self.stopped = True
             else:

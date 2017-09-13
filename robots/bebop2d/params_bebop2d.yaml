@@ -11,7 +11,7 @@ probcoll:
   dt: 0.4
   T: 40 # timesteps per trajectory
   logger: 'debug'
-  max_iter: 20
+  max_iter: 40
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
 
   # Training
@@ -20,13 +20,13 @@ probcoll:
   asynchronous_training: False # EXPERIMENTAL
 
   # Conditions
-  num_rollouts: 6
+  num_rollouts: 20
 
   testing:
     num_rollout: 4
     itr_freq: 40
-#  init_data: /home/bding/Desktop/code/probcoll/init_ar
-
+  autonomous: False
+  init_data: /home/bding/Desktop/code/probcoll/init_arena
 
 
 #  planner_type: 'primitives' # primitives / cem / ilqr / randomwalk / randomcontrolset
@@ -50,7 +50,7 @@ probcoll:
 #  label_with_noise: True # if false, saves desired controls (i.e. without dyn_noise)
 #  obs_noise: True # boolean use noise or not
 #
-##  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
+#  init_data: '/home/gkahn/code/gps_quadrotor/experiments/pointquad/data'
 #
 #  use_ground_truth: False
 #  use_init_cost: True # TODO
@@ -79,7 +79,7 @@ probcoll:
 ##################################
 
 model:
-  T: 4 # how many timesteps to predict
+  T: 6 # how many timesteps to predict
   logger: 'debug'
 
   # what to use as input to prediction model
@@ -91,8 +91,8 @@ model:
 
   center_O_im: False
   control_range:
-    lower: [0.0, -1.0, -1.57]
-    upper: [1.0, 1.0, 1.57]
+    lower: [0.4, -0.8, -1.57]
+    upper: [1.0, 0.8, 1.57]
 
   # Device
   device: 0
@@ -151,8 +151,9 @@ model:
 
   output_graph:
     graph_type: 'fc'
-  label_shift: 1
-
+  label_shift: 0
+  back_up: [3, 3]
+  back_up_speed: [0.6, 1.2]
 
 #################################################
 ### Planning objective and optimizer settings ###
@@ -162,14 +163,14 @@ planning:
   cost:
     coll_cost:
       cost: square # square
-      weight: [10., 0., 0.] # TODO
+      weight: [50., 0., 0.] # TODO
       std_weight: 0.0
       pre_activation: True
     
     control_cost:
-      des: [0.8, 0., 0.] # TODO: hard-coded order: steering then speed
+      des: [0.7, 0., 0.] # TODO: hard-coded order: steering then speed
       cost: square
-      weight: [1.0, 1.0, 0.0]
+      weight: [1.0, .1, 0.0]
       # TODO uncertainty
 #    pre_activation: True # wether std is before or after activation (sigmoid)
 
@@ -178,13 +179,14 @@ planning:
   
   control_range:
     lower: [0.6, -0.6, 0]
-    upper: [1.0, 0.6, 0]
+    upper: [0.8, 0.6, 0]
 
   random:
     K: 8192 # number of actions to sample from
 
   epsilon_greedy:
-    endpoints: [[0, 1.0], [6, 0.25], [18, 0.0]]
+#    endpoints: [[60, 0.5], [100, 0.25], [200, 0.15], [250, 0.0]]
+    endpoints: [[0.0, 0.5], [40, 0.5], [60, 0.25], [80, 0.1], [100, 0.0]]
     outside_value: 0.01
 
   control_noise:
@@ -194,11 +196,16 @@ planning:
     gaussian:
       std: [0.1, 0.1, 0.0]
     uniform:
-      lower: [0, -0.1, 0.0]
-      upper: [0.1, 0.1, 0.0]
-  visualize: False
+      lower: [-0.02, -0.05, 0.0]
+      upper: [0.02, 0.05, 0.0]
+  visualize: True
+  visualize_probcoll_only: False
+  visualize_sample_size: 64
+  visualize_relative_probcoll_cost: True
+  save_fig: False
   teleop: False
   target_height: 0.85
+  stop_command: False
 
 ######################################################
 ########### States, controls, observations ###########
@@ -224,20 +231,23 @@ U:
   linearvel: {idx: 0, dim: 3}
 
 O:
-  dim: 257
+  dim: 2305
   order: ['camera', 'collision']
 
   camera: # TODO
     idx: 0
-    dim: 256
-    height: 16
-    width: 16
+    dim: 2304
+    height: 64
+    width: 36
     noise: 0.01
     num_channels: 1
-  collision: {idx: 256, dim: 1, buffer: 0.0}
+  collision: {idx: 2304, dim: 1, buffer: 0.0}
 
 analyze:
-  plot: True
+  plot: False
+  prob_hist: False
+  plot_hist_sequence: True
+  plot_last: 10
 ##################
 ### ros topics ###
 ##################
@@ -255,3 +265,5 @@ bebop:
 
     debug_image: '/bebop/debug/image' # sensor_msgs/Image
     debug_cmd_vel: '/bebop/debug/cmd_vel' # visualization_msgs/Marker
+
+  minimum_battery: 10

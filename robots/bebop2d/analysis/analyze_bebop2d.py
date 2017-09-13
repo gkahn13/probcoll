@@ -13,6 +13,7 @@ class AnalyzeBebop2d(Analyze):
 
     def __init__(self):
         Analyze.__init__(self, parent_exp_dir=None)
+        self.count = 0
 
     #######################
     ### Data processing ###
@@ -138,8 +139,14 @@ class AnalyzeBebop2d(Analyze):
         samples_itrs, sample_times = self._load_samples()
         # import IPython; IPython.embed()
         num_O = params['model']['num_O']
-        visualized = params['planning']['visualize']
+        # visualized = params['planning']['visualize']
         if_plot = params['analyze']['plot']
+        self._no_coll_ns = []
+        self._coll_ns = []
+
+        def stop_algorithm(ns):
+            return ns[10] < 0.98
+
         for itr, samples in samples_itrs:
             for n, s in enumerate(samples):
                 if len(s.get_O()) >= num_O:
@@ -150,25 +157,68 @@ class AnalyzeBebop2d(Analyze):
                             0,
                             only_noise=False,
                             only_no_noise=False,
-                            visualize=visualized)
+                            visualize=True)
                         # print 'u_t: {0}; u_t_no_noise: {1}'.format(u_t, u_t_no_noise)
+                        if s.get_O()[i:i + num_O][-1][-1]:
+                            self._coll_ns.append(prediction._mpc_policy.ns)
+                        else:
+                            self._no_coll_ns.append(prediction._mpc_policy.ns)
                         if if_plot:
                             f = plt.figure()
                             for j in xrange(num_O):
                                 # import IPython; IPython.embed()
                                 # if s.get_O()[i:i+num_O][-1][-1] == 1 and j==num_O - 1:
                                 #     import IPython; IPython.embed()
-                                img = np.reshape(s.get_O()[i + j][:-1], [16, 16])
+                                img = np.reshape(s.get_O()[i + j][:-1], [params['O']['camera']['width'], params['O']['camera']['height']])
                                 a = f.add_subplot(2, np.ceil(num_O/2.0), j + 1)
                                 plt.imshow(img, cmap='gray', vmin=0, vmax=255)
                                 a.set_title(j)
                             # if s.get_O()[i:i+num_O][-1][-1] == 1:
                             #     import IPython; IPython.embed()
                             f.suptitle(str(u_t) + str(u_t_no_noise) + str(s.get_O()[i:i+num_O][-1][-1]))
+                            # plt.savefig(params['exp_dir'] + '/'+
+                            #             params['exp_name'] + '/' + 'plots/' + 'itr_'+ str(itr)+'_sample_'+str(n)+'_act_'+str(i) + '.jpg')
                             plt.savefig(params['exp_dir'] + '/'+
-                                        params['exp_name'] + '/' + 'plots/' + 'itr_'+ str(itr)+'_sample_'+str(n)+'_act_'+str(i) + '.jpg')
-
-
+                                        params['exp_name'] + '/' + 'plots/' + str(self.count) + '_im' + '.jpg')
+                            self.count += 1
+                    if params['analyze']['plot_hist_sequence']:
+                        total_length = params['analyze']['plot_last']
+                        f, axarr = plt.subplots(2, total_length, figsize=(20, 10))
+                        Os = s.get_O()
+                        for i in xrange(total_length):
+                            if num_O <= len(Os) - i:
+                                u_t, u_t_no_noise = prediction._mpc_policy.act(
+                                    Os[len(Os)-i-num_O: len(Os)-i],
+                                    0,
+                                    0,
+                                    only_noise=False,
+                                    only_no_noise=False,
+                                    visualize=True)
+                                img = np.reshape(Os[len(Os)-i-1][:-1],
+                                                 [params['O']['camera']['width'], params['O']['camera']['height']])
+                                axarr[0, i].imshow(img, cmap='gray', vmin=0, vmax=255)
+                                axarr[0, i].set_title('last_'+str(i))
+                                axarr[1, i].plot(np.linspace(0, 1, 20), prediction._mpc_policy.ns,'-o')
+                                if stop_algorithm(prediction._mpc_policy.ns):
+                                    axarr[1, i].set_title('hist_last_' + str(i), color='r')
+                                else:
+                                    axarr[1, i].set_title('hist_last_' + str(i), color='g')
+                        plt.savefig(params['exp_dir'] + '/'+
+                             params['exp_name'] + '/' + 'plots/' + 'itr_' + str(itr) + '_hist_sample_'+ str(n) + '.jpg')
+        if params['analyze']['prob_hist']:
+            no_coll_ns_array = np.array(self._no_coll_ns)
+            coll_ns_array = np.array(self._coll_ns)
+            no_coll_ns_mean = np.mean(no_coll_ns_array, axis=0)
+            coll_ns_mean = np.mean(coll_ns_array,axis=0)
+            f = plt.figure()
+            sub = f.add_subplot(2, 1, 1)
+            plt.plot(np.linspace(0, 1, 20), no_coll_ns_mean)
+            sub.set_title('no coll hist')
+            sub = f.add_subplot(2, 1, 2)
+            plt.plot(np.linspace(0, 1, 20), coll_ns_mean)
+            sub.set_title('coll hist')
+            plt.savefig('probcoll_hist.jpg')
+            plt.show()
     ###########
     ### Run ###
     ###########

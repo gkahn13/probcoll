@@ -1,13 +1,13 @@
 import abc
 import tensorflow as tf
 import numpy as np
-
+import os
 from general.policy.noise import ZeroNoise
 from general.policy.noise import GaussianNoise
 from general.policy.noise import UniformNoise
 from general.policy.epsilon_greedy import epsilon_greedy
 from general.utility import schedules
-
+from config import params as global_params
 class Policy(object):
     __metaclass__ = abc.ABCMeta
 
@@ -50,7 +50,9 @@ class Policy(object):
                         "Noise type {0} is not valid".format(noise_type))
                 return action + noise
                 # return noise
-            # Epsilon greedy 
+            # Epsilon greedy
+            self.update_epsilon_greedy_end_points()
+            print 'epsilon greedy schedule: {0}'.format(self.params['epsilon_greedy']['endpoints'])
             self.eps_schedule = schedules.PiecewiseSchedule(
                 endpoints=self.params['epsilon_greedy']['endpoints'],
                 outside_value=self.params['epsilon_greedy']['outside_value'])
@@ -71,6 +73,33 @@ class Policy(object):
             control_costs):
         pass
 
+    def update_epsilon_greedy_end_points(self):
+        temp_dir = global_params['exp_dir'] + '/' + global_params['exp_name']
+        num_ite_completed = len(filter(lambda x: x.startswith('itr'), os.listdir(temp_dir)))
+        rollout_per_itr = global_params['probcoll']['num_rollouts']
+        num_rollouts_completed = num_ite_completed* rollout_per_itr
+        end_points = self.params['epsilon_greedy']['endpoints']
+        points_passed = 0
+        if num_rollouts_completed > 0:
+            if len(end_points) > 1:
+                for point in end_points:
+                    point[0] -= num_rollouts_completed
+                    if point[0] <= 0:
+                        points_passed += 1
+                gradients = []
+                for i in xrange(len(end_points)-1):
+                    gradients.append((end_points[i+1][1] - end_points[i][1])/
+                                     float(end_points[i+1][0]-end_points[i][0]))
+                if points_passed == len(end_points):
+                    self.params['epsilon_greedy']['endpoints'] = [[0, 0.0]]
+                else:
+                    for i in xrange(len(end_points)-1):
+                        if end_points[i][0] <= 0 and end_points[i+1][0] > 0:
+                            end_points[i] = [0, end_points[i][1] + gradients[i]*(0-end_points[i][0])]
+                    new_end_points = []
+                    for point in end_points:
+                        if point[0] >= 0:
+                            new_end_points.append(point)
     def act(self, obs_frame, t, rollout_num, only_noise=False, only_no_noise=False, visualize=False):
         assert(not only_noise or not only_no_noise)
         if t == 0:

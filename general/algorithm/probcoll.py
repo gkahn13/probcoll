@@ -119,10 +119,11 @@ class Probcoll:
         self._logger.info('')
         self._logger.info('=== Itr {0}'.format(itr))
         self._logger.info('')
-        if self._agent.battery_percentage < 10:
-            self._logger.info('Please swap the battery and then restart the code to continue')
-            while self._agent.battery_percentage < 10:
-                time.sleep(2)
+        if params['probcoll']['autonomous']:
+            if self._agent.battery_percentage < params['bebop']['minimum_battery']:
+                self._logger.info('Please swap the battery and then restart the code to continue')
+                while self._agent.battery_percentage < params['bebop']['minimum_battery']:
+                    time.sleep(2)
         # if itr == 2:
         #     print 'weight changed'
         #     params['planning']['cost']['coll_cost']['weight'] = params['planning']['cost']['coll_cost']['weight_a']
@@ -190,15 +191,16 @@ class Probcoll:
         pass
 
     def _run_rollout(self, itr):
-        if itr == 0:
-            self._agent.reset()
+        # if itr == 0:
+        #     self._agent.reset()
         T = params['probcoll']['T']
         label_with_noise = params['probcoll']['label_with_noise']
         samples = []
-        self._agent._ros_pub_takeoff.publish(Empty())
-        time.sleep(8)
-        self._agent.maintain_height()
-        time.sleep(5)
+        # if params['probcoll']['autonomous']:
+        #     self._agent._ros_pub_takeoff.publish(Empty())
+        #     time.sleep(8)
+        #     self._agent.maintain_height()
+        #     time.sleep(5)
         for cond in xrange(self._num_rollouts):
             self._agent.reset()
             self._logger.info('\t\tStarting cond {0} itr {1}'.format(cond, itr))
@@ -221,7 +223,8 @@ class Probcoll:
                 elapsed,
                 t*params['probcoll']['dt']/elapsed))
             self._rollout_num += 1
-        self._agent.back_up()
-        self._agent._ros_pub_land.publish(Empty())
+        if params['probcoll']['autonomous']:
+            self._agent.back_up()
+            self._agent._ros_pub_land.publish(Empty())
         # self._agent.act(None)
         self._itr_save_samples(itr, samples)
