@@ -63,7 +63,7 @@ if __name__ == '__main__':
     parser_probcoll.add_argument('--password', type=str, default=None)
 
     parser_probcoll.add_argument('--start_itr', type=str, default=None)
-
+    parser_probcoll.add_argument('--reset', action='store_true')
     ### replay specific arguments
     parser_replay_probcoll.add_argument('-itr', type=int, default=None,
                                           help='optionally set itr. else replay all itrs')
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         elif robot == 'bebop2d':
             prediction = ProbcollBebop2d()
         elif robot == 'rccar':
-            prediction = ProbcollRCcar(server=args.server, username=args.username, password=args.password)
+            prediction = ProbcollRCcar(server=args.server, username=args.username, password=args.password, reset=args.reset)
         elif robot == 'rccar_remote':
             prediction = ProbcollRCcarRemote(start_itr=args.start_itr)
         elif robot == 'sim_rccar':

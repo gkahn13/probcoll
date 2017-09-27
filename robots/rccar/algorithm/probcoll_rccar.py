@@ -16,10 +16,11 @@ from config import params
 
 class ProbcollRCcar(Probcoll):
 
-    def __init__(self, server, username, password, save_dir=None, data_dir=None):
+    def __init__(self, server, username, password, reset=False, save_dir=None, data_dir=None):
         self._server = server
         self._username = username
         self._password = password
+        self._reset_init = reset
         Probcoll.__init__(self, save_dir=save_dir, data_dir=data_dir)
 
     def _setup(self):
@@ -27,8 +28,7 @@ class ProbcollRCcar(Probcoll):
         self._max_iter = probcoll_params['max_iter']
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
-        self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir)
-#        self.probcoll_model = ProbcollModelReplayBuffer(save_dir=self._save_dir, data_dir=self._data_dir)
+        self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir, trainable=True)
         self._remote_save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
         self._remote_samples = os.path.join(self._remote_save_dir, "samples")
         self._remote_ckpt = os.path.join(self._remote_save_dir, "model_checkpoints")
@@ -40,6 +40,7 @@ class ProbcollRCcar(Probcoll):
         # Move yaml
         local_yaml = os.path.join(self._save_dir, '{0}.yaml'.format(params['exp_name']))
         remote_yaml = os.path.join(self._remote_save_dir, '{0}.yaml'.format(params['exp_name']))
+        self._ssh.exec_command("mkdir {0} -p".format(self._remote_samples))
         self._ssh.exec_command("mkdir {0} -p".format(self._remote_ckpt))
         self._logger.info("Added experiments directory remotely")
         time.sleep(0.1)
@@ -83,9 +84,9 @@ class ProbcollRCcar(Probcoll):
             samples_start_itr = itr
             
             ### if any data and haven't trained on it already, train on it
+            self.probcoll_model.recover()
             if samples_start_itr > 0: 
-                self.probcoll_model.recover()
-                self._run_training(samples_start_itr)
+                self._run_training(samples_start_itr, reset=self._reset_init)
             elif init_data_folder is not None:
                 self._run_training(samples_start_itr)
             
@@ -108,14 +109,14 @@ class ProbcollRCcar(Probcoll):
     def _run_rollout(self, itr):
         pass
 
-    def _run_training(self, itr):
+    def _run_training(self, itr, reset=False):
         if itr >= params['probcoll']['training_start_iter']:
             if params['probcoll']['is_training']:
                 # TODO maybe add different training
-                self._async_training()
+                self._async_training(reset=reset)
 
-    def _async_training(self):
-        self.probcoll_model.train()
+    def _async_training(self, reset=False):
+        self.probcoll_model.train(reset=reset)
         try:
             for f in os.listdir(self.probcoll_model.checkpoints_dir):
                 local_file = os.path.join(self.probcoll_model.checkpoints_dir, f)

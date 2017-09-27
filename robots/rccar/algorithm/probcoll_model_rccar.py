@@ -10,9 +10,20 @@ from general.algorithm.probcoll_model_replay_buffer import ProbcollModelReplayBu
 
 class ProbcollModelRCcar(ProbcollModelReplayBuffer):
 
-    def __init__(self, save_dir=None, data_dir=None, gpu_fraction=None):
-        ProbcollModelReplayBuffer.__init__(self, save_dir=save_dir, data_dir=data_dir, gpu_fraction=gpu_fraction)
+    def __init__(self, save_dir=None, data_dir=None, gpu_fraction=None, trainable=True):
+        ProbcollModelReplayBuffer.__init__(self, save_dir=save_dir, data_dir=data_dir, gpu_fraction=gpu_fraction, trainable=trainable)
         self._setup_plotter()
+
+    #######################
+    ### DATA processing ###
+    #######################
+
+    def _modify_sample(self, sample):
+        """
+        In case you want to pre-process the sample before adding it
+        :return: Sample
+        """
+        return [sample]
 
     #############
     ### train ###
