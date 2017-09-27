@@ -14,6 +14,17 @@ class ProbcollModelRCcar(ProbcollModelReplayBuffer):
         ProbcollModelReplayBuffer.__init__(self, save_dir=save_dir, data_dir=data_dir)
         self._setup_plotter()
 
+    #######################
+    ### DATA processing ###
+    #######################
+
+    def _modify_sample(self, sample):
+        """
+        In case you want to pre-process the sample before adding it
+        :return: Sample
+        """
+        return [sample]
+
     #############
     ### train ###
     #############

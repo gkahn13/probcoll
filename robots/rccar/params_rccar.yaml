@@ -3,7 +3,7 @@
 random_seed: 0
 exp_dir: '/home/adam/probcoll/experiments/rccar'
 exp_dir_car: '/home/ubuntu/probcoll/experiments/rccar'
-exp_name: 'testing'
+exp_name: 'cory_test1'
 
 ##########################
 ### Probcoll algorithm ###
@@ -11,9 +11,9 @@ exp_name: 'testing'
 
 probcoll:
   dt: 0.25
-  T: 16  # timesteps per trajectory
+  T: 120  # timesteps per trajectory
   logger: 'info' # debug/info/fatal what level to log
-  max_iter: 31
+  max_iter: 120
   label_with_noise: True # if false, saves desired controls (i.e. without control_noise)
   save_O: True
 
@@ -170,11 +170,11 @@ planning:
     control_range:
       lower: [-45.,  2.0]
       upper: [ 45.,  2.0]
-    endpoints: [[0, 1.0], [2400, 0.1], [3600, 0.01]]
+    endpoints: [[0, 1.0], [9600, 0.1], [14400, 0.01]]
     outside_value: 0.0
 
   control_noise:
-    endpoints: [[0, 1.0],  [2400, 0.1], [3600, 0.01]]
+    endpoints: [[0, 1.0],  [9600, 0.1], [14400, 0.01]]
     outside_value: 0.0
 
     type: 'gaussian' # zero / gaussian / uniform
@@ -197,14 +197,14 @@ planning:
 
 env:
   use_vel: True
-  do_back_up: False
-  max_time_step: 16
+  do_back_up: True
+  max_time_step: 120
   dt: 0.25
-  check_rollouts: True
+  check_rollouts: False
   back_up:
-    steer: [-5., 5.]
-    vel: -1.
-    duration: 3.0
+    steer: [-30., 30.]
+    vel: -2.0
+    duration: 2.0
 
 ######################################################
 ########### States, controls, observations ###########

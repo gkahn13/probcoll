@@ -21,6 +21,7 @@ from general.state_info.sample import Sample
 from general.algorithm.mlplotter import MLPlotter
 from general.algorithm.probcoll_model import ProbcollModel
 from general.algorithm.replay_buffer import SplitReplayBuffer
+from general.algorithm.replay_buffer import ReplayBuffer
 from config import params
 
 
@@ -57,23 +58,40 @@ class ProbcollModelReplayBuffer(ProbcollModel):
         self.dtype = tf_utils.str_to_dtype(params["model"]["dtype"])
         self.dropout = params["model"]["action_graph"].get("dropout", None)
         
-        self.train_replay_buffer = SplitReplayBuffer(
-            int(5e5),
-            self.T,
-            self.dU,
-            self.dO_im,
-            self.dO_vec,
-            self.doutput,
-            self.pct_coll)
+        if not hasattr(self, 'pct_coll'):
+            self.train_replay_buffer = ReplayBuffer(
+                int(5e5),
+                self.T,
+                self.dU,
+                self.dO_im,
+                self.dO_vec,
+                self.doutput)
 
-        self.val_replay_buffer = SplitReplayBuffer(
-            int(5e5),
-            self.T,
-            self.dU,
-            self.dO_im,
-            self.dO_vec,
-            self.doutput,
-            self.pct_coll)
+            self.val_replay_buffer = ReplayBuffer(
+                int(5e5),
+                self.T,
+                self.dU,
+                self.dO_im,
+                self.dO_vec,
+                self.doutput)
+        else:
+            self.train_replay_buffer = SplitReplayBuffer(
+                int(5e5),
+                self.T,
+                self.dU,
+                self.dO_im,
+                self.dO_vec,
+                self.doutput,
+                self.pct_coll)
+
+            self.val_replay_buffer = SplitReplayBuffer(
+                int(5e5),
+                self.T,
+                self.dU,
+                self.dO_im,
+                self.dO_vec,
+                self.doutput,
+                self.pct_coll)
         
         self.threads = []
         self.graph = tf.Graph()

@@ -20,7 +20,6 @@ class SplitReplayBuffer(object):
         
         cut_off_1 = int(self._size * self._partition_pct)
         self._indices = [0, 0]
-        self._next_item_indices = [0, 0]
         self._curr_sizes = [0, 0]
         self._bases = [0, cut_off_1]
         self._cut_offs = [cut_off_1, self._size - cut_off_1]
@@ -64,4 +63,51 @@ class SplitReplayBuffer(object):
         obs_vec = np.concatenate(obs_vec, axis=0)
         output = np.concatenate(output, axis=0)
         length = np.concatenate(length, axis=0)
+        return action, obs_im, obs_vec, output, length
+
+class ReplayBuffer(object):
+
+    def __init__(self, size, T, dU, dO_im, dO_vec, doutput):
+        self._size = size
+        self._T = T
+        self._act_shape = (T, dU)
+        self._obs_im_shape = (dO_im,)
+        self._obs_vec_shape = (dO_vec,)
+        self._output_shape = (T, doutput)
+
+        # Create Buffers
+        self._actions = np.ones((self._size,) + self._act_shape, dtype=np.float32) * np.nan
+        self._obs_ims = np.zeros((self._size,) + self._obs_im_shape, dtype=np.uint8)
+        self._obs_vecs = np.ones((self._size,) + self._obs_vec_shape, dtype=np.float32) * np.nan 
+        self._outputs = np.zeros((self._size,) + self._output_shape, dtype=np.uint8)
+        self._lengths = np.zeros((self._size,), dtype=np.int32)
+
+        self._index = 0
+        self._curr_size = 0
+        
+    def __len__(self):
+        return self._curr_size
+
+    def add_data_point(self, u, O_im, O_vec, output, length, partition):
+        index = self._index
+        self._actions[index] = u
+        self._obs_ims[index] = O_im
+        self._obs_vecs[index] = O_vec
+        self._outputs[index] = output
+        self._lengths[index] = length
+        if self._curr_size < self._size:
+            self._curr_size += 1
+        self._index = (self._index + 1) % self._size
+
+    def can_sample(self):
+        return self._curr_size > 0
+
+    def sample(self, batch_size):
+        indices = np.random.randint(0, self._curr_size, batch_size)
+        action = self._actions[indices]
+        obs_im = self._obs_ims[indices]
+        obs_vec = self._obs_vecs[indices]
+        output = self._outputs[indices]
+        length = self._lengths[indices]
+        assert(np.isfinite(action).all())
         return action, obs_im, obs_vec, output, length
