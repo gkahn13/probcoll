@@ -17,9 +17,10 @@ from config import params
 
 class ProbcollRCcarRemote(Probcoll):
 
-    def __init__(self, save_dir=None, data_dir=None):
+    def __init__(self, start_itr=None, save_dir=None, data_dir=None):
         if save_dir is None:
             save_dir = os.path.join(params['exp_dir_car'], params['exp_name'])
+        self._start_itr = start_itr
         Probcoll.__init__(self, save_dir=save_dir, data_dir=data_dir)
         self._start_data = os.path.join(self._save_dir, "start_data.pkl")
 
@@ -30,7 +31,7 @@ class ProbcollRCcarRemote(Probcoll):
         self._num_timesteps = params['probcoll']['num_timesteps']
         ### load prediction neural net
         if self._planner_type != 'random_policy':
-            self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir, gpu_fraction=0.4)
+            self.probcoll_model = ProbcollModelRCcar(save_dir=self._save_dir, data_dir=self._data_dir, gpu_fraction=0.3)
 
     ###################
     ### Run methods ###
@@ -46,21 +47,21 @@ class ProbcollRCcarRemote(Probcoll):
         """
         try:
             ### find last model file
-            if os.path.exists(self._start_data):
-                with open(self._start_data, 'rb') as f:
-                    start_itr = pkl.load(f)
+            if self._start_itr is not None:
+                start_itr = int(self._start_itr)
             else:
-                start_itr = 0
-            if start_itr > 0:
-                self._run_training(start_itr)
+                if os.path.exists(self._start_data):
+                    with open(self._start_data, 'rb') as f:
+                        start_itr = pkl.load(f)
+                else:
+                    start_itr = 0
+            self._run_training(start_itr)
             self._time_step = self._num_timesteps * start_itr
             ### training loop
             for itr in range(start_itr, self._max_iter):
                 with open(self._start_data, 'wb') as f:
                     pkl.dump(itr, f)
                 self._run_rollout(itr)
-                self._run_training(itr)
-                self.run_testing(itr)
                 if hasattr(self, 'probcoll_model') and not self.probcoll_model.sess.graph.finalized:
                     self.probcoll_model.sess.graph.finalize()
         finally:

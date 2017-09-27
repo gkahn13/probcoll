@@ -19,7 +19,7 @@ class ProbcollModelRCcar(ProbcollModelReplayBuffer):
     #############
 
     def train(self, reset=False, **kwargs):
-        if not self.train_replay_buffer.can_sample():
+        if not hasattr(self, 'train_replay_buffer') or not self.train_replay_buffer.can_sample():
             self._logger.debug('Training skipped due to lack of data')
         else:
             self.graph.as_default()
@@ -212,8 +212,8 @@ class ProbcollModelRCcar(ProbcollModelReplayBuffer):
                     self._logger.info("Found checkpoint file")
                     break
                 except Exception as e:
-                    self._logger.warning("Could not find checkpoint file")
-                    self._logger.warning(e)
+                    pass
+                time.sleep(0.1)
         else:
             self._logger.warning("Could not find checkpoint file")
 

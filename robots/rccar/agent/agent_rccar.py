@@ -48,7 +48,7 @@ class AgentRCcar(Agent):
                 # TODO possibly determine state before
                 x_t = self.get_state()
                 coll = self.get_coll()
-                # Record
+#                # Record
                 sample_noise.set_X(x_t, t=t)
                 sample_noise.set_O(o_t, t=t)
                 sample_noise.set_O([coll], t=t, sub_obs='collision')
@@ -76,10 +76,9 @@ class AgentRCcar(Agent):
                     need_to_collect_sample = True
                 else:
                     need_to_collect_sample = False
-                self.reset()
             else:
                 need_to_collect_sample = False
-
+        self.reset()
         return sample_noise, sample_no_noise, t 
 
     def reset(self):
